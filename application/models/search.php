@@ -27,6 +27,8 @@ class Search_Model extends Model
 	 * - weight: that defines importance of the property in system, these field
 	 *   is used for searching of results. Weight should be a non-negative
 	 *   number from interval (0, 10>
+	 * - limit_weight: that may be use for rising number of searched results
+	 *   in the simple AJAX search
 	 * - ignore_special_threatment: that defines whether weight can be changed
 	 *   if property equals to searched keyword [optional, default FALSE]
 	 * - variation_enabled: enable variations of keyword for searching this 
@@ -43,6 +45,7 @@ class Search_Model extends Model
 			'method' => 'member_name',
 			'model' => 'member',
 			'weight' => 5,
+			'limit_weight' => 2.5,
 			'variation_enabled' => TRUE,
 			'access' => array('Members_Controller', 'members')
 		),
@@ -51,6 +54,7 @@ class Search_Model extends Model
 			'method' => 'member_id',
 			'model' => 'member',
 			'weight' => 0.1,
+			'limit_weight' => 0.5,
 			'access' => array('Members_Controller', 'members')
 		),
 		array
@@ -58,6 +62,7 @@ class Search_Model extends Model
 			'method' => 'member_variable_symbol',
 			'model' => 'member',
 			'weight' => 0.1,
+			'limit_weight' => 0.5,
 			'access' => array('Members_Controller', 'members')
 		),
 		array
@@ -65,6 +70,7 @@ class Search_Model extends Model
 			'method' => 'member_comment',
 			'model' => 'member',
 			'weight' => 0.5,
+			'limit_weight' => 0.5,
 			'variation_enabled' => TRUE,
 			'access' => array('Members_Controller', 'members')
 		),
@@ -73,6 +79,7 @@ class Search_Model extends Model
 			'method' => 'member_town',
 			'model' => 'member',
 			'weight' => 0.4,
+			'limit_weight' => 1,
 			'ignore_special_threatment' => TRUE,
 			'variation_enabled' => TRUE,
 			'access' => array('Members_Controller', 'members')
@@ -82,6 +89,7 @@ class Search_Model extends Model
 			'method' => 'member_street',
 			'model' => 'member',
 			'weight' => 0.6,
+			'limit_weight' => 1,
 			'variation_enabled' => TRUE,
 			'access' => array('Members_Controller', 'members')
 		),
@@ -90,6 +98,7 @@ class Search_Model extends Model
 			'method' => 'member_street_number',
 			'model' => 'member',
 			'weight' => 0.1,
+			'limit_weight' => 1,
 			'access' => array('Members_Controller', 'members')
 		),
 		array
@@ -97,6 +106,7 @@ class Search_Model extends Model
 			'method' => 'member_organization_identifier',
 			'model' => 'member',
 			'weight' => 0.1,
+			'limit_weight' => 1,
 			'access' => array('Members_Controller', 'members')
 		),
 		array
@@ -104,6 +114,7 @@ class Search_Model extends Model
 			'method' => 'member_vat_organization_identifier',
 			'model' => 'member',
 			'weight' => 0.1,
+			'limit_weight' => 1,
 			'access' => array('Members_Controller', 'members')
 		),
 		array
@@ -111,6 +122,7 @@ class Search_Model extends Model
 			'method' => 'user_name',
 			'model' => 'user',
 			'weight' => 1,
+			'limit_weight' => 1,
 			'variation_enabled' => TRUE,
 			'access' => array('Users_Controller', 'show')
 		),
@@ -119,6 +131,7 @@ class Search_Model extends Model
 			'method' => 'user_login',
 			'model' => 'user',
 			'weight' => 0.5,
+			'limit_weight' => 1,
 			'access' => array('Members_Controller', 'members')
 		),
 		array
@@ -126,6 +139,7 @@ class Search_Model extends Model
 			'method' => 'user_contact',
 			'model' => 'user',
 			'weight' => 0.1,
+			'limit_weight' => 1,
 			'access' => array('Members_Controller', 'members')
 		),
 		array
@@ -133,6 +147,7 @@ class Search_Model extends Model
 			'method' => 'town_name',
 			'model' => 'town',
 			'weight' => 1,
+			'limit_weight' => 1,
 			'variation_enabled' => TRUE,
 			'access' => array('Address_points_Controller', 'town')
 		),
@@ -141,6 +156,7 @@ class Search_Model extends Model
 			'method' => 'device_name',
 			'model' => 'device',
 			'weight' => 1,
+			'limit_weight' => 1,
 			'variation_enabled' => TRUE,
 			'access' => array('Devices_Controller', 'devices')
 		),
@@ -149,6 +165,7 @@ class Search_Model extends Model
 			'method' => 'device_mac',
 			'model' => 'device',
 			'weight' => 0.5,
+			'limit_weight' => 1,
 			'access' => array('Devices_Controller', 'devices')
 		),
 		array
@@ -156,12 +173,14 @@ class Search_Model extends Model
 			'method' => 'device_ip_address',
 			'model' => 'device',
 			'weight' => 0.5,
+			'limit_weight' => 1,
 			'access' => array('Devices_Controller', 'devices')
 		),
 		array(
 			'method' => 'device_ssid',
 			'model' => 'device',
 			'weight' => 0.5,
+			'limit_weight' => 1,
 			'access' => array('Devices_Controller', 'devices')
 		),
 		array
@@ -169,6 +188,7 @@ class Search_Model extends Model
 			'method' => 'subnet_name',
 			'model' => 'subnet',
 			'weight' => 1,
+			'limit_weight' => 1,
 			'variation_enabled' => TRUE,
 			'access' => array('Subnets_Controller', 'subnet')
 		),
@@ -177,6 +197,7 @@ class Search_Model extends Model
 			'method' => 'subnet_address',
 			'model' => 'subnet',
 			'weight' => 1,
+			'limit_weight' => 1,
 			'access' => array('Subnets_Controller', 'subnet')
 		),
 		array
@@ -184,6 +205,7 @@ class Search_Model extends Model
 			'method' => 'link_name',
 			'model' => 'link',
 			'weight' => 1,
+			'limit_weight' => 1,
 			'variation_enabled' => TRUE,
 			'access' => array('Links_Controller', 'link')
 		),
@@ -259,17 +281,19 @@ class Search_Model extends Model
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE m.name LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
 		".$sql_limit, array
 		(
 			" (" . __('I') . ")",
+			Config::get('lang'),
 			"%$keyword%"
 		));
 	}
@@ -295,17 +319,19 @@ class Search_Model extends Model
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				LEFT JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE m.id LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
 		".$sql_limit, array
 		(
 			" (" . __('I') . ")",
+			Config::get('lang'),
 			"$keyword%"
 		));
 	}
@@ -333,18 +359,20 @@ class Search_Model extends Model
 				JOIN enum_types e ON m.type = e.id
 				LEFT JOIN accounts a ON a.member_id = m.id
 				LEFT JOIN variable_symbols vs ON vs.account_id = a.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				LEFT JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE vs.variable_symbol LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
 		".$sql_limit, array
 		(
 			__('Variable symbol') . ": ",
 			" (" . __('I') . ")",
+			Config::get('lang'),
 			"$keyword%"
 		));
 	}
@@ -370,18 +398,20 @@ class Search_Model extends Model
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				LEFT JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE m.comment LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
 		".$sql_limit, array
 		(
 			__('Comment') . ": ",
 			" (" . __('I') . ")",
+			Config::get('lang'),
 			"%$keyword%"
 		));
 	}
@@ -408,15 +438,16 @@ class Search_Model extends Model
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				LEFT JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE CONCAT(tw.town, IF(tw.quarter IS NOT NULL, CONCAT(' ', tw.quarter), '')) LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
-		".$sql_limit, " (" . __('I') . ")", "%$keyword%");
+		".$sql_limit, " (" . __('I') . ")", Config::get('lang'), "%$keyword%");
 	}
 
 	/**
@@ -441,15 +472,16 @@ class Search_Model extends Model
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE CONCAT(s.street, ' ',ap.street_number) LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
-		".$sql_limit, " (" . __('I') . ")", "%$keyword%");
+		".$sql_limit, " (" . __('I') . ")", Config::get('lang'), "%$keyword%");
 	}
 
 	/**
@@ -474,15 +506,16 @@ class Search_Model extends Model
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				LEFT JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE ap.street_number LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
-		".$sql_limit, " (" . __('I') . ")", "$keyword%");
+		".$sql_limit, " (" . __('I') . ")", Config::get('lang'), "$keyword%");
 	}
 	
 	/**
@@ -506,17 +539,19 @@ class Search_Model extends Model
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				LEFT JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE m.organization_identifier LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
 		".$sql_limit, array
 		(
 			" (" . __('I') . ")",
+			Config::get('lang'),
 			"$keyword%"
 		));
 	}
@@ -542,17 +577,19 @@ class Search_Model extends Model
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
 				LEFT JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
 				WHERE m.vat_organization_identifier LIKE ? COLLATE utf8_general_ci
+				GROUP BY m.id
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
 		".$sql_limit, array
 		(
 			" (" . __('I') . ")",
+			Config::get('lang'),
 			"$keyword%"
 		));
 	}
@@ -642,10 +679,10 @@ class Search_Model extends Model
 				LEFT JOIN users_contacts uc ON u.id = uc.user_id
 				LEFT JOIN contacts c ON uc.contact_id = c.id
 				LEFT JOIN enum_types e ON c.type = e.id
-				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = 'cs'
+				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				WHERE c.value LIKE ? COLLATE utf8_general_ci
 				ORDER BY ABS(LENGTH(c.value) - " . mb_strlen($keyword) . ")
-		".$sql_limit, __('User') . ": ", "%$keyword%");
+		".$sql_limit, __('User') . ": ", Config::get('lang'), "%$keyword%");
 	}
 
 	/**

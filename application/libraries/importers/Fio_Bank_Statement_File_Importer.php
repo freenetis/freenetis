@@ -2,19 +2,19 @@
 /*
  * This file is part of open source system FreenetIS
  * and it is released under GPLv3 licence.
- * 
+ *
  * More info about licence can be found:
  * http://www.gnu.org/licenses/gpl-3.0.html
- * 
+ *
  * More info about project can be found:
  * http://www.freenetis.org/
- * 
+ *
  */
 
 /**
  * FIO abstract importer that handles storing of transfers. Subclass add method
  * for handling different input file types and format.
- * 
+ *
  * @author Ondrej Fibich, Jiri Svitak
  * @since 1.1
  */
@@ -25,25 +25,25 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 	 * Download of new transaction will start from this transaction.
 	 * Transactions are identified by their transaction codes that are stored
 	 * in the bank transfer model.
-	 * 
+	 *
 	 * @Override
 	 */
 	protected function before_download(Bank_account_Model $bank_account,
 			Bank_Account_Settings $settings)
-	{		
+	{
 		// get last transaction ID of this bank account that is stored in database
 		$bt_model = new Bank_transfer_Model();
 		$ltc = $bt_model->get_last_transaction_code_of($bank_account->id);
-		
+
 		if (empty($ltc) || $ltc <= 0)
 		{
 			$ltc = 0; // no transaction for this account
 		}
-		
+
 		// set a start transaction for downloading of next transactions
-		$url = $settings->get_download_base_url() . 'set-last-id/' 
+		$url = $settings->get_download_base_url() . 'set-last-id/'
 				. $settings->api_token . '/' . $ltc . '/';
-		
+
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
@@ -55,19 +55,19 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 		{
 			return TRUE;
 		}
-		
+
 		// error in downloading
 		$m = __('Setting of the last downloaded transaction has failed');
 		throw new Exception($m . ' (' . $response . ')');
 	}
-	
+
 	/**
 	 * Gets parsed data.
-	 * 
+	 *
 	 * @return array Contains array of transactions
 	 */
 	protected abstract function get_parsed_transactions();
-	
+
 	/*
 	 * @Override
 	 */
@@ -76,14 +76,14 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 		$statement = new Bank_statement_Model();
 		$ba = $this->get_bank_account();
 		$user_id = $this->get_user_id();
-		
+
 		try
 		{
 			/* header */
-			
+
 			$statement->transaction_start();
 			$header = $this->get_header_data();
-			
+
 			// bank statement
 			$statement->bank_account_id = $ba->id;
 			$statement->user_id = $this->get_user_id();
@@ -93,15 +93,15 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 			$statement->opening_balance = $header->openingBalance;
 			$statement->closing_balance = $header->closingBalance;
 			$statement->save_throwable();
-			
+
 			/* transactions */
-			
+
 			// preparation of system double-entry accounts
 			$suppliers = ORM::factory('account')->get_account_by_attribute(Account_attribute_Model::SUPPLIERS);
 			$member_fees = ORM::factory('account')->get_account_by_attribute(Account_attribute_Model::MEMBER_FEES);
 			$operating = ORM::factory('account')->get_account_by_attribute(Account_attribute_Model::OPERATING);
 			$cash = ORM::factory('account')->get_account_by_attribute(Account_attribute_Model::CASH);
-			
+
 			$account = $ba->get_related_account_by_attribute_id(Account_attribute_Model::BANK);
 			$bank_interests = $ba->get_related_account_by_attribute_id(Account_attribute_Model::BANK_INTERESTS);
 
@@ -210,127 +210,83 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 					elseif ($item['typ'] == 'Vklad pokladnou')
 					{
 						$member_id = $this->find_member_by_vs($item['vs']);
-						
+
 						if (!$member_id)
 						{
-							// if VS is empty, that it is deposit (propably
-							// accountant came to bank with cash and put
-							// them on the association bank account). 
-							// Otherwise if there is a VS that wrong (because 
-							// it was not founded in DB) then assume that it 
-							// is member fee. (#851)
-							if (empty($item['vs']))
-							{
-								// deposit transfer
-								$transfer_id = Transfer_Model::insert_transfer(
-										$cash->id, $account->id, null, null,
-										$user_id, null, $datetime, $now, 
-										$item['typ'], abs($item['castka'])
-								);
-								
-								$stats['deposits'] += abs($item['castka']);
-								$stats['deposits_nr']++;
-							}
-							else // undefined member fee
-							{
-								// double-entry incoming transfer
-								$transfer_id = Transfer_Model::insert_transfer(
-										$member_fees->id, $account->id, null, 
-										null, $user_id, null, $datetime, $now,
-										$item['zprava'], abs($item['castka'])
-								);
-						
-								$stats['member_fees'] += abs($item['castka']);
-								$stats['unidentified_nr']++;
-							}
-							
-							$bt->clear();
-							$bt->set_logger(false);
-							$bt->origin_id = null;
-							$bt->destination_id = $ba->id;
-							$bt->transfer_id = $transfer_id;
-							$bt->bank_statement_id = $statement->id;
-							$bt->transaction_code = $item['id_pohybu'];
-							$bt->number = $number;
-							$bt->constant_symbol = $item['ks'];
-							$bt->variable_symbol = $item['vs'];
-							$bt->specific_symbol = $item['ss'];
-							$bt->save();
+							$stats['unidentified_nr']++;
 						}
-						else
-						{
-							// double-entry incoming transfer
-							$transfer_id = Transfer_Model::insert_transfer(
-									$member_fees->id, $account->id, null, $member_id,
-									$user_id, null, $datetime, $now, $item['zprava'],
-									abs($item['castka'])
-							);
-							// incoming bank transfer
-							$bt->clear();
-							$bt->set_logger(false);
-							$bt->origin_id = $counter_ba->id;
-							$bt->destination_id = $ba->id;
-							$bt->transfer_id = $transfer_id;
-							$bt->bank_statement_id = $statement->id;
-							$bt->transaction_code = $item['id_pohybu'];
-							$bt->number = $number;
-							$bt->constant_symbol = $item['ks'];
-							$bt->variable_symbol = $item['vs'];
-							$bt->specific_symbol = $item['ss'];
-							$bt->save();
 
-							// assign transfer? (0 - invalid id, 1 - assoc id, other are ordinary members)
-							if ($member_id && $member_id != Member_Model::ASSOCIATION)
-							{
-								$ca = ORM::factory('account')
-										->where('member_id', $member_id)
-										->find();
+                        // double-entry incoming transfer
+                        $transfer_id = Transfer_Model::insert_transfer(
+                                $member_fees->id, $account->id, null, $member_id,
+                                $user_id, null, $datetime, $now, $item['zprava'],
+                                abs($item['castka'])
+                        );
+                        // incoming bank transfer
+                        $bt->clear();
+                        $bt->set_logger(false);
+                        $bt->origin_id = $counter_ba->id;
+                        $bt->destination_id = $ba->id;
+                        $bt->transfer_id = $transfer_id;
+                        $bt->bank_statement_id = $statement->id;
+                        $bt->transaction_code = $item['id_pohybu'];
+                        $bt->number = $number;
+                        $bt->constant_symbol = $item['ks'];
+                        $bt->variable_symbol = $item['vs'];
+                        $bt->specific_symbol = $item['ss'];
+                        $bt->save();
 
-								// has credit account?
-								if ($ca->id)
-								{
-									// add affected member for notification
-									$this->add_affected_member($member_id);
-									
-									// assigning transfer
-									$a_transfer_id = Transfer_Model::insert_transfer(
-											$account->id, $ca->id, $transfer_id, $member_id,
-											$user_id, null, $datetime, $now,
-											__('Assigning of transfer'), abs($item['castka'])
-									);
+                        // assign transfer? (0 - invalid id, 1 - assoc id, other are ordinary members)
+                        if ($member_id && $member_id != Member_Model::ASSOCIATION)
+                        {
+                            $ca = ORM::factory('account')
+                                    ->where('member_id', $member_id)
+                                    ->find();
 
-									// transaction fee
-									$fee = $fee_model->get_by_date_type(
-											$datetime, 'transfer fee'
-									);
-									if ($fee && $fee->fee > 0)
-									{
-										$tf_transfer_id = Transfer_Model::insert_transfer(
-												$ca->id, $operating->id, $transfer_id,
-												$member_id, $user_id, null, $datetime,
-												$now, __('Transfer fee'), $fee->fee
-										);
-									}
-									// do not change owner if there is already
-									// one (#800)
-									if (!$counter_ba->member_id)
-									{
-										$counter_ba->member_id = $member_id;
-										$counter_ba->save_throwable();
-									}
-								}
-							}
-							// member fee stats
-							$stats['member_fees'] += abs($item['castka']);
-							$stats['member_fees_nr']++;
-						}
+                            // has credit account?
+                            if ($ca->id)
+                            {
+                                // add affected member for notification
+                                $this->add_affected_member($member_id);
+
+                                // assigning transfer
+                                $a_transfer_id = Transfer_Model::insert_transfer(
+                                        $account->id, $ca->id, $transfer_id, $member_id,
+                                        $user_id, null, $datetime, $now,
+                                        __('Assigning of transfer'), abs($item['castka'])
+                                );
+
+                                // transaction fee
+                                $fee = $fee_model->get_by_date_type(
+                                        $datetime, 'transfer fee'
+                                );
+                                if ($fee && $fee->fee > 0)
+                                {
+                                    $tf_transfer_id = Transfer_Model::insert_transfer(
+                                            $ca->id, $operating->id, $transfer_id,
+                                            $member_id, $user_id, null, $datetime,
+                                            $now, __('Transfer fee'), $fee->fee
+                                    );
+                                }
+                                // do not change owner if there is already
+                                // one (#800)
+                                if (!$counter_ba->member_id)
+                                {
+                                    $counter_ba->member_id = $member_id;
+                                    $counter_ba->save_throwable();
+                                }
+                            }
+                        }
+                        // member fee stats
+                        $stats['member_fees'] += abs($item['castka']);
+                        $stats['member_fees_nr']++;
 					}
 					// otherwise we assume that it is member fee
 					else
 					{
 						// let's identify member
 						$member_id = $this->find_member_by_vs($item['vs']);
-						
+
 						if (!$member_id)
 						{
 							$stats['unidentified_nr']++;
@@ -362,13 +318,13 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 							$ca = ORM::factory('account')
 									->where('member_id', $member_id)
 									->find();
-							
+
 							// has credit account?
 							if ($ca->id)
 							{
 								// add affected member for notification
 								$this->add_affected_member($member_id);
-								
+
 								// assigning transfer
 								$a_transfer_id = Transfer_Model::insert_transfer(
 										$account->id, $ca->id, $transfer_id, $member_id,
@@ -413,16 +369,16 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 
 			// let's check duplicities
 			$duplicities = $bt->get_transaction_code_duplicities($transaction_codes, $ba->id);
-			
+
 			if (count($duplicities) > count($transaction_codes))
 			{
 				$dm = __('Duplicate transaction codes') . ': ' . implode(', ', $duplicities);
 				throw new Duplicity_Exception($dm);
 			}
-			
+
 			// done
 			$statement->transaction_commit();
-			
+
 			// return
 			return $statement;
 		}
@@ -436,6 +392,6 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 			Log::add_exception($e);
 			$this->add_exception_error($e);
 			return NULL;
-		}		
+		}
 	}
 }

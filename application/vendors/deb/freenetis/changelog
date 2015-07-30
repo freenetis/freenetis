@@ -1,3 +1,12 @@
+freenetis (1.1.7) stable; urgency=low
+  * Fix release
+  * Fixes #895: Notification activation for members filtered by stored query
+  * Fixes #913: Fulltext search weights fix for important results
+  * Fixes #917: Count of IP addresses in IP grid
+  * Fixes #918: Monitoring activation for filtered devices
+  * Closes #953: Support for deposit payment by cash removed from FIO importer
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 29 Jan 2015 17:27:11 +0100
+
 freenetis (1.1.6) stable; urgency=hight
   * Fix release
   * Fixes #894: Member name length limitation extended
@@ -14,7 +23,7 @@ freenetis (1.1.5) stable; urgency=hight
 
 freenetis (1.1.4) stable; urgency=hight
   * Fix release
-  * Fixes #880: Fixes filter initialization due to forgotten JS debug 
+  * Fixes #880: Fixes filter initialization due to forgotten JS debug
   * Fixes #881: Filter initialization if field has no class
  -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 11 Feb 2014 15:12:02 +0100
 

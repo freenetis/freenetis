@@ -363,24 +363,35 @@ class Filter_form
 		
 		$query = Input::instance()->get('query');
 		
-		// load query from database
-		if ($query && is_numeric($query) && isset($this->queries[$query]))
+		// load query from database (because of #895 can be from different URL)
+		if ($query && is_numeric($query))
 		{
-			$data = json_decode($this->queries[$query]->values, TRUE);
-				
-			$on = @$data["on"];
-			$types = @$data["types"];
-			$operations = @$data["opers"];
-			$values = @$data["values"];
-			$tables = @$data["tables"];
+			$loaded_query = new Filter_query_Model($query);
 			
-			$this->loaded_from_saved_query = TRUE;
+			if ($loaded_query && $loaded_query->id) {
+				
+				$data = json_decode($loaded_query->values, TRUE);
+
+				$on = @$data["on"];
+				$types = @$data["types"];
+				$operations = @$data["opers"];
+				$values = @$data["values"];
+				$tables = @$data["tables"];
+
+				$this->loaded_from_saved_query = TRUE;
+				
+			}
+			else
+			{
+				$on = $types = $operations = $values = $tables = NULL;
+				status::warning('Invalid saved query');
+			}
 			
 			$this->first_load = FALSE;
 		}
 		// load query from URL
 		else
-		{	
+		{
 			$on = Input::instance()->get('on');
 			$types = Input::instance()->get('types');
 			$operations = Input::instance()->get('opers');
@@ -401,11 +412,11 @@ class Filter_form
 		{
 			$data = json_decode($this->queries[$this->default_query_id]->values, TRUE);
 
-			$on = $data["on"];
-			$types = $data["types"];
-			$operations = $data["opers"];
-			$values = $data["values"];
-			$tables = $data["tables"];
+			$on = @$data["on"];
+			$types = @$data["types"];
+			$operations = @$data["opers"];
+			$values = @$data["values"];
+			$tables = @$data["tables"];
 			
 			$this->can_add = FALSE;
 			$this->loaded_from_saved_query = TRUE;

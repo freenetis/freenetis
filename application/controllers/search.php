@@ -95,8 +95,6 @@ class Search_Controller extends Controller
 		// each rule should get oportunity to be searched (reserved limits)
 		$result_limit = !empty($limit) ? ceil($limit / count($search_rules)) : NULL;
 		
-		$total_count = 0;
-		
 		// foreach all search rules
 		foreach ($search_rules as $rule)
 		{
@@ -131,7 +129,8 @@ class Search_Controller extends Controller
 					$total_counts[$rule['model']] = 1;
 				}
 
-				$result = $search_model->{$rule['method']}($key, $result_limit);
+				$method_result_limit = ceil($result_limit * $rule['limit_weight']);
+				$result = $search_model->{$rule['method']}($key, $method_result_limit);
 
 				foreach ($result as $row)
 				{
@@ -191,19 +190,12 @@ class Search_Controller extends Controller
 					// add rating about the current result
 					$sums[$rule['model']][$row->id] += $percent * $weight;
 					$counts[$rule['model']][$row->id]++;
-					
-					$total_count++;
-					
-					// end if we have already enought results
-					if (!empty($limit) && $total_count >= $limit)
-					{
-						break 3;
-					}
 				}
 			}
 		}
 
 		$result_sums = array();
+		$this->results = array();
 
 		// transforms to 1-dimensional array
 		foreach ($sums as $model => $model_sums)

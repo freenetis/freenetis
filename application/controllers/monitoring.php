@@ -139,10 +139,8 @@ class Monitoring_Controller extends Controller
 		
 		$filter_form->add('device_name');
 		
-		$filter_form->add('member_id')
-			->type('select')
-			->label('Member')
-			->values(ORM::factory('member')->select_list('id', 'name'));
+		$filter_form->add('member_name')
+			->callback('json/member_name');
 		
 		$filter_form->add('state')
 			->type('select')
@@ -153,20 +151,12 @@ class Monitoring_Controller extends Controller
 			));
 		
 		$filter_form->add('town')
-			->type('select')
-			->values(
-				array_unique(
-					ORM::factory('town')->select_list('town', 'town')
-				)
-			);
+			->type('combo')
+			->callback('json/town_name');
 		
 		$filter_form->add('street')
-			->type('select')
-			->values(
-				array_unique(
-					ORM::factory('street')->select_list('street', 'street')
-				)
-			);
+			->type('combo')
+			->callback('json/street_name');
 		
 		$filter_form->add('type')
 			->type('select')
@@ -517,22 +507,20 @@ class Monitoring_Controller extends Controller
 		if (!$action)
 		{
 			$action_options = array();
+			$do_id = isset($device) ? $device->user->member_id : NULL;
 			
 			// access control
-			if ($this->acl_check_new('Monitoring_Controller', 'monitoring',
-				$device->user->member_id))
+			if ($this->acl_check_new('Monitoring_Controller', 'monitoring', $do_id))
 			{
 				$action_options['add'] = __('Add');
 			}
 			
-			if ($this->acl_check_edit('Monitoring_Controller', 'monitoring',
-				$device->user->member_id))
+			if ($this->acl_check_edit('Monitoring_Controller', 'monitoring', $do_id))
 			{
 				$action_options['edit'] = __('Edit');
 			}
 			
-			if ($this->acl_check_delete('Monitoring_Controller', 'monitoring',
-				$device->user->member_id))
+			if ($this->acl_check_delete('Monitoring_Controller', 'monitoring', $do_id))
 			{
 				$action_options['delete'] = __('Delete');
 			}

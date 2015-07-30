@@ -184,6 +184,7 @@ class Ip_address_Model extends ORM
 				LEFT JOIN members_whitelists mw ON mw.member_id = m.id AND
 					mw.since <= CURDATE() AND mw.until >= CURDATE()
 				WHERE ip.member_id IS NULL
+				GROUP BY ip.id
 			) ip
 			$where
 		")->current()->total;

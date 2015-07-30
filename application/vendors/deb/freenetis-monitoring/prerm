@@ -1,0 +1,12 @@
+#!/bin/sh
+# FreenetIS DEB: actions before uninstalling of package
+
+NAME=freenetis-monitoring
+CONFIGFILE=/etc/freenetis/freenetis-monitoring.conf
+
+# stop daemon
+/etc/init.d/$NAME stop
+
+#DEBHELPER#
+
+exit 0

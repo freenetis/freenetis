@@ -1,0 +1,112 @@
+body
+{
+    margin: 0px;
+    padding: 0px;
+    font-family: Arial;
+    font-size: 12px;
+    text-align: center;
+}
+
+h2
+{
+    font-size: 40px;
+    margin: 25px;
+}
+
+a
+{
+    border: 0px solid black;
+    text-decoration: none;
+}
+.subnet
+{
+    border: 1px solid black;
+    float:left;
+}
+
+#c-box-all
+{
+    width: 1960px;
+    float: left;
+}
+
+#d-box-all
+{
+    width: 1960px;
+    height: 30px;
+}
+
+.c-box
+{
+    border-left: 0px;
+    border-top: 0px;
+    border-right: 0px;
+    border-bottom: 0px;
+    border-color: black;
+    border-style: solid;
+    float:left;
+    height: 30px;
+    width: 30px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.d-box
+{
+    border-left: 0px;
+    border-top: 0px;
+    border-right: 0px;
+    border-bottom: 0px;
+    border-color: black;
+    border-style: solid;
+    float:left;
+    height: 30px;
+    width: 30px;
+    font-weight: bold;
+    text-align: center;
+}
+.unused-box
+{
+    border-left: 0px;
+    border-top: 0px;
+    border-right: 0px;
+    border-bottom: 0px;
+    border-color: #c0c0c0;
+    border-style: solid;
+    float:left;
+    height: 30px;
+    width: 7.5px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.used-box
+{
+    border-left: 0px;
+    border-top: 0px;
+    border-right: 0px;
+    border-bottom: 0px;
+    border-color: black;
+    border-style: solid;
+    float:left;
+    height: 30px;
+    width: 7.5px;
+    font-weight: bold;
+    text-align: center;
+    overflow: hidden;
+    color: white;
+}
+
+.subnet-name
+{
+    vertical-align: middle;
+    margin-top: 5px;
+}
+
+#footer
+{
+    height: 20px;
+    width: 100%;
+    border: 1px solid black;
+    float: left;
+}

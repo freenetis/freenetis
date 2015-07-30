@@ -1,0 +1,39 @@
+Template: freenetis/server_type
+Type: select
+Choices: localhost, other
+Default: other
+Description: Server:
+ Type of server (localhost or other with its own domain name)
+Description-cs.UTF-8: Server:
+ Typ serveru (localhost nebo jiný s vlastním doménovým jménem)
+
+Template: freenetis/servername
+Type: string
+Default: 
+Description: Server Name:
+ Server Name (with path) on which the FreenetIS will be hosted (without prefix www.).
+Description-cs.UTF-8: Jméno serveru:
+ Jméno serveru (společně s cestou) na kterém bude FreenetIS nainstalován (bez předpony www.).
+
+Template: freenetis/protocol
+Type: select
+Choices: http, https
+Default: http
+Description: Protocol:
+ Protocol for accessing of FreenetIS.
+Description-cs.UTF-8: Protokol:
+ Protokol pro přístup k FreenetISu.
+
+Template: freenetis/https_add_redir
+Type: boolean
+Default: false
+Description: Automatically redirect from HTTP to HTTPS:
+ Generates redirection from HTTP version of FreenetIS to HTTPS version.
+Description-cs.UTF-8: Automaticky přesměrovávej z HTTP na HTTPS:
+ Generuje přesměrování z HTTP verze .FreenetISu na HTTPS verzi.
+
+Template: freenetis/hack_reload
+Type: boolean
+Default: true
+Description: Hack:
+ Hack for propper working of loading package.

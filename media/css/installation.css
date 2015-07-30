@@ -1,0 +1,242 @@
+/* CSS Document */
+* {
+	margin:0px;
+	padding:0px;
+	border:0px;
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	color:#464646;
+}
+
+code  {
+	font-family: Monospace;
+}
+
+html {
+	font-size: 12px;
+}
+
+body {
+	text-align:center;
+	color:#5B5B5B;
+	background-color: white;
+}
+
+span {
+	color: #808080;
+}
+
+span.current  {
+	color: black;
+}
+
+ol, ul  {
+	padding: 5px 5px 5px 22px;
+}
+
+.green {
+	color: green;
+}
+
+.red  {
+	color: red;
+}
+
+#main {
+	position:relative;
+	text-align:left;
+	width:780px;
+	margin:55px auto 20px auto;
+}
+
+#main h1 {
+	background:url(../images/layout/logo_freenetis2.jpg);
+	width:229px;
+	height:49px;
+	/*margin: 25px;*/
+}
+
+#main h1 a {
+	width: 100%;
+	height: 100%;
+	display: block;
+	text-decoration: none;
+}
+
+#main h1 em {
+	font-style: normal;
+	color: #f15900;
+}
+
+#main h1 span {
+	visibility:hidden;
+}
+
+#main h2 {
+	margin-bottom: 25px;
+	font-size:150%;
+}
+
+#main #main-padd {
+	padding:0px;
+	border:1px #CCCCCC solid;
+	position:relative;
+	margin:0px;
+	clear: both;
+}
+
+#main #main-padd #left{
+	float: left;
+	width: 200px;
+}
+
+#main #main-padd #content{
+	float: left;
+	margin: 30px;
+}
+
+#main #main-padd #content p  {
+	line-height: 18px;
+	margin-bottom: 20px;
+}
+
+#main #main-padd #content ol, ul  {
+	margin-bottom: 20px;
+}
+
+#main #main-padd #content ol li, #main #main-padd #content ul li  {
+	line-height: 18px;
+}
+
+.clear {
+	clear:both;
+}
+
+#requirements td  {
+	width: 280px;
+
+}
+
+input, select  {
+	font-size: 15px;
+	padding: 2px;
+	line-height: 20px;
+	border: 1px solid #CCC;
+}
+
+input[type="radio"] {
+	margin-right: 5px;
+}
+
+#form  {
+	width: 100%;
+}
+
+table.form  {
+	border: 0px solid black;
+	width: 700px;
+}
+
+table.form th  {
+	padding: 16px 10px 10px;
+	font-weight: bold;
+	font-size: 13px;
+	width: 110px;
+	vertical-align: top;
+	border-bottom: 1px solid white;
+}
+
+table.form td  {
+	border-bottom: 1px solid white;
+	padding: 0px 10px;
+}
+
+table.form tr  {
+	background-color: #F1F1F1;
+}
+
+.submit, #submit  {
+	cursor: pointer;
+	margin: 30px 0px;
+	padding: 6px 12px;
+	font-weight: bold;
+	background-color: white;
+	border: 1px solid #CCC;
+	border-radius: 15px;
+	-moz-border-radius: 15px;
+}
+
+textarea  {
+	border: 1px solid black;
+	font-family: Monospace;
+	margin-bottom: 20px;
+}
+
+textarea.comment_ta {
+	height: 150px;
+	font-size: 15px;
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	padding: 2px;
+	line-height: 20px;
+	border: 1px solid #CCC;
+}
+
+div.flags  {
+	text-align:right;
+	float:right;
+}
+
+th.group  {
+	text-align: center;
+	background-color: white;
+}
+
+p.error  {
+	color: red;
+}
+
+#lock {
+	float:left;
+	width:120px;
+	height:120px;
+	background: url(../images/layout/lock.png) top left no-repeat;
+	margin: 40px 0 0 20px;
+}
+
+div#login_div  {
+	float: right;
+}
+
+p.registration  {
+	float: right;
+	margin-top: 25px;
+	margin-right: 5px;
+	font-size: 95%;
+}
+
+div#error {
+	background: url(../images/icons/status/warning.png) left top no-repeat;
+	padding:5px 5px 5px 40px;
+	margin:5px 0 5px 0;
+}
+
+div#error strong {
+	color:#CC0000;
+}
+
+.warning {
+	color: red;
+}
+
+.error {
+	color:#CC0000;
+}
+
+label.error  {
+	display: block;
+}
+
+.status_icon {
+	vertical-align: middle;
+	padding-right: .5em;
+	padding-bottom: .5em;
+}

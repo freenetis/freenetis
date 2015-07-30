@@ -1,0 +1,11 @@
+#!/bin/sh
+# FreenetIS-redirection DEB: actions before uninstalling of package
+
+NAME=freenetis-redirection
+
+# stop daemon
+/etc/init.d/$NAME stop
+
+#DEBHELPER#
+
+exit 0

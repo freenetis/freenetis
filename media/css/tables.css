@@ -1,0 +1,58 @@
+/* CSS Document */
+
+/* ------------------------ */
+/* --------- MAIN --------- */
+/* ------------------------ */
+
+table.main {
+	font-size:90%;
+	border:1px #CCCCCC solid;
+	border-right:none;
+	text-align:left;
+}
+.main th, .main td {
+	border:1px #CCCCCC solid;
+	border-left:none;
+	border-bottom:none;
+}
+.main th {
+	background:#F1F1F1 url(../images/layout/bg-gray.gif) top left repeat-x;
+	border-top:none;
+	text-align:center;
+	color:#990000;
+	padding:10px;
+}
+.main td {
+	padding:5px;
+}
+.main tr.even {
+	background-color:#f1f1f1;
+}
+/* -------#end MAIN-------- */
+/* ------------------------ */
+
+/* ------------------------ */
+/* ------- EXTENDED ------- */
+/* ------------------------ */
+
+table.extended {
+	font-size:90%;
+	border:1px #CCCCCC solid;
+	border-bottom:none;
+	text-align:left;
+}
+.extended th, .extended td {
+	border-bottom:1px #CCCCCC solid;
+	padding:5px;
+}
+.extended th, .extended .th  {
+	background:#F1F1F1;
+	text-align:left;
+	color:#990000;
+	font-weight:bold;
+}
+.extended td, .extended .th {
+	border-left:1px #CCCCCC solid;
+}
+/* -----#end EXTENDED------ */
+/* ------------------------ */

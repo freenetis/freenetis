@@ -1,0 +1,29 @@
+Template: freenetis-redirection/path_freenetis
+Type: string
+Default: http://localhost/freenetis
+Description: FreenetIS URL:
+ Base path to running FreenetIS instance (e.g. http://freenet.org/is)
+Description-cs.UTF-8: FreenetIS URL:
+ Cesta ke kořenu běžící instalace FreenetISu (např. http://freenet.org/is)
+
+Template: freenetis-redirection/input_interface
+Type: string
+Default: eth0
+Description: Input interface:
+ Input interface on which redirection rules are applicated on.
+Description-cs.UTF-8: Vstupní rozhraní:
+ Vstupní rozhraní, na které jsou aplikována pravidla přesměrování a QoS download.
+
+Template: freenetis-redirection/self_cancel_target_ip
+Type: string
+Default: 
+Description: Self cancel IP:
+ IP address which is use for self-canceling of the redirection directly by a redirected member.
+Description-cs.UTF-8: IP adresa samozrušení
+ IP adresa, která je použita pro samozrušení přesměrování přesměrovaným členem.
+
+Template: freenetis-redirection/hack_reload
+Type: boolean
+Default: true
+Description: Hack:
+ Hack for propper working of loading package.

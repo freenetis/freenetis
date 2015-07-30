@@ -1,0 +1,22 @@
+RewriteEngine On
+RewriteBase /
+
+# Protect application and system files from being viewed.
+RewriteCond $1 ^(application|system)
+# Rewrite to index.php/access_denied/URL
+RewriteRule ^(.*)$ access_denied/$1 [PT,L]
+
+# URL containing these strings will not be rewrited.
+RewriteCond $1 ^(index\.php|robots\.txt|favicon\.ico|media|redirection)
+RewriteRule ^(.*)$ - [PT,L]
+
+# Force EVERY URL to contain a language in its first segment.
+# Redirect URLs without a language to the invalid xx language.
+RewriteCond $2 !^([a-z]{2}(/|$)) [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(index\.php/?)?(.*)$ en/$2 [R=301,L]
+
+# Silently prepend index.php to EVERY URL.
+RewriteCond $1 !^(index\.php)
+RewriteRule ^(.*)$ index.php/$1 [L]

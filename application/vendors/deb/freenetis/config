@@ -1,0 +1,43 @@
+#!/bin/sh
+
+set -e
+. /usr/share/debconf/confmodule
+
+CONFIGFILE=/etc/freenetis/freenetis.conf
+
+# Load config file, if it exists.
+if [ -e $CONFIGFILE ]; then
+	db_get freenetis/hack_reload
+	if [ "$RET" = true ]; then
+		. $CONFIGFILE || true
+		db_set freenetis/servername "$SERVERNAME"
+		db_set freenetis/protocol "$PROTOCOL"
+	fi
+fi
+
+# h@ck for not reloading variables from config file (enabled again by postinst)
+db_set freenetis/hack_reload false
+
+# Ask questions.
+db_input critical freenetis/server_type || true
+db_go || true
+
+db_get freenetis/server_type
+if [ "$RET" = localhost ]; then
+	db_set freenetis/servername "localhost/freenetis"
+	db_set freenetis/protocol "http"
+else
+	db_input critical freenetis/servername || true
+	db_input critical freenetis/protocol || true
+fi
+
+db_go || true
+
+db_get freenetis/protocol
+if [ "$RET" = https ]; then
+	db_input critical freenetis/https_add_redir || true
+else
+	db_set freenetis/https_add_redir false
+fi
+
+db_go || true

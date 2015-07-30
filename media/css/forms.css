@@ -1,0 +1,104 @@
+/* CSS Document */
+
+/* ------------------------ */
+/* -------- FORMS --------- */
+/* ------------------------ */
+
+table.form {
+	font-size:90%;
+	width:730px;
+	/*width:450px;*/
+}
+.popup table.form
+{
+	width: auto ! important;
+}
+.form th {
+	background-color:#F1F1F1;
+	width:200px;
+	padding:5px 0 5px 5px;
+	text-align:left;
+}
+.form th.group {
+	margin-top:20px;
+	background:#ebebeb;
+	text-align:center;
+	color:#990000;
+	border:1px #CCCCCC solid;
+	width:auto;
+}
+input, .submit, select, textarea {
+	border:1px #CCCCCC solid;
+	vertical-align:middle;
+	font-size: 100%;
+}
+
+input {
+	width:194px;
+	padding:2px;
+}
+textarea {
+	width:330px;
+	padding:2px;
+}
+
+option {
+	padding:1px 2px 1px 2px;
+}
+
+textarea {
+	height:50px;
+	overflow:auto;
+}
+.submit {
+	width:100px;
+	margin-top:0px;
+	background-color:#ffffff;
+	font-weight:bold;
+	padding:0px;
+	cursor: pointer;
+}
+
+.dropdown {
+	padding:2px;
+}
+
+.button_big {
+	padding: 5px;
+	font-weight: bold;
+	cursor: pointer;
+	border: 1px solid #AAA;
+}
+
+.form .submit {
+	width:100px;
+	margin-top:10px;
+	background-color:#ffffff;
+	font-weight:bold;
+	padding:2px;
+}
+
+.required {
+    background: url(../images/icons/required.gif) top right no-repeat;
+}
+
+.label_required {
+	color: #990000;
+}
+
+.label_required label {
+	color: #990000;
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: #FFA500;
+    background-color: #FAFAD2;
+}
+
+.checkbox, .radio {
+	width:auto;
+	margin:5px 0 5px 0;
+}
+/* ------#end FORMS-------- */
+/* ------------------------ */
+

@@ -1,0 +1,114 @@
+/*
+	Mobile device style
+*/
+
+#main { 
+	background-image: none;
+	width: auto;
+}
+
+#middle { 
+	font-size: 120%;
+	-webkit-text-size-adjust: 100%;
+}
+
+#header, #content, #footer {
+	width: 100%;
+}
+
+#menu {
+	background-color: #fff;
+	position: absolute;
+	width: 100%;
+	z-index: 100;
+	display: none;
+}
+
+#content.dispNone {
+	display: none;
+}
+
+#cellphone_hide_menu {
+	width: 50px;
+	position: absolute;
+	height: 100%;
+	right: 0;
+	background: #ff5c00 url('../../media/images/menu/hide_menu.png') no-repeat center 10px;
+	cursor: pointer;
+}
+
+#cellphone_show_menu {
+	top: 24px;
+	left: 18px;
+	background: #FF5C00 url('../../media/images/layout/logo_freenetis.jpg') no-repeat -1px 0px;
+	position: absolute;
+	width: 48px;
+	height: 48px;
+	cursor: pointer;
+}
+
+h1#logo {
+	display: none;
+}
+
+#header .separator1 {
+	left: 75px;
+}
+
+#header .status {
+	left: 87px;
+}
+
+#header .logout {
+	top: 64px;
+}
+
+#menu-padd {
+	width: 240px;
+}
+
+table.form {
+	width: auto ! important;
+}
+
+table.extended {
+	float: none ! important;
+	margin-left: 0 ! important;
+}
+
+#loading-overlay {
+	left: 0;
+	top: 95px;
+}
+
+.status div#user_ip_address {
+	display: inline-block;
+	width: 90px;
+	overflow: hidden;
+	font-weight: normal;
+}
+
+input, textarea {
+	margin: 0 ! important;
+	max-width: 100px ! important;
+}
+
+textarea {
+	width: 100% ! important;
+	max-width: 100% ! important;
+	padding: 0;
+	margin: 0;
+	-moz-box-sizing: border-box;
+	-webkit-box-sizing: border-box;
+	box-sizing: border-box;
+}
+
+select {
+	margin: 0 ! important;
+	max-width: 100px ! important;
+}
+
+.search input#keyword {
+	max-width: 210px ! important;
+	width: 210px;
+}

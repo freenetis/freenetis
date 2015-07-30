@@ -1,0 +1,88 @@
+#!/bin/bash
+# FreenetIS-ssh-keys DEB: actions after installing of package
+
+set -e
+. /usr/share/debconf/confmodule
+
+NAME=freenetis-ssh-keys
+CONFIGFILE=/etc/freenetis/freenetis-ssh-keys.conf
+
+# Quit if config file is missing.
+if [ ! -e $CONFIGFILE ]; then
+	echo "$CONFIGFILE not founded!"
+	exit 1
+fi
+
+. $CONFIGFILE
+
+url_regex='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
+
+# Substitute in the values from the debconf db.
+# There are obvious optimizations possible here.
+# The cp before the sed ensures we do not mess up
+# the config file’s ownership and permissions.
+
+db_get freenetis-ssh-keys/path_freenetis
+PATH_FN="$RET" 
+
+db_get freenetis-ssh-keys/device_id
+DEVICE_ID="$RET"
+
+# check path
+if [ -z "$PATH_FN" ]; then
+	echo "Empty path to FreenetIS instance, configuration failed!"
+	exit 3
+fi
+
+# check path format
+if [[ ! "$PATH_FN" =~ $url_regex ]]; then
+	echo "Wrong format of the path to FreenetIS instance, configuration failed!"
+	exit 3
+fi
+
+# check device ID
+if [[ ! "$DEVICE_ID" =~ ^[0-9]+$ ]] || [ $DEVICE_ID -lt 1 ]; then
+	echo "Wrong configuration (ID not set properly), configuration failed!" 1>&2
+	exit 1
+fi
+
+cp -a -f $CONFIGFILE $CONFIGFILE.tmp
+
+# If the admin deleted or commented some variables but then set
+# them via debconf, (re-)add them to the conffile.
+
+test -z "$PATH_FN" || grep -Eq '^ *PATH_FN=' $CONFIGFILE || echo "PATH_FN=" >> $CONFIGFILE
+test -z "$DEVICE_ID" || grep -Eq '^ *DEVICE_ID=' $CONFIGFILE || echo "DEVICE_ID=" >> $CONFIGFILE
+
+PATH_FN_ESCAPED="${PATH_FN//\//\\/}"
+DEVICE_ID_ESCAPED="${DEVICE_ID//\//\\/}"
+
+sed -e "s/^ *PATH_FN=.*/PATH_FN=\"$PATH_FN_ESCAPED\"/" \
+	-e "s/^ *DEVICE_ID=.*/DEVICE_ID=\"$DEVICE_ID_ESCAPED\"/" < $CONFIGFILE > $CONFIGFILE.tmp
+
+mv -f $CONFIGFILE.tmp $CONFIGFILE
+
+# Make post install things
+
+# 1) Rights
+
+# set rights
+chmod u+x /usr/sbin/freenetis-ssh-keys-sync
+
+# 2) CRON
+
+echo "Preparing CRON"
+
+echo "# /etc/cron.d/freenetis-ssh-keys: Regular CRON file for freenetis-ssh-keys package (triggered each minute)" > /etc/cron.d/freenetis-ssh-keys
+echo "" >> /etc/cron.d/freenetis-ssh-keys
+echo "SHELL=/bin/sh" >> /etc/cron.d/freenetis-ssh-keys
+echo "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin" >> /etc/cron.d/freenetis-ssh-keys
+echo "* *     * * *   root    /usr/sbin/freenetis-ssh-keys-sync 1>>\"$LOG_FILE\"" >> /etc/cron.d/freenetis-ssh-keys
+
+if [ -x /usr/sbin/invoke-rc.d ]; then
+	invoke-rc.d cron restart 3>/dev/null || true
+else
+	/etc/init.d/cron restart 3>/dev/null || true
+fi
+
+exit 0

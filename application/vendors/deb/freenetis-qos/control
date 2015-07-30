@@ -1,0 +1,13 @@
+Priority: optional
+Section: web
+Pre-Depends: debconf (>= 0.5) | debconf-2.0
+Depends: coreutils, ipset, wget, procps, iptables
+Suggests: freenetis
+Architecture: all
+Maintainer: Ondrej Fibich <ondrej.fibich@gmail.com>
+Homepage: http://www.freenetis.org
+Description: FreenetIS QoS - QoS tool for FreenetIS
+ The tool is capable of:
+  * enforcing of download and upload rate of members (max and guaranteed)
+  * set priority of services (dedicated services may be set)
+ Data that are required are fetched dynamically from FreenetIS using wget.

@@ -1,0 +1,21 @@
+#!/bin/sh
+# FreenetIS-ssh-keys DEB: actions before uninstalling of package
+
+set -e
+
+CONFIGFILE=/etc/freenetis/freenetis-ssh-keys.conf
+
+# remove all configuration if purge
+if [ "$1" = purge ]; then
+	# remove defconf values
+	if [ -e /usr/share/debconf/confmodule ]; then
+		. /usr/share/debconf/confmodule
+		db_purge
+	fi
+	# remove config files
+	rm -rf $CONFIGFILE
+	# remove dir if empty
+	[ "$(ls -A /etc/freenetis)" ] || rm -rf /etc/freenetis
+fi
+
+exit 0

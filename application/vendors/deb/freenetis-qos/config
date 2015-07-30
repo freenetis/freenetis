@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -e
+. /usr/share/debconf/confmodule
+
+CONFIGFILE=/etc/freenetis/freenetis-qos.conf
+
+# Load config file, if it exists.
+if [ -e $CONFIGFILE ]; then
+	db_get freenetis-qos/hack_reload
+	if [ "$RET" = true ]; then
+		. $CONFIGFILE || true
+		db_set freenetis-qos/path_freenetis "$PATH_FN"
+		db_set freenetis-qos/input_interface "$INPUT_INTERFACE"
+		db_set freenetis-qos/output_interface "$OUTPUT_INTERFACE"
+	fi
+fi
+
+# h@ck for not reloading variables from config file (enabled again by postinst)
+db_set freenetis-qos/hack_reload false
+
+# Ask questions.
+db_input critical freenetis-qos/path_freenetis || true
+db_input critical freenetis-qos/input_interface || true
+db_input critical freenetis-qos/output_interface || true
+db_go || true

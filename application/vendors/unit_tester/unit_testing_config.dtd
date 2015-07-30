@@ -1,0 +1,66 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!--
+    DTD for unit testiong config XML file
+
+	@author Ondřej Fibich
+	@version 1.0
+-->
+
+<!--
+    An example how to use this DTD from your XML document:
+
+    <?xml version="1.0"?>
+
+    <!DOCTYPE unit_test SYSTEM "unit_testing_config.dtd">
+
+    <unit_test>
+    ...
+    </unit_test>
+-->
+
+<!--- Unit test can contain helpers, models and controllers. -->
+<!ELEMENT unit_test (helper|model|controller)*>
+
+<!--- Controller has attribute name and children methods. -->
+<!ELEMENT controller (method)*>
+<!ATTLIST controller
+    name CDATA #REQUIRED
+  >
+
+<!ELEMENT method (attributes,values)>
+<!ATTLIST method
+    autogenerate (on|off) #IMPLIED
+    name CDATA #REQUIRED
+  >
+
+<!ELEMENT attributes (attribute)*>
+
+<!ELEMENT values (input)*>
+
+<!ELEMENT input (param)*>
+
+<!ELEMENT attribute EMPTY>
+<!ATTLIST attribute
+    default_value CDATA #REQUIRED
+    name CDATA #REQUIRED
+  >
+
+<!ELEMENT param EMPTY>
+<!ATTLIST param
+    value CDATA #REQUIRED
+    type (post|get) #IMPLIED
+    name CDATA #IMPLIED
+  >
+
+<!--- Model has attribute name and children methods. -->
+<!ELEMENT model (method)*>
+<!ATTLIST model
+    name CDATA #REQUIRED
+  >
+
+<!--- Helper has attribute name and children methods. -->
+<!ELEMENT helper (method)*>
+<!ATTLIST helper
+    name CDATA #REQUIRED
+  >

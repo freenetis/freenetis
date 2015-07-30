@@ -1,0 +1,338 @@
+/* CSS Document */
+* {
+	margin:0px;
+	padding:0px;
+	border:0px;
+	font-family: Arial, Verdana, Helvetica, sans-serif;
+	color: #464646;
+}
+body, img, a {
+	
+}
+
+a  {
+    text-decoration: none;
+}
+
+html {
+	font-size:80%;
+	height:100%;
+	overflow: auto;
+}
+body {
+	text-align:center;
+	height:100%;
+}
+table, input, textarea {
+	font-size:100%;
+}
+
+table {
+	border-width: 0px 0px 0px 0px;
+	border-spacing: 0px;
+}
+table th {
+	border-width: 0px 0px 0px 0px;
+	padding: 0px 0px 0px 0px;
+}
+table td {
+	border-width: 0px 0px 0px 0px;
+	padding: 0px 0px 0px 0px;
+}
+
+table.picturebox {
+
+	border-width: 0px 0px 0px 0px;
+	border-spacing: 0px;
+	border-style: outset outset outset outset;
+	border-collapse: separate;
+    width: 100%;
+}
+
+table.picturebox td {
+	border-width: 0px 0px 0px 0px;
+	padding: 0px 0px 0px 0px;
+	border-style: inset inset inset inset;
+	width: 100%;
+    color:#990000;
+}
+
+.error {
+	color:#CC0000;
+}
+.dispNone {
+	display:none;
+}
+.clear {
+	clear:both;
+}
+.center { text-align:center; }
+.left { text-align:left; }
+.right { text-align:right; }
+.justify { text-align:justify; }
+.bold { font-weight:bold; }
+
+.ajax-loader {
+	position:absolute;
+	margin-left:10px;
+	margin-top:2px;
+}
+/* ------------------------ */
+/* -------- LAYOUT -------- */
+/* ------------------------ */
+#main {
+	position:relative;
+	width:1000px;
+	margin:auto;
+	background:#ffffff url(../images/layout/bg-main250.jpg) left top repeat-y;
+	
+	
+	height:auto;
+	_height:100%; /* IE 6- */
+	min-height:100%;
+}
+
+#header {
+        display: none;
+	position:relative;
+	height:90px;
+	background: url(../images/layout/bg_header.png) repeat-x;
+	border-bottom:1px #CCCCCC solid;
+}
+#middle {
+	padding-bottom:50px;
+}
+
+#menu {
+        display: none;
+	float:left;
+	display:inline;
+	width:250px;
+	text-align:left;
+}
+#menu-padd {
+	padding:10px;
+        display: none;
+}
+
+#content {
+	width:1000px;
+	float:left;
+	display:inline;
+	text-align:justify;
+}
+
+.grid_button {
+        display: none;
+
+}
+
+#content-padd {
+	padding:10px;
+}
+
+.table_form  {
+        display: none;
+}
+
+#footer {
+	position:absolute;
+	height:35px;
+	bottom:0px;
+	left:0px;
+	background: url(../images/layout/bg_footer.jpg) top repeat-x;
+	border-top:1px #CCCCCC solid;
+	width:1000px;	
+}
+#footer-padd {
+	padding-top:10px;
+}
+
+/* -----#end LAYOUT-------- */
+/* ------------------------ */
+
+/* ------------------------ */
+/* ------- BOXES ------ */
+/* ------------------------ */
+#header .separator1 {
+	background:url(../images/layout/header_separator.jpg);
+	width:3px;
+	height:77px;
+	position:absolute;
+	left:248px;
+	top:11px;
+}
+#header .map {
+	position:absolute;
+	top:11px;
+	right:110px;
+	background:url(../images/layout/header_map.jpg) no-repeat;
+	width:332px;
+	height:77px;
+}
+#header .status {
+	position:absolute;
+	left:260px;
+	top:20px;
+	text-align:left;
+}
+.status table {
+	margin-top:5px;
+}
+#header .logout {
+	position:absolute;
+	right:0;
+	top:43px;
+	width:110px;
+}
+#header .logout span {
+	background:url(../images/layout/ico_logout.png) right 0px no-repeat;
+	padding-right:22px;
+}
+#header .logout a {
+	color:#FF833D;
+}
+#header .logout a:hover {
+	text-decoration:none;
+}
+
+.pagination {
+        display: none;
+	padding:10px 0 0px 0;
+}
+.pagination strong {
+	border:1px #FF833D solid;
+	padding:0 5px 0 5px;
+}
+
+#record_per_page  {
+        display: none;
+}
+
+.noprint  {
+        display: none;
+}
+
+.message {
+	border:1px #FF833D solid;
+	background:#F7F7F7;
+	font-weight:bold;
+	text-align:center;
+	margin:10px 0 10px 0;
+	padding:10px 0 10px 0;
+}
+/* -----#end BOXES-------- */
+/* ------------------------ */
+
+#statesbox
+{
+	width: 500px;
+    margin-left: 140px;
+    margin-top: 60px;
+}
+
+#statesbox div
+{
+	text-align: center;
+	background:#F7F7F7;
+	padding: 0px;
+	border:3px #666666 solid;
+	width: 450px;
+    height: 140px;
+}
+
+
+/* -------------------------------- */
+/* ------- HEADLINES & Texts ------ */
+/* -------------------------------- */
+h1 {
+	position:absolute;
+	top:24px;
+	left:18px;
+	background:url(../images/layout/logo_freenetis.jpg);
+	width:212px;
+	height:49px;
+}
+h1 span {
+	visibility:hidden;
+}
+h2 {
+	padding-bottom:5px;
+	font-size:150%;
+}
+h3 {
+	padding-bottom:5px;
+}
+.status span {
+	background: url(../images/layout/ico_user.gif) no-repeat;
+	padding-left:20px;
+	color:#B3B3B3;
+}
+.status .orange {
+	color:#FF833D;
+}
+a:hover {
+	color: #EC7A04;
+	text-decoration:none;
+}
+/* ----#end HEADLINES------ */
+/* ------------------------ */
+
+/* CSS Document */
+
+/* ------------------------ */
+/* --------- MAIN --------- */
+/* ------------------------ */
+
+table.main {
+	font-size:95%;
+	border:1px #CCCCCC solid;
+	border-right:none;
+	text-align:left;
+}
+.main th, .main td {
+	border:1px #CCCCCC solid;
+	border-left:none;
+	border-bottom:none;
+}
+.main th {
+	background:#F1F1F1 url(../images/layout/bg-gray.gif) top left repeat-x;
+	border-top:none;
+	text-align:center;
+	color:#990000;
+	padding:10px;
+}
+.main td {
+	padding:5px;
+}
+.main tr.even {
+	background-color:#f1f1f1;
+}
+/* -------#end MAIN-------- */
+/* ------------------------ */
+
+/* ------------------------ */
+/* ------- EXTENDED ------- */
+/* ------------------------ */
+
+table.extended {
+	font-size:95%;
+	border:1px #CCCCCC solid;
+	border-bottom:none;
+	text-align:left;
+}
+.extended th, .extended td {
+	border-bottom:1px #CCCCCC solid;
+	padding:5px;
+}
+.extended th, .extended .th  {
+	background:#F1F1F1;
+	text-align:left;
+	color:#990000;
+	font-weight:bold;
+}
+.extended td, .extended .th {
+	border-left:1px #CCCCCC solid;
+}
+/* -----#end EXTENDED------ */
+/* ------------------------ */

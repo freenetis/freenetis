@@ -1,0 +1,21 @@
+#!/bin/sh
+
+set -e
+. /usr/share/debconf/confmodule
+
+CONFIGFILE=/etc/freenetis/freenetis-monitoring.conf
+CONFIGFILE_FN=/etc/freenetis/freenetis.conf
+
+# pre-fill if not pre-filled already
+db_get freenetis-monitoring/hack_reload
+if [ "$RET" = true ] && [ -e $CONFIGFILE ]; then
+	. $CONFIGFILE || true
+	db_set freenetis-monitoring/path_freenetis "$PATH_FN"
+fi
+
+# h@ck for not reloading variables from config file (enabled again by postinst)
+db_set freenetis-monitoring/hack_reload false
+
+# Ask questions.
+db_input critical freenetis-monitoring/path_freenetis || true
+db_go || true

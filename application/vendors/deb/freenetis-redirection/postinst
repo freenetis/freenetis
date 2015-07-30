@@ -1,0 +1,104 @@
+#!/bin/bash
+# FreenetIS-redirection DEB: actions after installing of package
+
+set -e
+. /usr/share/debconf/confmodule
+
+NAME=freenetis-redirection
+CONFIGFILE=/etc/freenetis/freenetis-redirection.conf
+
+# Quit if config file is missing.
+if [ ! -e $CONFIGFILE ]; then
+	echo "$CONFIGFILE not founded!"
+	exit 1
+fi
+
+. $CONFIGFILE
+
+ip_regex='^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$'
+url_regex='(https?|ftp|file)://[-A-Za-z0-9\+&@#/%?=~_|!:,.;]*[-A-Za-z0-9\+&@#/%=~_|]'
+
+# Substitute in the values from the debconf db.
+# There are obvious optimizations possible here.
+# The cp before the sed ensures we do not mess up
+# the config file’s ownership and permissions.
+
+db_get freenetis-redirection/path_freenetis
+PATH_FN="$RET"
+
+db_get freenetis-redirection/input_interface
+INPUT_INTERFACE="$RET"
+
+db_get freenetis-redirection/self_cancel_target_ip
+IP_TARGET="$RET"
+
+# check path
+if [ -z "$PATH_FN" ]; then
+	echo "Empty path to FreenetIS instance, configuration failed!"
+	exit 3
+fi
+
+# check path format
+if [[ ! "$PATH_FN" =~ $url_regex ]]; then
+	echo "Wrong format of the path to FreenetIS instance, configuration failed!"
+	exit 3
+fi
+
+# check input iface
+if [ -z "$INPUT_INTERFACE" ]; then
+	echo "Empty input interface, configuration failed!"
+	exit 3
+fi
+
+# check IP target
+if [ -z "$IP_TARGET" ]; then
+	echo "Empty target IP for self-canceling, configuration failed!"
+	exit 3
+fi
+
+# check IP target format
+if [[ ! "$IP_TARGET" =~ $ip_regex ]]; then
+	echo "Wrong format of the target IP for self-canceling, configuration failed!"
+	exit 3
+fi
+
+# check port
+if [ -z "$PORT_REDIRECT" ]; then
+	echo "Empty port redirect, configuration failed!"
+	exit 3
+fi
+
+cp -a -f $CONFIGFILE $CONFIGFILE.tmp
+
+# If the admin deleted or commented some variables but then set
+# them via debconf, (re-)add them to the conffile.
+
+test -z "$PATH_FN" || grep -Eq '^ *PATH_FN=' $CONFIGFILE || echo "PATH_FN=" >> $CONFIGFILE
+test -z "$INPUT_INTERFACE" || grep -Eq '^ *INPUT_INTERFACE=' $CONFIGFILE || echo "INPUT_INTERFACE=" >> $CONFIGFILE
+test -z "$IP_TARGET" || grep -Eq '^ *IP_TARGET=' $CONFIGFILE || echo "IP_TARGET=" >> $CONFIGFILE
+
+PATH_FN_ESCAPED="${PATH_FN//\//\\/}"
+INPUT_INTERFACE_ESCAPED="${INPUT_INTERFACE//\//\\/}"
+IP_TARGET_ESCAPED="${IP_TARGET//\//\\/}"
+
+sed -e "s/^ *PATH_FN=.*/PATH_FN=\"$PATH_FN_ESCAPED\"/" \
+	-e "s/^ *INPUT_INTERFACE=.*/INPUT_INTERFACE=\"$INPUT_INTERFACE_ESCAPED\"/" \
+	-e "s/^ *IP_TARGET=.*/IP_TARGET=\"$IP_TARGET_ESCAPED\"/" < $CONFIGFILE > $CONFIGFILE.tmp
+
+mv -f $CONFIGFILE.tmp $CONFIGFILE
+
+# Make post install things
+
+# 1) Rights
+
+# set rights
+chmod u+x /etc/init.d/${NAME}
+chmod u+x /usr/sbin/freenetis-redirection-sync
+chmod u+x /usr/sbin/freenetis-http-302-redirection.py
+
+# 2) Startup at boot
+
+# set on fire after boot 
+update-rc.d ${NAME} defaults
+
+exit 0

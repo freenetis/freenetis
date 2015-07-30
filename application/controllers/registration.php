@@ -380,6 +380,12 @@ class Registration_Controller extends Controller
 						$account->name = $form_data['membername'];
 					$account->save_throwable();
 
+					// save allowed subnets count of member
+					$allowed_subnets_count = new Allowed_subnets_count_Model();
+					$allowed_subnets_count->member_id = $member->id;
+					$allowed_subnets_count->count = Settings::get('allowed_subnets_default_count');
+					$allowed_subnets_count->save_throwable();
+
 					// access rights of expectant for membership (wannabe - aro group 23)
 					$groups_aro_map = new Groups_aro_map_Model();
 					$groups_aro_map->aro_id = $user->id;

@@ -451,10 +451,19 @@ class Fees_Controller extends Controller
 		
 		$arr_from = date_parse_from_format(DateTime::ISO8601, $this->input->post('from'));
 		$arr_to = date_parse_from_format(DateTime::ISO8601, $this->input->post('to'));
-		
+
 		$date_from = date::round_month($arr_from['day'], $arr_from['month'], $arr_from['year']);
-		$date_to = date::round_month($arr_to['day'], $arr_to['month'], $arr_to['year']);
-		
+
+        // handle 9999-12-31 (#956)
+        if ($arr_to['year'] == 9999 && $arr_to['month'] == 12 && $arr_to['day'] == 31)
+        {
+            $date_to = '9999-12-31';
+        }
+        else
+        {
+            $date_to = date::round_month($arr_to['day'], $arr_to['month'], $arr_to['year']);
+        }
+
 		$diff = date::diff_month($date_to, $date_from);
 		
 		if ($diff < 0)

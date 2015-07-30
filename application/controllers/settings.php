@@ -1899,6 +1899,12 @@ class Settings_Controller extends Controller
 			
 			if (Settings::get('allowed_subnets_enabled'))
 			{
+				$this->form->input('allowed_subnets_default_count')
+						->label('Default allowed subnets count')
+						->help(help::hint('allowed_subnets_default_count'))
+						->rules('required_with_zero|valid_digit')
+						->value(Settings::get('allowed_subnets_default_count'));
+
 				$this->form->input('allowed_subnets_update_interval')
 						->label('Interval of update')
 						->help(help::hint('allowed_subnets_update_interval'))

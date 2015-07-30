@@ -72,7 +72,7 @@ class Transfers_Controller extends Controller
 			$order_by = 'id';
 		
 		if (strtolower($order_by_direction) != 'desc')
-			$order_by_direction = 'desc';
+			$order_by_direction = 'asc';
 		
 		// there are two groups of transfers
 		$arr_groups[Transfer_Model::OUTER_TRANSFERS] = __('Outer transfers');

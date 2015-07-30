@@ -15,7 +15,7 @@ if (Settings::get('works_enabled') && $user_data->id <> Member_Model::ASSOCIATIO
 	$links[] = html::anchor('works/show_by_user/'.$user_data->id,__('Show works'));
 	$links[] = html::anchor('work_reports/show_by_user/'.$user_data->id,__('Show work reports'));
 }
-if ($user_data->id <> Member_Model::ASSOCIATION &&  $this->acl_check_view('Requests_Controller', 'request', $user_data->member_id))
+if ($user_data->id <> Member_Model::ASSOCIATION && Settings::get('approval_enabled') && $this->acl_check_view('Requests_Controller', 'request', $user_data->member_id))
 {
 	$links[] = html::anchor('requests/show_by_user/'.$user_data->id,__('Show requests'));
 }

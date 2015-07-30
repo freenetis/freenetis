@@ -744,6 +744,7 @@ $lang = array
 	'deduction of device repayments' => 'Stržení splátek zařízení',
 	'deduction of entrance fees' => 'Stržení vstupních příspěvků',
 	'default' => 'Výchozí',
+	'default allowed subnets count' => 'Výchozí počet povolených podsítí',
 	'default approval template' => 'Výchozí hlasovací šablona',
 	'default approval template for "proposals to association"' => 'Výchozí hlasovací šablona pro "návrhy na sdružení"',
 	'default approval template for "support requests"' => 'Výchozí hlasovací šablona pro "požadavky na podporu"',

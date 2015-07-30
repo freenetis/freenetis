@@ -732,6 +732,17 @@ class Form_Input
 	}
 
 	/**
+	 * Validate required that works for zero number.
+	 */
+	protected function rule_required_with_zero()
+	{
+		if ($this->value == FALSE && $this->value !== '0')
+		{
+			$this->errors['required'] = TRUE;
+		}
+	}
+
+	/**
 	 * Validate length.
 	 */
 	protected function rule_length($min, $max = NULL)

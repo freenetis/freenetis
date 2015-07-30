@@ -40,3 +40,35 @@ freenetis (1.0.0~rc7) unstable; urgency=low
 freenetis (1.0.0~rc13) unstable; urgency=low
   * Restrict local installation (#289)
  -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 21 Aug 2012 08:37:46 +0200
+
+freenetis (1.0.0) stable; hight
+  * Official release 1.0.0
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 23 Aug 2012 10:37:46 +0200
+
+freenetis (1.0.1) stable; hight
+  * Fix release (#296, #298, #299, #305, #309, #310)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 28 Aug 2012 09:28:44 +0200
+
+freenetis (1.0.2) stable; hight
+  * Fix release (#336, #334, #331, #329, #325, #324, #321, #320, #297)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Sat, 15 Sep 2012 09:01:17 +0200
+
+freenetis (1.0.3) stable; hight
+  * Fix release (#363, #355, #358, #362, #361)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 18 Sep 2012 19:33:24 +0200
+
+freenetis (1.0.4) stable; hight
+  * Fix release (#366, #367, #373, #374, #376, #377, #378, #380, #383, #384)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 27 Sep 2012 21:24:48 +0200
+
+freenetis (1.0.5) stable; hight
+  * Fix release (#254, #294, #396, #399, #402, #409, #410)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Wed, 31 Oct 2012 00:35:25 +0100
+
+freenetis (1.0.6) stable; hight
+  * Fix release (#358, #443)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 03 Jan 2013 17:41:28 +0100
+
+freenetis (1.0.7) stable; hight
+  * Fix release (#416, #436, #445, #452)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Wed, 16 Jan 2013 19:09:56 +0100

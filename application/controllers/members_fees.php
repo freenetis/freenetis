@@ -154,6 +154,17 @@ class Members_fees_Controller extends Controller
 				date('Y-m-d'), 'regular member fee'
 		);
 		
+		// default fee is set
+		if ($default_fee && $default_fee->fee)
+		{
+			$default_fee = $default_fee->fee;
+		}
+		// default fee is not set
+		else
+		{
+			$default_fee = NULL;
+		}
+		
 		// breadcrumbs
 		$breadcrumbs = breadcrumbs::add()
 				->link('members/show_all', 'Members',
@@ -176,7 +187,7 @@ class Members_fees_Controller extends Controller
 		$view->content->member = $member;
 		$view->content->fee_types = $arr_fee_types;
 		$view->content->members_fees_grids = $members_fees_grids;
-		$view->content->default_fee = $default_fee->fee;
+		$view->content->default_fee = $default_fee;
 		$view->render(TRUE);
 	}
 

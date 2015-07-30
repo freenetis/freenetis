@@ -1205,9 +1205,6 @@ class Settings_Controller extends Controller
 			// set logs checkbox value to db
 			Settings::set('action_logs_active', $action_logs_active);
 			
-			//$config_model->update_variable('ulogd_enabled', $ulogd_enabled);
-			Settings::set('ulogd_enabled', $ulogd_enabled);
-			
 			Settings::set('syslog_ng_mysql_api_enabled', $syslog_ng_mysql_api_enabled);
 
 			$issaved = true;
@@ -1217,7 +1214,16 @@ class Settings_Controller extends Controller
 			{
 				try
 				{
+					// create table
 					Log_Model::create_table();
+					// create partition fo today (fixes #363)
+					try
+					{
+						ORM::factory('log')->add_partition();
+					}
+					catch (Exception $ignore)
+					{ // ignore errors (partition already exists)
+					}
 				}
 				catch (Exception $e)
 				{
@@ -1234,6 +1240,7 @@ class Settings_Controller extends Controller
 				{
 					Members_traffic_Model::create_tables(TRUE);
 					Ulog2_ct_Model::create_functions();
+					Settings::set('ulogd_enabled', 1);
 				}
 				catch (Exception $e)
 				{
@@ -1246,6 +1253,7 @@ class Settings_Controller extends Controller
 			else
 			{
 				Ulog2_ct_Model::destroy_functions();
+				Settings::set('ulogd_enabled', 0);
 			}
 			
 			foreach ($form_data as $name => $value)

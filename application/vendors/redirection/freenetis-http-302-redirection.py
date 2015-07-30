@@ -3,7 +3,7 @@
 #
 # Script for redirecting with HTTP 302 code for FreenetIS redirection
 #
-# version: 0.1.1
+# version: 0.1.2
 # author:  Ondrej Fibich <ondrej.fibich@gmail.com>
 #
 ################################################################################
@@ -181,7 +181,7 @@ try:
 	connections.open()
 except socket.error, msg:
 	connections.close()
-	print >> sys.stderr, "Cannot create/bind socket, error (" + msg[0] + "): " + msg[1]
+	print >> sys.stderr, "Cannot create/bind socket, error (" + str(msg[0]) + "): " + str(msg[1])
 	sys.exit(4)
 
 # set signal handlers

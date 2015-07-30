@@ -345,7 +345,7 @@ class Ip_addresses_Controller extends Controller
 				) + ORM::factory('iface')->select_list_grouped_by_device($device->id);
 				
 				$title = __('Add new IP address to device').' '.$device->name;
-				$link_back_url = 'devices/show/'.$device->id;
+				$linkback = 'devices/show/'.$device->id;
 			}
 			else
 			{			
@@ -368,7 +368,7 @@ class Ip_addresses_Controller extends Controller
 				);
 				
 				$title = __('Add new IP address to interface').' '.strval($iface);
-				$link_back_url = 'ifaces/show/'.$device->id;
+				$linkback = 'ifaces/show/'.$iface->id;
 			}
 
 		}
@@ -385,7 +385,7 @@ class Ip_addresses_Controller extends Controller
 			) + ORM::factory('iface')->select_list_grouped_by_device();
 
 			$title = __('Add new IP address');
-			$link_back_url = 'ip_addresses/show_all';
+			$linkback = 'ip_addresses/show_all';
 		}
 
 		$this->form = new Forge();
@@ -431,29 +431,61 @@ class Ip_addresses_Controller extends Controller
 		{
 			$form_data = $this->form->as_array();
 
-			$ip = new Ip_address_Model();
+			$ip_address = new Ip_address_Model();
 			
-			$ip->delete_ip_address_with_member($form_data['ip_address']);
+			// gets number of maximum of acceptable repeating of operation
+			// after reaching of deadlock and time of waiting between
+			// other attempt to make transaction (#254)
+			$transaction_attempt_counter = 0;
+			$max_attempts = max(1, abs(Settings::get('db_trans_deadlock_repeats_count')));
+			$timeout = abs(Settings::get('db_trans_deadlock_repeats_timeout'));
 
-			$ip->iface_id = $form_data['iface_id'];
-			$ip->ip_address = $form_data['ip_address'];
-			$ip->subnet_id = $form_data['subnet_id'];
-			$ip->gateway = $form_data['gateway'];
-			$ip->service = $form_data['service'];
-			$ip->whitelisted = Ip_address_Model::NO_WHITELIST;
-			$ip->member_id = NULL;
-			
-			unset($form_data);
-			
-			if ($ip->save())
+			// try to delete
+			while (TRUE)
 			{
-				status::success('IP address is successfully saved.');
-				Allowed_subnets_Controller::update_enabled(
-						$ip->iface->device->user->member->id, array($ip->subnet_id)
-				);
-			}
+				try // try to make DB transction
+				{
+					$ip_address->transaction_start();
+					$ip_address->delete_ip_address_with_member($form_data['ip_address']);
+					$ip_address->iface_id = $form_data['iface_id'];
+					$ip_address->ip_address = $form_data['ip_address'];
+					$ip_address->subnet_id = $form_data['subnet_id'];
+					$ip_address->gateway = $form_data['gateway'];
+					$ip_address->service = $form_data['service'];
+					$ip_address->whitelisted = Ip_address_Model::NO_WHITELIST;
+					$ip_address->member_id = NULL;
+					$ip_address->save_throwable();
+					$ip_address->transaction_commit();
 			
-			$this->redirect($link_back_url);
+					try
+					{
+						Allowed_subnets_Controller::update_enabled(
+										$ip_address->iface->device->user->member->id, array($ip_address->subnet_id)
+						);
+					}
+					catch (Exception $e)
+					{
+						status::warning('Error - cannot update allowed subnets of member.');
+					}
+			
+					// redirect
+					status::success('IP address is successfully saved.');
+					$this->redirect($linkback);
+				}
+				catch (Exception $e) // failed => rollback and wait 100ms before next attempt
+				{
+					$ip_address->transaction_rollback();
+		
+					if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
+					{
+						Log::add_exception($e);
+						status::error('Error - cant add ip address.');
+						$this->redirect($linkback);
+					}
+
+					usleep($timeout);
+				}
+			}
 		}
 		
 		$view = new View('main');
@@ -544,58 +576,89 @@ class Ip_addresses_Controller extends Controller
 		{
 			$form_data = $this->form->as_array();
 			
-			try
+			// gets number of maximum of acceptable repeating of operation
+			// after reaching of deadlock and time of waiting between
+			// other attempt to make transaction (#254)
+			$transaction_attempt_counter = 0;
+			$max_attempts = max(1, abs(Settings::get('db_trans_deadlock_repeats_count')));
+			$timeout = abs(Settings::get('db_trans_deadlock_repeats_timeout'));
+
+			// try to delete
+			while (TRUE)
 			{
-				$ip_address->transaction_start();
-
-				$ip_address->delete_ip_address_with_member($form_data['ip_address']);
-
-				$old_subnet_id = $ip_address->subnet_id;
-
-				$ip_address->iface_id = $form_data['iface_id'];
-				$ip_address->ip_address = $form_data['ip_address'];
-				$ip_address->subnet_id = $form_data['subnet_id'];
-				$ip_address->gateway = $form_data['gateway'];
-				$ip_address->service = $form_data['service'];
-				$ip_address->whitelisted = $form_data['whitelisted'];
-				$ip_address->member_id = NULL;
-				
-				unset($form_data);
-
-				$ip_address->save_throwable();
-				
-				$ip_address->transaction_commit();
-				
-				$member_id = $device->user->member_id;
-				
-				// this block of code cannot be in database transation otherwise
-				// you will get error
-				// subnet has been changed and ip address was the only one of this member
-				// from this subnet -> deletes subnet from allowed subnets of member
-				if ($old_subnet_id != $ip_address->subnet_id &&
-					!$ip_address->count_all_ip_addresses_by_member_and_subnet(
-							$member_id, $old_subnet_id
-					))
+				try // try to make DB transction
 				{
-					Allowed_subnets_Controller::update_enabled(
-							$member_id, NULL, NULL, array($old_subnet_id)
-					);
-				}
+					$ip_address->transaction_start();
 
-				Allowed_subnets_Controller::update_enabled(
-						$member_id, array($ip_address->subnet_id)
-				);
+					$ip_address->delete_ip_address_with_member($form_data['ip_address']);
+
+					$old_subnet_id = $ip_address->subnet_id;
+
+					$ip_address->iface_id = $form_data['iface_id'];
+					$ip_address->ip_address = $form_data['ip_address'];
+					$ip_address->subnet_id = $form_data['subnet_id'];
+					$ip_address->gateway = $form_data['gateway'];
+					$ip_address->service = $form_data['service'];
+					$ip_address->whitelisted = $form_data['whitelisted'];
+					$ip_address->member_id = NULL;
+
+					$ip_address->save_throwable();
+
+					$ip_address->transaction_commit();
+
+					$member_id = $device->user->member_id;
+
+					// this block of code cannot be in database transation otherwise
+					// you will get error
+					// subnet has been changed and ip address was the only one of this member
+					// from this subnet -> deletes subnet from allowed subnets of member
+					if ($old_subnet_id != $ip_address->subnet_id &&
+						!$ip_address->count_all_ip_addresses_by_member_and_subnet(
+								$member_id, $old_subnet_id
+						))
+					{
+						try
+						{
+							Allowed_subnets_Controller::update_enabled(
+											$member_id, NULL, NULL,
+											array($old_subnet_id), TRUE
+							);
+						}
+						catch (Exception $e)
+						{
+							status::warning('Error - cannot update allowed subnets of member.');
+						}
+					}
+
+					try
+					{
+						Allowed_subnets_Controller::update_enabled(
+										$member_id, array($ip_address->subnet_id), array(),
+										array(), TRUE
+						);
+					}
+					catch (Exception $e)
+					{
+						status::warning('Error - cannot update allowed subnets of member.');
+					}
 				
-				status::success('IP address has been successfully updated.');
+					status::success('IP address has been successfully updated.');
+					$this->redirect('ip_addresses/show/'.$ip_address->id);
+				}
+				catch (Exception $e) // failed => rollback and wait 100ms before next attempt
+				{
+					$ip_address->transaction_rollback();
+
+					if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
+					{
+						Log::add_exception($e);
+						status::error('Error - Cannot update ip address.');
+						$this->redirect('ip_addresses/show/'.$ip_address->id);
+					}
+
+					usleep($timeout);
+				}
 			}
-			catch (Exception $e)
-			{
-				$ip_address->transaction_rollback();
-				Log::add_exception($e);
-				status::error('Error - Cannot update ip address.');
-			}
-			
-			$this->redirect('ip_addresses/show/'.$ip_address->id);
 		}
 		else
 		{
@@ -645,35 +708,76 @@ class Ip_addresses_Controller extends Controller
 			Controller::error(ACCESS);
 		}
 
-		// success
-		if ($ip_address->delete())
+		// link back
+		$linkback = Path::instance()->previous();
+		
+		if (url::slice(url_lang::uri($linkback), 0, 2) == 'ip_addresses/show')
 		{
+			$linkback = 'ip_addresses/show_all';
+		}
+		
+		// gets number of maximum of acceptable repeating of operation
+		// after reaching of deadlock and time of waiting between
+		// other attempt to make transaction (#254)
+		$transaction_attempt_counter = 0;
+		$max_attempts = max(1, abs(Settings::get('db_trans_deadlock_repeats_count')));
+		$timeout = abs(Settings::get('db_trans_deadlock_repeats_timeout'));
+		
+		// try to delete
+		while (TRUE)
+		{
+			try // try to make DB transction
+			{
+				$ip_address->transaction_start();
+				
+				if ($ip_address->subnet->subnets_owner->id)
+				{
+					$ip_address->member_id = $ip_address->subnet->subnets_owner->member->id;
+					$ip_address->iface_id = NULL;
+	
+					$ip_address->save_throwable();
+				}
+				else
+					$ip_address->delete_throwable();
+				
+				$ip_address->transaction_commit();
+				
 			// ip address was the only one of this member
 			// from this subnet -> deletes subnet from allowed subnets of member
 			if (!$ip_address->count_all_ip_addresses_by_member_and_subnet(
 					$member_id, $subnet_id
 				))
 			{
+					try
+					{
 				Allowed_subnets_Controller::update_enabled(
-						$member_id, NULL, NULL, array($subnet_id)
+								$member_id, NULL, NULL, array($subnet_id), TRUE
 				);
 			}
+					catch (Exception $e)
+					{
+						status::warning('Error - cannot update allowed subnets of member.');
+					}
+				}
 
+				// redirect
 			status::success('IP address has been successfully deleted.');
+				$this->redirect($linkback);
 		}
-		else
+			catch (Exception $e) // failed => rollback and wait 100ms before next attempt
 		{
-			status::error('Error - cant delete ip address.');
-		}
+				$ip_address->transaction_rollback();
 		
-		$linkback = Path::instance()->previous();
-		
-		if (url::slice(url_lang::uri($linkback),0,2) == 'ip_addresses/show')
+				if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
 		{
-			$linkback = 'ip_addresses/show_all';
+					Log::add_exception($e);
+					status::error('Error - cant delete ip address.');
+					$this->redirect($linkback);
 		}
 
-		$this->redirect($linkback);
+				usleep($timeout);
+	}
+		}
 	}
 
 	/**

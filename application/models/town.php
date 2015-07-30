@@ -48,19 +48,40 @@ class Town_Model extends ORM
 	 * Not exists - create it a return it
 	 * 
 	 * @author Michal Kliment
-	 * @param string $zip_code	zip code
+	 * @param string $zip_code	zip code (if set to FALSE, do not search by ZIP code)
 	 * @param string $town		town
 	 * @param string $quarter	quarter
 	 * @return Town_Model
 	 */
 	public function get_town($zip_code = NULL, $town = NULL, $quarter = NULL)
 	{
-		$towns = $this->where(array
-		(
-			'zip_code' => $zip_code,
-			'town'     => $town,
-			'quarter'  => $quarter
-		))->find_all();
+		if ($zip_code === FALSE) // do not search
+		{
+			$zip_code_where = '';
+		}
+		else if (empty($zip_code))
+		{
+			$zip_code_where = ' AND (zip_code IS NULL OR LENGTH(zip_code) = 0)';
+		}
+		else
+		{
+			$zip_code_where = ' AND LOWER(zip_code) = ' . $this->db->escape(strtolower($zip_code));
+		}
+		
+		if (empty($quarter))
+		{
+			$quarter_where = ' AND (quarter IS NULL OR LENGTH(quarter) = 0)';
+		}
+		else
+		{
+			$quarter_where = ' AND LOWER(quarter) = ' . $this->db->escape(strtolower($quarter));
+		}
+		
+		$towns = $this->db->query("
+			SELECT *
+			FROM towns
+			WHERE LOWER(town) = ? $zip_code_where $quarter_where
+		", strtolower($town));
 
 		if (count($towns) == 0)
 		{

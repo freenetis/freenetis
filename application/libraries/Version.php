@@ -24,7 +24,7 @@ class Version
 	/**
 	 * Regex for valitadation of versions 
 	 */
-	const VERSION_REGEX = '^(([0-9]+\.[0-9]+\.[0-9+])(~(alpha|beta|dev|rc)[0-9]*)?)$';
+	const VERSION_REGEX = '^(([0-9]+\.[0-9]+\.[0-9]+)(~(alpha|beta|dev|rc)[0-9]*)?)$';
 	
 	/**
 	 * Gets version of Freenetis code

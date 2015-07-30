@@ -537,9 +537,27 @@ class Transfer_Model extends ORM
 				SELECT SUBSTR(datetime, 1, 7) AS date, SUBSTR(datetime, 1, 4) AS year,
 					SUBSTR(datetime, 6, 2) AS month, SUM(amount) AS amount
 				FROM transfers t
-				WHERE t.origin_id = 8 AND (t.destination_id = 1 OR t.destination_id = 9)
+				WHERE t.origin_id IN (
+						SELECT id
+						FROM accounts
+						WHERE account_attribute_id = ?
+					) AND (
+						t.destination_id IN (
+							SELECT id
+							FROM accounts
+							WHERE account_attribute_id = ?
+						) OR t.destination_id IN (
+							SELECT id
+							FROM accounts
+							WHERE member_id = ? AND account_attribute_id = ?
+						)
+					)
 				GROUP BY date
-		");
+		", array
+		(
+			Account_attribute_Model::MEMBER_FEES, Account_attribute_Model::CASH,
+			Member_Model::ASSOCIATION, Account_attribute_Model::BANK
+		));
 	}
 
 	/**

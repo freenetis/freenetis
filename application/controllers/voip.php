@@ -107,8 +107,8 @@ class VoIP_Controller extends Controller
 				->label('User');
 		
 		$grid->order_link_field('member_id')
-				->link('users/show', 'mname')
-				->label('User');
+				->link('members/show', 'mname')
+				->label('Member');
 		
 		$grid->callback_field('regseconds')
 				->label('')
@@ -577,7 +577,7 @@ class VoIP_Controller extends Controller
 			$view->title = __('Change member limit');
 			$view->breadcrumbs = $breadcrumbs->html();
 			$view->content = new View('form');
-			$view->content->headline = 'VoIP' . __('Limit of member');
+			$view->content->headline = 'VoIP ' . __('Limit of member');
 			$view->content->form = $form->html();
 			$view->render(TRUE);
 		}

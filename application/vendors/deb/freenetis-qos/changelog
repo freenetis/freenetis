@@ -9,3 +9,7 @@ freenetis-qos (0.9.1) stable; urgency=low
 freenetis-qos (0.9.2) stable; urgency=low
   * Fixes in dependencies
  -- Ondrej Fibich <ondrej.fibich@gmail.com>  Mon, 13 Aug 2012 11:10:52 +0200
+
+freenetis-qos (0.9.3) stable; urgency=low
+  * Improved building of ipset on squeeze (#454)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Wed, 23 Jan 2013 14:24:32 +0100

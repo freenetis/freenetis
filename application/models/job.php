@@ -447,7 +447,8 @@ class Job_Model extends ORM
 							FROM comments c
 							LEFT JOIN users u ON c.user_id = u.id
 							ORDER BY datetime DESC
-						) AS c WHERE c.comments_thread_id = j.comments_thread_id GROUP BY c.user_id
+						) AS c WHERE c.comments_thread_id = j.comments_thread_id
+						GROUP BY c.comments_thread_id
 					) AS comments,
 					(
 						SELECT GROUP_CONCAT(comment SEPARATOR ', \n\n') FROM

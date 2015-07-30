@@ -209,11 +209,12 @@ class Acl_Model extends ORM
 		if (!$acl_id)
 			$acl_id = $this->id;
 		
+		$acl_id = intval($acl_id);
 		$sql_insert = "INSERT INTO aco_map (acl_id, value) VALUES ";
 		
 		$values = array();
 		foreach ($acos as $aco)
-			$values[] = "($acl_id, '$aco')";
+			$values[] = "($acl_id, " . $this->db->escape($aco) . ")";
 		
 		if (count($values))
 		{
@@ -235,11 +236,12 @@ class Acl_Model extends ORM
 		if (!$acl_id)
 			$acl_id = $this->id;
 		
+		$acl_id = intval($acl_id);
 		$sql_insert = "INSERT INTO aro_groups_map (acl_id, group_id) VALUES ";
 		
 		$values = array();
 		foreach ($aro_groups as $aro_group)
-			$values[] = "($acl_id, '$aro_group')";
+			$values[] = "($acl_id, " . $this->db->escape($aro_group) . ")";
 		
 		if (count($values))
 		{
@@ -261,11 +263,13 @@ class Acl_Model extends ORM
 		if (!$acl_id)
 			$acl_id = $this->id;
 		
+		$acl_id = intval($acl_id);
 		$sql_insert = "INSERT INTO axo_map (acl_id, section_value, value) VALUES ";
 		
 		$values = array();
 		foreach ($axos as $axo)
-			$values[] = "($acl_id, '".$axo['section_value']."', '".$axo['value']."')";
+			$values[] = "($acl_id, " . $this->db->escape($axo['section_value'])
+				. ", " . $this->db->escape($axo['value']) . ")";
 		
 		if (count($values))
 		{

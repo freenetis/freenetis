@@ -400,8 +400,11 @@ class Members_Controller extends Controller
 		}
 		
 		// delete user
-		$member->user->delete_depends_items($member->user->id);
-		$member->user->delete();
+		foreach ($member->users as $user)
+		{
+			$user->delete_depends_items($user->id);
+			$user->delete();
+		}
 		
 		// delete account
 		$member->delete_accounts($member->id);
@@ -421,8 +424,8 @@ class Members_Controller extends Controller
 	 * @param string $order_by_direction sorting direction
 	 */
 	public function show(
-			$member_id = NULL, $order_by = 'member_id',
-			$order_by_direction = 'ASC')
+			$member_id = NULL, $limit_results = 20, $order_by = 'ip_address',
+			$order_by_direction = 'ASC', $page_word = null, $page = 1)
 	{
 		// parameter is wrong
 		if (!$member_id || !is_numeric($member_id))
@@ -629,10 +632,7 @@ class Members_Controller extends Controller
 		(
 			'separator'		   		=> '<br /><br />',
 			'use_paginator'	   		=> false,
-			'use_selector'	   		=> false,
-			'order_by'				=> $order_by,
-			'order_by_direction'	=> $order_by_direction,
-			'variables'				=>	$member_id.'/'
+			'use_selector'	   		=> false
 		));
 
 		$voip_grid->field('id')
@@ -829,16 +829,46 @@ class Members_Controller extends Controller
 		$membership_interrupts_grid->datasource($membership_interrupts);
 
 		// activated redirections of member, including short statistic of whitelisted IP addresses
+		
 		$ip_model = new Ip_address_Model();
-		$ip_addresses = $ip_model->get_ips_and_redirections_of_member($member_id);
+			
+		$total_ips = $ip_model->count_ips_and_redirections_of_member($member_id);
+		
+		// get new selector
+		if (is_numeric($this->input->get('record_per_page')))
+			$limit_results = (int) $this->input->get('record_per_page');
+		
+		// limit check
+		if (($sql_offset = ($page - 1) * $limit_results) > $total_ips)
+			$sql_offset = 0;
+		
+		$ip_addresses = $ip_model->get_ips_and_redirections_of_member(
+				$member_id, $sql_offset, $limit_results,
+				$order_by, $order_by_direction
+		);
 		
 		$redir_grid = new Grid('members', null, array
 		(
-			'use_paginator'	   			=> false,
-			'use_selector'	   			=> false
+			'selector_increace'			=> 20,
+			'selector_min'				=> 20,
+			'selector_max_multiplier'	=> 10,
+			'current'					=> $limit_results,
+			'base_url'					=> Config::get('lang'). '/members/show/' . $member_id . '/'
+										. $limit_results.'/'.$order_by.'/'.$order_by_direction,
+			'uri_segment'				=> 'page',
+			'total_items'				=> $total_ips,
+			'items_per_page' 			=> $limit_results,
+			'style'						=> 'classic',
+			'order_by'					=> $order_by,
+			'order_by_direction'		=> $order_by_direction,
+			'limit_results'				=> $limit_results,
+			'variables'					=> $member_id . '/',
+			'url_array_ofset'			=> 1,
+			'query_string'				=> $this->input->get(),
 		));
 		
-		if ($this->acl_check_new('Messages_Controller', 'member'))
+		if ($this->acl_check_new('Messages_Controller', 'member') &&
+			$total_ips < 1000) // limited count
 		{
 			$redir_grid->add_new_button(
 					'redirect/activate_to_member/'.$member_id,
@@ -847,15 +877,15 @@ class Members_Controller extends Controller
 			);
 		}
 		
-		$redir_grid->callback_field('ip_address')
+		$redir_grid->order_callback_field('ip_address')
 				->label(__('IP address'))
 				->callback('callback::ip_address_field');
 		
-		$redir_grid->callback_field('whitelisted')
+		$redir_grid->order_callback_field('whitelisted')
 				->label(__('Whitelist').'&nbsp;'.help::hint('whitelist'))
 				->callback('callback::whitelisted_field');
 		
-		$redir_grid->callback_field('message')
+		$redir_grid->order_callback_field('message')
 				->label(__('Activated redirection').'&nbsp;'.help::hint('activated_redirection'))
 				->callback('callback::message_field');
 		
@@ -867,7 +897,7 @@ class Members_Controller extends Controller
 		{
 			$redir_grid->callback_field('redirection')
 					->label(__('Canceling of message for redirection'))
-					->callback("callback::cancel_redirection_of_member");
+					->callback('callback::cancel_redirection_of_member');
 		}
 		
 		$redir_grid->datasource($ip_addresses);
@@ -1635,7 +1665,6 @@ class Members_Controller extends Controller
 				// id of user who added member
 				$member->user_id = $this->session->get('user_id');
 				$member->comment = $form_data['comment'];
-				$member->entrance_date = date("Y-m-d",$form_data['entrance_date']);
 				
 				if ($form_data['membername'] == '')
 				{
@@ -1652,6 +1681,16 @@ class Members_Controller extends Controller
 				$member->qos_rate = $form_data['qos_rate'];
 				$member->entrance_fee = $form_data['entrance_fee'];
 				$member->debt_payment_rate = $form_data['debt_payment_rate'];
+				
+				if ($member->type == Member_Model::TYPE_APPLICANT)
+				{
+					$member->entrance_date = NULL;
+				}
+				else
+				{
+					$member->entrance_date = date("Y-m-d",$form_data['entrance_date']);
+				}
+				
 				// saving member
 				$member->save_throwable();
 				
@@ -2100,6 +2139,15 @@ class Members_Controller extends Controller
 					->options($arr_lock)
 					->selected($member->locked);
 		}
+		
+		if ($member->id != Member_Model::ASSOCIATION &&
+			$this->acl_check_edit('Members_Controller', 'registration', $member->id))
+		{
+			$form->dropdown('registration')
+					->options(arr::rbool())
+					->selected($member->registration);
+		}
+		
 		if ($this->acl_check_edit('Members_Controller', 'user_id'))
 		{
 			$form->dropdown('user_id')
@@ -2352,6 +2400,12 @@ class Members_Controller extends Controller
 			{
 				$member->locked = $form_data['locked'];
 			}
+			
+			if ($member->id != Member_Model::ASSOCIATION &&
+				$this->acl_check_edit('Members_Controller', 'registration', $member->id))
+			{
+				$member->registration = $form_data['registration'];
+			}
 
 			if ($this->acl_check_edit('Members_Controller', 'user_id'))
 				$member->user_id = $form_data['user_id'];
@@ -2361,7 +2415,12 @@ class Members_Controller extends Controller
 
 			// member data
 			if ($this->acl_check_edit(get_class($this),'entrance_date',$member->id))
-				$member->entrance_date = date("Y-m-d",$form_data['entrance_date']);
+			{
+				if ($member->type == Member_Model::TYPE_APPLICANT)
+					$member->entrance_date = NULL;
+				else
+					$member->entrance_date = date("Y-m-d",$form_data['entrance_date']);
+			}
 
 			if ($this->acl_check_edit(get_class($this),'name',$member->id))
 				$member->name = $form_data['membername'];

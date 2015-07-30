@@ -26,30 +26,39 @@
  */
 class Aro_group_Model extends ORM
 {
-	// ARO groups (must correspinds to database) =>
+	// ARO groups (must corresponds to database) =>
 	const ALL									= 21;
 	const REGULAR_MEMBERS						= 22;
 	const REGISTERED_APPLICANTS					= 23;
-	const AUDITING_COMITTEE						= 24;
-	const EXECUTIVE_COUNSIL						= 25;
-	const ENGINEERS								= 26;
-	const ADMINS								= 32;
-	const USERS									= 33;
+	const ADMINS									= 32;
 	const TELEPHONISTS							= 44;
-	const CHAIRMAN_AND_AGENT					= 28;
-	const FIRST_DEGREE_CERTIFIED_ENGINEERS		= 29;
-	const VOIP_ADMINS							= 34;
-	const SECOND_DEGREE_CERTIFIED_ENGINEERS		= 35;
-	const THIRD_DEGREE_CERTIFIED_ENGINEERS		= 36;
-	const FOURTH_DEGREE_CERTIFIED_ENGINEERS		= 37;
-	const FIFTH_DEGREE_CERTIFIED_ENGINEERS		= 38;
-	const SIXTH_DEGREE_CERTIFIED_ENGINEERS		= 39;
-	const SEVENTH_DEGREE_CERTIFIED_ENGINEERS	= 40;
-	const EIGHTH_DEGREE_CERTIFIED_ENGINEERS		= 41;
-	const NINETH_DEGREE_CERTIFIED_ENGINEERS		= 42;
-	const TENTH_DEGREE_CERTIFIED_ENGINEERS		= 43;
 	// <= ARO groups
 	
+	/**
+	 * Is given ARO group deletable?
+	 * If no ARO group given, current (this) ARO group is checked.
+	 * 
+	 * @author Ondřej Fibich
+	 * @param integer $aro_group_id [optional]
+	 * @return boolean
+	 */
+	public function is_deletable($aro_group_id = NULL)
+	{
+		if ($aro_group_id === NULL && $this)
+		{
+			$aro_group_id = $this->id;
+		}
+		
+		return (
+				$aro_group_id != self::ALL &&
+				$aro_group_id != self::REGULAR_MEMBERS &&
+				$aro_group_id != self::REGISTERED_APPLICANTS &&
+				$aro_group_id != self::ADMINS &&
+				$aro_group_id != self::TELEPHONISTS
+		);
+	}
+
+
 	/**
 	 * Cleans ARO group - deletes all ARO objects
 	 * 
@@ -315,11 +324,13 @@ class Aro_group_Model extends ORM
 		if (!$group_id)
 			$group_id = $this->id;
 		
+		$group_id = intval($group_id);
+		
 		$sql_insert = "INSERT INTO groups_aro_map (group_id, aro_id) VALUES ";
 		
 		$values = array();
 		foreach ($aros as $aro)
-			$values[] = "($group_id, $aro)";
+			$values[] = "($group_id, " . intval($aro) . ")";
 		
 		if (count($values))
 		{

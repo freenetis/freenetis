@@ -200,6 +200,8 @@ class Contacts_Controller extends Controller
 			Controller::error(RECORD);
 		}
 
+		$this->_contact_id = NULL;
+
 		$contact_model = new Contact_Model($contact_id);
 		$country_model = new Country_Model();
 
@@ -402,21 +404,9 @@ class Contacts_Controller extends Controller
 
 		if ($form->validate())
 		{
-			if ($contact_model->value != $form->value->value &&
-				$contact_model->find_contact_id(
-						$contact_model->type, $form->value->value
-				))
-			{
-				status::warning('Contact is already in database');
-			}
-			else
-			{
-				$issaved = TRUE;
-
 				$contact_model->value = $form->value->value;
-				$issaved = $issaved && $contact_model->save();
 
-				if ($issaved)
+			if ($contact_model->save())
 				{
 					status::success('Additional contacts have been successfully updated');
 				}
@@ -424,7 +414,6 @@ class Contacts_Controller extends Controller
 				{
 					status::error('Error - cant update additional contacts');
 				}
-			}
 
 			$this->redirect('contacts/show_by_user/',$user_id);
 		}
@@ -585,18 +574,19 @@ class Contacts_Controller extends Controller
 			$contact_model = new Contact_Model();
 			
 			// search for contacts
-			$contact_id = $contact_model->find_contact_id(
-					$type, trim($input->value)
-			);
+			$duplicip_contacts = $contact_model->find_contacts($type, trim($input->value));
 
-			if ($contact_id && $contact_id != $this->_contact_id)
+			foreach ($duplicip_contacts as $c)
 			{
-				$contact_model = ORM::factory('contact', $contact_id);
-				if ($contact_model->count_all_users_contacts_relation() > 0)
+				if ($c->id && ($c->id != $this->_contact_id))
 				{
+					if ($contact_model->count_all_users_contacts_relation($c->id) > 0)
+					{
 					$input->add_error('required', __('Contact is already in database'));
+						break;
 				}
 			}
 		}
 	}
+}
 }

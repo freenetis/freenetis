@@ -2,15 +2,17 @@
 <?php
 $links = array();
 
-$links[] = html::anchor('transfers/show_by_account/'.$account->id.'#transfers', __('Transfers'), array('id' => 'transfers_link'));
-
 if ($this->acl_check_view ('Members_Controller', 'comment', $account->member_id))
+{
+	$links[] = html::anchor('transfers/show_by_account/'.$account->id.'#transfers', __('Transfers'), array('id' => 'transfers_link'));
 	$links[] = html::anchor('transfers/show_by_account/'.$account->id.'#comments', __('Comments'), array('id' => 'comments_link'));
+}
 
-echo implode(' | ', $links);
-?>
+if ($links): 
+echo implode(' | ', $links); ?>
 <br />
 <br />
+<?php endif; ?>
 <table class="extended" style="float:left">
 	<tr>
 		<th><?php echo __('Account ID')?></th>

@@ -584,27 +584,57 @@ class Subnets_Controller extends Controller
 		if($form->validate())
 		{
 			$form_data = $form->as_array();
-
-			if ($subnet_model->subnets_owner->member->id != $form_data['owner_id'])
+			
+			$ip_address_model = new Ip_address_Model();
+			
+			try
 			{
-				$ip_address_model = new Ip_address_Model();
+				$subnet_model->transaction_start();
 				
-				$ip_address_model->delete_ip_addresses_by_subnet_member(
-						$subnet_id, $subnet_model->subnets_owner->member_id
-				);
-				
-				if ($form_data['owner_id'])
+				$subnet_model->name = $form_data['name'];
+				$subnet_model->network_address = $form_data['network_address'];
+				$subnet_model->netmask = $form_data['netmask'];
+				$subnet_model->OSPF_area_id = $form_data['OSPF_area_id'];
+
+				if ($this->acl_check_edit('Devices_Controller', 'redirect'))
 				{
+					$subnet_model->redirect = $form_data['redirect'];
+				}
+
+				$subnet_model->save_throwable();
+				
+				// deletes all IP addresses with owner
+				$ip_address_model->delete_ip_addresses_of_subnet_with_owner($subnet_model->id);
+				
+				// owner has been set and will be changed
+				if ($subnet_model->subnets_owner->id && $subnet_model->subnets_owner->member_id != $form_data['owner_id'])
+				{
+					$member_id = $subnet_model->subnets_owner->member->id;
+					
+					$count = $ip_address_model->count_all_ip_addresses_by_member_and_subnet(
+							$member_id, $subnet_model->id
+					);
+
+					if (!$count)
+					{
+						Allowed_subnets_Controller::update_enabled(
+								$member_id, NULL, NULL, array($subnet_model->id)
+						);
+					}
+				}
+				
+				// owner is set
+				if ($form_data['owner_id'])
+				{	
 					$subnet_model->subnets_owner->subnet_id = $subnet_model->id;
 					$subnet_model->subnets_owner->member_id = $form_data['owner_id'];
 					$subnet_model->subnets_owner->redirect = 0;
 
-					$subnet_model->subnets_owner->save();
-					
+					$subnet_model->subnets_owner->save_throwable();
+
+					// find all free IP addresses
 					$ips = $subnet_model->get_free_ip_addresses();
-					
-					$ip_address_model = new Ip_address_Model();
-		
+
 					foreach ($ips as $ip)
 					{
 						$ip_address_model->clear();
@@ -617,42 +647,25 @@ class Subnets_Controller extends Controller
 					Allowed_subnets_Controller::update_enabled(
 							$form_data['owner_id'], array($subnet_model->id)
 					);
+					
 				}
-				else
-				{
-					$subnet_model->subnets_owner->delete();
+				else if ($subnet_model->subnets_owner->id)
+				{	
+					$subnet_model->subnets_owner->delete_throwable();
 				}
 				
-				$member_id = $subnet_model->subnets_owner->member->id;
-				$count = ORM::factory('ip_address')->count_all_ip_addresses_by_member_and_subnet(
-						$member_id, $subnet_model->id
-				);
-
-				if ($subnet_model->subnets_owner->member->id && !$count)
-				{
-					Allowed_subnets_Controller::update_enabled(
-							$member_id, NULL, NULL, array($subnet_model->id)
-					);
-				}
-			}
-
-			$subnet_model->name = $form_data['name'];
-			$subnet_model->network_address = $form_data['network_address'];
-			$subnet_model->netmask = $form_data['netmask'];
-			$subnet_model->OSPF_area_id = $form_data['OSPF_area_id'];
-			
-			if ($this->acl_check_edit('Devices_Controller', 'redirect'))
-			{
-				$subnet_model->redirect = $form_data['redirect'];
-			}
-
-			if ($subnet_model->save())
-			{
+				$subnet_model->transaction_commit();
+				
 				status::success('Subnet has been successfully updated.');
 			}
-
-			$this->redirect('subnets/show/' . $subnet_id);
+			catch (Exception $e)
+			{
+				$subnet_model->transaction_rollback();
+				
+				status::error('Error - subnet has not been successfully updated.');
+			}
 			
+			$this->redirect('subnets/show/' . $subnet_id);
 		}
 		else
 		{
@@ -863,13 +876,55 @@ class Subnets_Controller extends Controller
 		
 		$netip = ip2long($input->value);
 		$mask = (int) ip2long($_POST['netmask']);
+		
+		$net_start = ip2long($input->value);
+		$net_end = $net_start + (~ip2long($netmask) & 0xffffffff) + 1;
+		
+		$ip_address_model = new Ip_address_Model();
+		
+		// try to find first IP address of subnet
+		$first_ip_address = $ip_address_model->get_first_ip_address_of_subnet(
+			$this->subnet_id, TRUE
+		);
+		
+		// first IP address exist
+		if ($first_ip_address)
+		{
+			// trasnsform to long
+			$first_ip_address = ip2long($first_ip_address->ip_address);
+
+			// first IP address is not in subnet range 
+			if ($first_ip_address < $net_start || $first_ip_address > $net_end)
+			{
+				$input->add_error('required', __(
+					'There is at least one ip address of subnet which not belong to subnet range'
+				));
+			}
+		}
+		
+		// try to find last IP address of subnet
+		$last_ip_address = $ip_address_model->get_last_ip_address_of_subnet(
+			$this->subnet_id, TRUE
+		);
+		
+		// last IP address exist
+		if ($last_ip_address)
+		{
+			// trasnsform to long
+			$last_ip_address = ip2long($last_ip_address->ip_address);
+
+			// last IP address is not in subnet range 
+			if ($last_ip_address < $net_start || $last_ip_address > $net_end)
+			{
+				$input->add_error('required', __(
+					'There is at least one ip address of subnet which not belong to subnet range'
+				));
+			}
+		}
 
 		// default network adress ranges are set
 		if (($ranges = Settings::get('address_ranges')) != '')
 		{
-			$net_start = ip2long($input->value);
-			$net_end = $net_start + (~ip2long($netmask) & 0xffffffff) + 1;
-
 			// transform string to array
 			$ranges = explode(',', $ranges);
 

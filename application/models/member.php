@@ -735,18 +735,18 @@ class Member_Model extends ORM
 		switch ($type)
 		{
 			case Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE:
-				$where = "WHERE mf.id IS NOT NULL";
+				$where = "WHERE mi.id IS NOT NULL";
 				$order_by = 'whitelisted ASC, interrupt DESC';
 				break;
 			
 			case Message_Model::DEBTOR_MESSAGE:
-				$where = "WHERE a.balance < ".intval(Settings::get('debtor_boundary'))
+				$where = "WHERE mi.id IS NULL AND a.balance < ".intval(Settings::get('debtor_boundary'))
 						." AND DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_debtor_immunity'));
 				$order_by = "whitelisted ASC, balance ASC";
 				break;
 			
 			case Message_Model::PAYMENT_NOTICE_MESSAGE:
-				$where = "WHERE a.balance < ".intval(Settings::get('payment_notice_boundary'))."
+				$where = "WHERE mi.id IS NULL AND a.balance < ".intval(Settings::get('payment_notice_boundary'))."
 				AND
 				(
 					DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_debtor_immunity'))."
@@ -768,7 +768,7 @@ class Member_Model extends ORM
 				m.*, m.id AS member_id, m.name AS member_name, 
 				a.id AS aid, a.balance, a.comments_thread_id AS a_comments_thread_id,
 				a_comment, w.whitelisted,
-				IF(mf.id IS NOT NULL, 1,0) AS interrupt,
+				IFNULL(mi.id, 0) AS interrupt,
 				1 AS redirection, 1 AS email, 1 AS sms
 			FROM
 			(
@@ -794,10 +794,14 @@ class Member_Model extends ORM
 				JOIN users u ON c.user_id = u.id
 				GROUP BY comments_thread_id
 			) c ON c.comments_thread_id = a.comments_thread_id
-			LEFT JOIN membership_interrupts mip ON mip.member_id = m.id
-			LEFT JOIN members_fees mf ON mip.members_fee_id = mf.id
-				AND mf.activation_date <= CURDATE()
-				AND mf.deactivation_date >= CURDATE()
+			LEFT JOIN
+			(
+				SELECT mi.id, mi.member_id
+				FROM membership_interrupts mi
+				JOIN members_fees mf ON mi.members_fee_id = mf.id
+					AND mf.activation_date <= CURDATE()
+					AND mf.deactivation_date >= CURDATE()
+			) mi ON mi.member_id = m.id
 			LEFT JOIN
 			(
 				SELECT *

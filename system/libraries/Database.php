@@ -87,31 +87,37 @@ class Database {
 	 */
 	public function __construct($config = array())
 	{
-		// Parse the DSN, creating an array to hold the connection parameters
-		$db = array
-		(
-			'type'     => 'mysql',
-			'user'     => FALSE,
-			'pass'     => FALSE,
-			'host'     => FALSE,
-			'port'     => FALSE,
-			'socket'   => FALSE,
-			'database' => FALSE
-		);
+		if (!is_array($config) && count($config))
+		{
+			// Parse the DSN, creating an array to hold the connection parameters
+			$db = array
+			(
+				'type'     => 'mysql',
+				'user'     => FALSE,
+				'pass'     => FALSE,
+				'host'     => FALSE,
+				'port'     => FALSE,
+				'socket'   => FALSE,
+				'database' => FALSE
+			);
 
-		// Reset the connection array to the database config
-		$this->config['connection'] = $db;
+			// Reset the connection array to the database config
+			$this->config['connection'] = $db;
 
-		if (Config::get('db_type') != '')
-			$this->config['connection']['type'] = Config::get('db_type');
+			if (Config::get('db_type') != '')
+				$this->config['connection']['type'] = Config::get('db_type');
 
-		$this->config['connection']['user'] = Config::get('db_user');
-		$this->config['connection']['pass'] = Config::get('db_password');
-		$this->config['connection']['host'] = Config::get('db_host');
-		$this->config['connection']['database'] = Config::get('db_name');
+			$this->config['connection']['user'] = Config::get('db_user');
+			$this->config['connection']['pass'] = Config::get('db_password');
+			$this->config['connection']['host'] = Config::get('db_host');
+			$this->config['connection']['database'] = Config::get('db_name');
 
-		$this->config['table_prefix'] = Config::get('db_table_prefix');
-
+			$this->config['table_prefix'] = Config::get('db_table_prefix');
+		}
+		else
+		{
+			$this->config['connection'] = $config;
+		}
 
 		// Set driver name
 		$driver = 'Database_'.ucfirst($this->config['connection']['type']).'_Driver';

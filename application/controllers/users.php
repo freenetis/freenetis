@@ -333,6 +333,10 @@ class Users_Controller extends Controller
 		if (!$user_model || !$user_model->id)
 			Controller::error(RECORD);
 		
+		// cannot delete main user (fixes #384)
+		if ($user_model->id == User_Model::ASSOCIATION)
+			Controller::warning(PARAMETER);
+		
 		$member_id = $user_model->member_id;
 		
 		// access rights

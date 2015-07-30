@@ -27,10 +27,11 @@
  * @property bool $service 	 	 
  * @property integer $whitelisted
  * @property integer $member_id
+ * @property Member_Model $member
  */
 class Ip_address_Model extends ORM
 {
-	protected $belongs_to = array('iface', 'subnet');
+	protected $belongs_to = array('iface', 'subnet', 'member');
 	
 	/**
 	 * No whitelist means, that is ip address can be redirected in any time
@@ -523,21 +524,43 @@ class Ip_address_Model extends ORM
         ", Message_Model::SELF_CANCEL_DISABLED);
     }
 
-
-
 	/**
 	 * Gets all ip addresses including their redirections.
 	 * Used in member's profile screen.
 	 * 
 	 * @author Jiri Svitak
 	 * @param integer $member_id
+	 * @param integer $sql_offset
+	 * @param integer $limit_results
+	 * @param string $order_by
+	 * @param string $order_by_direction
 	 * @return Mysql_Result
 	 */
-	public function get_ips_and_redirections_of_member($member_id)
+	public function get_ips_and_redirections_of_member(
+			$member_id, $sql_offset, $limit_results,
+			$order_by, $order_by_direction)
 	{
+		// order by
+		if (strtolower($order_by) == 'ip_address')
+		{
+			$order_by = 'inet_aton(ip.ip_address)';
+		}
+		else
+		{
+			$order_by = $this->db->escape_column($order_by);
+		}
+		
+		// order by direction
+		if (strtolower($order_by_direction) != 'asc')
+		{
+			$order_by_direction = 'desc';
+		}
+		
+		
 		return $this->db->query("
 			SELECT ip.id AS ip_address_id, ip.ip_address, ip.whitelisted,
-			m.id AS message_id, m.name AS message, m.type, ? AS member_id
+				m.id AS message_id, m.name AS message, m.type, ? AS member_id,
+				mip.datetime AS active_redir_datetime
 			FROM ip_addresses ip
 			LEFT JOIN ifaces i ON ip.iface_id = i.id
 			LEFT JOIN devices d ON i.device_id = d.id
@@ -545,9 +568,32 @@ class Ip_address_Model extends ORM
 			LEFT JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
 			LEFT JOIN messages m ON m.id = mip.message_id
 			WHERE u.member_id = ? OR ip.member_id = ?
-			ORDER BY inet_aton(ip.ip_address) ASC,
+			ORDER BY $order_by $order_by_direction,
 				m.self_cancel DESC, mip.datetime ASC
+			LIMIT " . intval($sql_offset) . ", " . intval($limit_results) . "
 		", $member_id, $member_id, $member_id);
+	}
+	
+	/**
+	 * Gets count of all ip addresses including their redirections.
+	 * Used in member's profile screen.
+	 * 
+	 * @author Ondřej Fibich
+	 * @param integer $member_id
+	 * @return integer
+	 */
+	public function count_ips_and_redirections_of_member($member_id)
+	{
+		return $this->db->query("
+			SELECT COUNT(*) AS total
+			FROM ip_addresses ip
+			LEFT JOIN ifaces i ON ip.iface_id = i.id
+			LEFT JOIN devices d ON i.device_id = d.id
+			LEFT JOIN users u ON d.user_id = u.id
+			LEFT JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
+			LEFT JOIN messages m ON m.id = mip.message_id
+			WHERE u.member_id = ? OR ip.member_id = ?
+		", $member_id, $member_id, $member_id)->current()->total;
 	}
 
 	/**
@@ -650,6 +696,20 @@ class Ip_address_Model extends ORM
 	}
 	
 	/**
+	 * Deletes all IP addresses of subnet with owner
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $subnet_id
+	 */
+	public function delete_ip_addresses_of_subnet_with_owner($subnet_id)
+	{
+		$this->db->query("
+			DELETE FROM ip_addresses
+			WHERE subnet_id = ? AND member_id IS NOT NULL
+		", $subnet_id);
+	}
+	
+	/**
 	 * Sets whitelist
 	 *
 	 * @param ineteger $whitelist
@@ -719,4 +779,47 @@ class Ip_address_Model extends ORM
 		return $arr_ip;
 	}
 	
+	/**
+	 * Returns first IP address of subnet
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $subnet_id
+	 * @return type
+	 */
+	public function get_first_ip_address_of_subnet($subnet_id, $without_owner = FALSE)
+	{
+		// not return IP addresses with owner
+		$WHERE = ($without_owner) ? "AND member_id IS NULL" : "";
+		
+		$result = $this->db->query("
+		    SELECT ip.*
+		    FROM ip_addresses ip
+		    WHERE subnet_id = ? $WHERE
+		    ORDER BY INET_ATON(ip_address)
+		", array($subnet_id));
+	    
+		return ($result && $result->current()) ? $result->current() : FALSE;
+	}
+	
+	/**
+	 * Returns last IP address of subnet
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $subnet_id
+	 * @return type
+	 */
+	public function get_last_ip_address_of_subnet($subnet_id, $without_owner = FALSE)
+	{
+		// not return IP addresses with owner
+		$WHERE = ($without_owner) ? "AND member_id IS NULL" : "";
+		
+		$result = $this->db->query("
+		    SELECT ip.*
+		    FROM ip_addresses ip
+		    WHERE subnet_id = ? $WHERE
+		    ORDER BY INET_ATON(ip_address) DESC
+		", array($subnet_id));
+	    
+		return ($result && $result->current()) ? $result->current() : FALSE;
+	}
 }

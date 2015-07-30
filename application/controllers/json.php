@@ -978,5 +978,29 @@ class Json_Controller extends Controller
 		
 		echo json_encode($arr_ifaces);
 	}
+	
+	/**
+	 * Function return address of given user
+	 * 
+	 * @author David Raska
+	 */
+	public function get_user_address()
+	{
+		$user_id = (int) $this->input->get('user_id');
+		
+		if ($user_id)
+		{
+			$um = new User_Model($user_id);
+			
+			$result = array(
+				'country_id' => $um->member->address_point->country_id,
+				'town_id' => $um->member->address_point->town_id,
+				'street_id' => $um->member->address_point->street_id,
+				'street_number' => $um->member->address_point->street_number,
+			);
+
+			echo json_encode($result);
+		}
+	}
 
 }

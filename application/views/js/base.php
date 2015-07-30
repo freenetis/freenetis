@@ -902,6 +902,27 @@ $(document).ready(function()
 		
 		reload_element('#'+select_id+'_options', "<?php echo url_lang::base().url_lang::current(0,1) ?>", limit, '#'+select_id);
 	}
+	
+	/**
+	 * Search in multiple
+	 * 
+	 * @author Ondřej Fibich
+	 */
+	function multiple_select_search(select_id, search_for)
+	{
+		// clear
+		$('#'+select_id).html('');
+		// search
+		search_for = strtolower(search_for)
+		
+		for (var i in select_multiple[select_id])
+		{
+			if (strtolower(select_multiple[select_id][i]['value']).search(search_for) != -1)
+			{
+				$('#'+select_id).append('<option value="'+select_multiple[select_id][i]['key']+'">'+select_multiple[select_id][i]['value']+'</option>');
+			}
+		}
+	}
         
 	$('select[multiple="multiple"] option').live('dblclick', function ()
 	{
@@ -949,14 +970,7 @@ $(document).ready(function()
 	$('.dropdown_button_search').live('keyup', function ()
 	{
 		var id = str_replace('_button_search', '', this.id);
-		$('#'+id).html('');
-		for (var i in select_multiple[id])
-		{
-			if (strtolower(select_multiple[id][i]['value']).search(strtolower($(this).val())) != -1)
-			{
-				$('#'+id).append('<option value="'+select_multiple[id][i]['key']+'">'+select_multiple[id][i]['value']+'</option>');
-			}
-		}
+		multiple_select_search(id, $(this).val());
 	});
 
 	$('.dropdown_button_search_clear').live('click', function()
@@ -970,6 +984,9 @@ $(document).ready(function()
 	{
 		$('form .right_dropdown').each(function ()
 		{
+			// before submit - show filtered values (fixes #367)
+			multiple_select_search(this.id, '');
+			// select all fields in right part of multiple field
 			$('#'+this.id+' option').attr('selected', true);
 		});
 	});

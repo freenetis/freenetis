@@ -103,6 +103,19 @@ if [ "$PROTOCOL" = "https" ]; then
 	a2enmod ssl > /dev/null
 fi
 
+# PHP settings
+php_settings="
+                # PHP settings
+                php_flag register_globals Off
+                php_flag magic_quotes_gpc Off
+                php_flag magic_quotes_runtime Off
+                php_flag file_uploads On
+                php_flag short_open_tag On
+                # large inputs (fixes #358, #410)
+				php_value max_input_vars 100000
+                php_admin_value suhosin.post.max_vars 100000
+				php_admin_value suhosin.request.max_vars 100000"
+
 # make config for FN
 if [ "$SERVER_TYPE" = localhost ]; then
 
@@ -111,6 +124,7 @@ if [ "$SERVER_TYPE" = localhost ]; then
 	echo "        AllowOverride All" >> $A2CF
 	echo "        Order allow,deny" >> $A2CF
 	echo "        allow from all" >> $A2CF
+	echo "        ${php_settings}" >> $A2CF
 	echo "</Directory>"	>> $A2CF
 
 else
@@ -131,6 +145,7 @@ else
 	echo "                AllowOverride All" >> $A2CF
 	echo "                Order allow,deny" >> $A2CF
 	echo "                allow from all" >> $A2CF
+	echo "                ${php_settings}" >> $A2CF
 	echo "        </Directory>"	>> $A2CF
 	echo "        ErrorLog $ERROR_LOG_FILE" >> $A2CF
 	echo "        CustomLog $CUSTOM_LOG_FILE common" >> $A2CF
@@ -192,7 +207,7 @@ echo "# /etc/cron.d/freenetis: Regular CRON file for freenetis package (triggere
 echo "" >> /etc/cron.d/freenetis
 echo "SHELL=/bin/sh" >> /etc/cron.d/freenetis
 echo "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin" >> /etc/cron.d/freenetis
-echo "* *     * * *   root    wget -O /dev/null ${PROTOCOL}://${SERVERNAME}/index.php/cs/scheduler/run --no-check-certificate" >> /etc/cron.d/freenetis
+echo "* *     * * *   root    wget -O /dev/null ${PROTOCOL}://${SERVERNAME}/index.php/cs/scheduler/run --no-check-certificate -q" >> /etc/cron.d/freenetis
 
 if [ -x /usr/sbin/invoke-rc.d ]; then
 	invoke-rc.d cron restart 3>/dev/null || true

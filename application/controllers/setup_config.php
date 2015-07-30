@@ -109,6 +109,14 @@ class Setup_config_Controller extends Controller
 								'${1}'.$suffix, $line
 						);
 					}
+					// update language after redirection (#460)
+					else if (preg_match("/ (en)\//", $line))
+					{
+						$htaccessFile[$line_num] = str_replace(
+								' en/', ' ' . Config::get('lang') . '/',
+								$htaccessFile[$line_num]
+						);
+					}
 				}
 				// root directory is writable, create .htacess
 				$handle = @fopen('.htaccess', 'w');

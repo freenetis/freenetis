@@ -80,6 +80,12 @@ class Settings
 		'allowed_subnets_update_interval'	=> 60,
 		// default count of allowed subnets
 		'allowed_subnets_default_count'		=> 1,
+		// if a deadlock came in, whole transaction may be executed again
+		// this property sets the max count of repeats of execution. (#284)
+		'db_trans_deadlock_repeats_count'	=> 4,
+		// if repeats (previous variable) are set as greater than 1, this
+		// timeout in ms defines time to next repeat of execution. (#284)
+		'db_trans_deadlock_repeats_timeout'	=> 100,
 		// default value for prefix of subject of notification
 		// e-mails to members
 		'email_subject_prefix'				=> 'FreenetIS',

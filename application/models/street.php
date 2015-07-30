@@ -41,11 +41,11 @@ class Street_Model extends ORM
 	 */
 	public function get_street($street = NULL, $town_id = NULL)
 	{
-		$streets = $this->where(array
-		(
-			'street'	=> $street,
-			'town_id'	=> $town_id
-		))->find_all();
+		$streets = $this->db->query("
+			SELECT *
+			FROM streets
+			WHERE town_id = ? AND LOWER(street) = ?
+		", $town_id, strtolower($street));
 		
 		if (count($streets) == 0)
 		{

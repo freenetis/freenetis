@@ -282,11 +282,7 @@ class Approval_types_Controller extends Controller
 
 			status::success('Approval type has been successfully added.');
 			
-			// classic adding
-			if (!$this->popup)
-			{
-				url::redirect('approval_types/show/'.$at->id);
-			}
+			$this->redirect('approval_types/show/', $at->id);
 		}
 	
 		// headline

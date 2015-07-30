@@ -293,11 +293,14 @@ class Allowed_subnets_Controller extends Controller
 	 * @author Michal Kliment
 	 * @param integer $member_id
 	 * @param string | array $to_enable
-	 * @return void
+	 * @param string | array $to_disable
+	 * @param string | array $to_remove
+	 * @param boolean $thow_ex_on_error Trow an exception if an error occure?
+	 * @return boolean State of operation.
 	 */
 	public static function update_enabled(
 			$member_id, $to_enable = array(), $to_disable = array(),
-			$to_remove = array())
+			$to_remove = array(), $thow_ex_on_error = FALSE)
 	{
 		// bad parameter
 		if (!$member_id)
@@ -319,69 +322,98 @@ class Allowed_subnets_Controller extends Controller
 		// finds all allowed subnet of member
 		$allowed_subnet_model = new Allowed_subnet_Model();
 		
-		try
+		
+		// gets number of maximum of acceptable repeating of operation
+		// after reaching of deadlock and time of waiting between
+		// other attempt to make transaction (#254)
+		$transaction_attempt_counter = 0;
+		$max_attempts = max(1, abs(Settings::get('db_trans_deadlock_repeats_count')));
+		$timeout = abs(Settings::get('db_trans_deadlock_repeats_timeout'));
+		
+		// try to delete
+		while (TRUE)
 		{
-			$allowed_subnet_model->transaction_start();
-			
-			$allowed_subnets = $allowed_subnet_model->where('member_id', $member->id)
-					->where('member_id', $member->id)
-					->orderby(array('enabled' => 'desc', 'last_update' => 'desc'))
-					->find_all();
-
-			$arr_subnets = array();
-
-			// to_enabled have the hightest priority
-			foreach ($allowed_subnets as $allowed_subnet)
+			try
 			{
-				if (in_array($allowed_subnet->subnet_id, $to_remove))
+				$allowed_subnet_model->transaction_start();
+
+				$allowed_subnets = $allowed_subnet_model->where('member_id', $member->id)
+						->where('member_id', $member->id)
+						->orderby(array('enabled' => 'desc', 'last_update' => 'desc'))
+						->find_all();
+
+				$arr_subnets = array();
+
+				// to_enabled have the hightest priority
+				foreach ($allowed_subnets as $allowed_subnet)
 				{
-					$allowed_subnet->delete();
-					continue;
+					if (in_array($allowed_subnet->subnet_id, $to_remove))
+					{
+						$allowed_subnet->delete_throwable();
+						continue;
+					}
+
+					if (!in_array($allowed_subnet->subnet_id, $to_enable) &&
+						!in_array($allowed_subnet->subnet_id, $to_disable))
+					{
+						$arr_subnets[] = $allowed_subnet->subnet_id;
+					}
 				}
 
-				if (!in_array($allowed_subnet->subnet_id, $to_enable) &&
-					!in_array($allowed_subnet->subnet_id, $to_disable))
+				$arr_subnets = arr::merge($to_enable, $arr_subnets, $to_disable);
+
+				// maximum count of allowed subnets (0 = unlimited)
+				$max_enabled = ($member->allowed_subnets_count->count) ?
+						$member->allowed_subnets_count->count : count($arr_subnets);
+
+				$enabled = 0;
+				foreach ($arr_subnets as $subnet)
 				{
-					$arr_subnets[] = $allowed_subnet->subnet_id;
+					if (!$subnet)
+						continue;
+
+					if ($aid = $allowed_subnet_model->exists($member->id, $subnet))
+					{
+						$allowed_subnet_model->where('id', $aid)->find();
+					}
+					else
+					{
+						$allowed_subnet_model->clear();
+						$allowed_subnet_model->member_id = $member->id;
+						$allowed_subnet_model->subnet_id = $subnet;
+					}
+
+					$allowed_subnet_model->enabled = ($enabled < $max_enabled);
+
+					$enabled++;
+
+					$allowed_subnet_model->save_throwable();
 				}
+
+				$allowed_subnet_model->transaction_commit();
+
+				return TRUE; // all OK
 			}
-
-			$arr_subnets = arr::merge($to_enable, $arr_subnets, $to_disable);
-
-			// maximum count of allowed subnets (0 = unlimited)
-			$max_enabled = ($member->allowed_subnets_count->count) ?
-					$member->allowed_subnets_count->count : count($arr_subnets);
-
-			$enabled = 0;
-			foreach ($arr_subnets as $subnet)
+			catch (Exception $e) // failed => rollback and wait 100ms before next attempt
 			{
-				if (!$subnet)
-					continue;
+				$allowed_subnet_model->transaction_rollback();
 
-				if ($aid = $allowed_subnet_model->exists($member->id, $subnet))
+				if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
 				{
-					$allowed_subnet_model->where('id', $aid)->find();
+					Log::add_exception($e);
+
+					if ($thow_ex_on_error)
+					{
+						throw $e;
+					}
+					else
+					{
+						return FALSE;
+					}
 				}
-				else
-				{
-					$allowed_subnet_model->clear();
-					$allowed_subnet_model->member_id = $member->id;
-					$allowed_subnet_model->subnet_id = $subnet;
-				}
 
-				$allowed_subnet_model->enabled = ($enabled < $max_enabled);
-
-				$enabled++;
-
-				$allowed_subnet_model->save();
+				usleep($timeout);
 			}
-			
-			$allowed_subnet_model->transaction_commit();
-		}
-		catch (Exception $e)
-		{
-			$allowed_subnet_model->transaction_rollback();
-			Log::add_exception($e);
 		}
 	}
 

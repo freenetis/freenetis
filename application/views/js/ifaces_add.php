@@ -131,7 +131,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			if ($('#dialog_link_detail form').valid())
 			{
 				// fill in hidden fields
-				switch (parseInt($('#type').val()))
+				switch (parseInt($('#itype').val()))
 				{
 					case <?php echo Iface_Model::TYPE_WIRELESS ?>:
 						$('#medium').val($('#wl_medium_input').val());

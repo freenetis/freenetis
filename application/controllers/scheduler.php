@@ -307,9 +307,9 @@ class Scheduler_Controller extends Controller
 	{
 		$model_members_traffic_montly = new Members_traffic_Model();
 		// remove log partition
-		$model_members_traffic_montly->remove_montly_old_partitions();
+		$model_members_traffic_montly->remove_monthly_old_partitions();
 		// add partition for today
-		$model_members_traffic_montly->add_montly_partition();
+		$model_members_traffic_montly->add_monthly_partition();
 	}
 
 	/**
@@ -558,6 +558,9 @@ class Scheduler_Controller extends Controller
 		
 		$email_queue = $email_queue_model->get_current_queue();
 		
+		if (!count($email_queue))
+			return; // do not connect to SMPT server for no reason (fixes #336)
+		
 		$swift = email::connect();
 		
 		foreach ($email_queue as $email)
@@ -688,7 +691,7 @@ class Scheduler_Controller extends Controller
 			 * following code generate sequence of diffs
 			 * for each diff and host will be sent notification once time
 			 */
-			$diffs = array();
+			$down_diffs = array();
 
 			$increase = 3;
 			$growth = 5;
@@ -699,7 +702,7 @@ class Scheduler_Controller extends Controller
 
 			while ($i <= $max_down_diff)
 			{
-				$diffs[] = $i;
+				$down_diffs[] = $i;
 
 				$i += $increase;
 
@@ -711,11 +714,7 @@ class Scheduler_Controller extends Controller
 				}
 			}
 
-			// maximal value from sequence of diff for which will sent notification
-			// about hosts which returned from down state
-			$max_returned_diff = 10;
-
-			for($i=0;$i<count($diffs)-1;$i++)
+			for($i=0;$i<count($down_diffs)-1;$i++)
 			{	
 				/**
 				 * find all down hosts in interval between this diff and next diff
@@ -723,7 +722,7 @@ class Scheduler_Controller extends Controller
 				 * in this interval)
 				 */
 				$down_hosts = $monitor_host_model->get_all_hosts_by_state(
-						Monitor_host_Model::STATE_DOWN, $diffs[$i], $diffs[$i+1]);
+						Monitor_host_Model::STATE_DOWN, $down_diffs[$i], $down_diffs[$i+1]);
 
 				// for each send e-mail
 				foreach ($down_hosts as $down_host)
@@ -739,32 +738,62 @@ class Scheduler_Controller extends Controller
 
 					$monitor_host_model->update_host_notification_date($down_host->id);
 				}
+			}
+			
+			// maximal value from sequence of diff for which will sent notification
+			// about hosts which returned from down state
+			$max_returned_diff = 30;
+			
+			/**
+			 * following code generate sequence of diffs
+			 * for each diff and host will be sent notification once time
+			 */
+			$returned_diffs = array();
 
-				// send notification about hosts which returned from down state
-				if ($diffs[$i] < $max_returned_diff)
-				{
-					/**
-					* find all hosts which returned from down state in interval
-					* between this diff and next diff (exclude hosts about which
-					* has been already sent notification in this interval)
-					*/
-					$returned_hosts = $monitor_host_model->get_all_hosts_by_state(
-							Monitor_host_Model::STATE_UP, $diffs[$i], $diffs[$i+1]);
+			$increase = 3;
+			$growth = 5;
 
-					// for each send e-mail
-					foreach ($returned_hosts as $returned_host)
-					{	
-						$email_queue_model->push(
-							Settings::get('email_default_email'),
-							Settings::get('monitoring_email_to'),
-							__('Monitoring notice').': '.__('Host').' '.$returned_host->name.' '.__('is again reachable'),
-							__('Host').' '
-								.html::anchor(url_lang::base().'devices/show/'.$returned_host->device_id, $returned_host->name)
-								.' '.__('is again reachable since').' '.strftime("%c", strtotime($returned_host->state_changed_date))
-						);
+			$i = 0;
 
-						$monitor_host_model->update_host_notification_date($returned_host->id);
-					}
+			$max = 5;
+
+			while ($i <= $max_returned_diff)
+			{
+				$returned_diffs[] = $i;
+
+				$i += $increase;
+
+				if ($i >= $max)
+				{			
+					$increase = $max;
+
+					$max *= $growth;
+				}
+			}
+			
+			for($i=0;$i<count($returned_diffs)-1;$i++)
+			{	
+				/**
+				* find all hosts which returned from down state in interval
+				* between this diff and next diff (exclude hosts about which
+				* has been already sent notification in this interval)
+				*/
+				$returned_hosts = $monitor_host_model->get_all_hosts_by_state(
+						Monitor_host_Model::STATE_UP, $returned_diffs[$i], $returned_diffs[$i+1]);
+
+				// for each send e-mail
+				foreach ($returned_hosts as $returned_host)
+				{	
+					$email_queue_model->push(
+						Settings::get('email_default_email'),
+						Settings::get('monitoring_email_to'),
+						__('Monitoring notice').': '.__('Host').' '.$returned_host->name.' '.__('is again reachable'),
+						__('Host').' '
+							.html::anchor(url_lang::base().'devices/show/'.$returned_host->device_id, $returned_host->name)
+							.' '.__('is again reachable since').' '.strftime("%c", strtotime($returned_host->state_changed_date))
+					);
+
+					$monitor_host_model->update_host_notification_date($returned_host->id);
 				}
 			}
 			

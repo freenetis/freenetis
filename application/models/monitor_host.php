@@ -199,7 +199,7 @@ class Monitor_host_Model extends ORM
 				IFNULL(tr.translated_term, et.value) AS type_name,
 				u.member_id, m.name AS member_name,
 				IF(state <> ?, IF(state <> ?, ?, ?), ?) AS state_name,
-				0 AS host_id
+				0 AS host_id, d.address_point_id
 			FROM devices d
 			JOIN ifaces i ON i.device_id = d.id
 			JOIN ip_addresses ip ON ip.iface_id = i.id

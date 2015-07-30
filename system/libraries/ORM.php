@@ -1861,7 +1861,8 @@ class ORM_Core {
 		$cache[$column_name] = ($this->db->query("
 			SELECT COUNT(*) AS count
 			FROM INFORMATION_SCHEMA.COLUMNS
-			WHERE table_name = " . $this->db->escape($this->table_name) . "
+			WHERE table_schema LIKE " . $this->db->escape(Config::get('db_name')) . "
+				  AND table_name LIKE " . $this->db->escape($this->table_name) . "
 				  AND column_name LIKE " . $this->db->escape($column_name) . "
 		")->current()->count == 1);
 		// get result

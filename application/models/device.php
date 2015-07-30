@@ -39,25 +39,6 @@
  */
 class Device_Model extends ORM
 {
-	// type constants of devices (not all of them)
-	const TYPE_PC = 7;
-	const TYPE_CLIENT = 8;
-	const TYPE_ROUTER = 9;
-	const TYPE_SWITCH = 10;
-	const TYPE_NOTEBOOK = 17;
-	const TYPE_HOMEAP = 24;
-	const TYPE_VOIP = 26;
-	const TYPE_AP = 62;
-	const TYPE_MOBILE = 93;
-	const TYPE_TV = 94;
-	const TYPE_UPS = 95;
-	const TYPE_PLAYSTATION = 96;
-	const TYPE_OTHER = 97;
-	const TYPE_CAMERA = 98;
-	const TYPE_TABLET = 99;
-	const TYPE_PRINTER = 100;
-	const TYPE_DREAMBOX = 101;
-	const TYPE_SERVER = 102;
 	
 	protected $has_many = array
 	(
@@ -127,6 +108,20 @@ class Device_Model extends ORM
 		else
 			$limit = "";
 		
+		// HACK FOR IMPROVING PERFORMANCE (fixes #362)
+		$select_cloud = '';
+		$join_cloud = '';
+		
+		if (strpos($params['filter_sql'], '.`cloud` LIKE '))
+		{
+			$select_cloud = ', c.id AS cloud';
+			$join_cloud = "
+				LEFT JOIN ifaces i ON i.device_id = d.id
+				LEFT JOIN ip_addresses ip ON ip.iface_id = i.id
+				LEFT JOIN clouds_subnets cs ON cs.subnet_id = ip.subnet_id
+				LEFT JOIN clouds c ON cs.cloud_id = c.id";
+		}
+		
 		// query
 		return $this->db->query("
 			SELECT * FROM
@@ -137,7 +132,7 @@ class Device_Model extends ORM
 					u.name AS user_name, u.surname AS user_surname, u.login AS user_login,
 					d.login, d.password, d.price, d.trade_name, d.payment_rate,
 					d.buy_date, m.name AS member_name, s.street, t.town,
-					ap.street_number, d.comment, c.id AS cloud
+					ap.street_number, d.comment $select_cloud
 				FROM devices d
 				JOIN users u ON d.user_id = u.id
 				JOIN members m ON u.member_id = m.id
@@ -146,10 +141,7 @@ class Device_Model extends ORM
 				LEFT JOIN towns t ON ap.town_id = t.id
 				LEFT JOIN enum_types e ON d.type = e.id
 				LEFT JOIN translations f ON lang = ? AND e.value = f.original_term
-				LEFT JOIN ifaces i ON i.device_id = d.id
-				LEFT JOIN ip_addresses ip ON ip.iface_id = i.id
-				LEFT JOIN clouds_subnets cs ON cs.subnet_id = ip.subnet_id
-				LEFT JOIN clouds c ON cs.cloud_id = c.id
+				$join_cloud
 			) d
 			$where
 			GROUP BY device_id
@@ -171,6 +163,20 @@ class Device_Model extends ORM
 		if ($filter_sql != '')
 			$where = "WHERE $filter_sql";
 		
+		// HACK FOR IMPROVING PERFORMANCE (fixes #362)
+		$select_cloud = '';
+		$join_cloud = '';
+		
+		if (strpos($filter_sql, '.`cloud` LIKE '))
+		{
+			$select_cloud = ', c.id AS cloud';
+			$join_cloud = "
+				LEFT JOIN ifaces i ON i.device_id = d.id
+				LEFT JOIN ip_addresses ip ON ip.iface_id = i.id
+				LEFT JOIN clouds_subnets cs ON cs.subnet_id = ip.subnet_id
+				LEFT JOIN clouds c ON cs.cloud_id = c.id";
+		}
+		
 		// query
 		return $this->db->query("
 			SELECT COUNT(device_id) AS total FROM
@@ -183,7 +189,7 @@ class Device_Model extends ORM
 						u.surname AS user_surname, u.login AS user_login,
 						d.login, d.password, d.price, d.trade_name, d.payment_rate,
 						d.buy_date, m.name AS member_name, s.street, t.town,
-						ap.street_number, d.comment, c.id AS cloud
+						ap.street_number, d.comment $select_cloud
 					FROM devices d
 					JOIN users u ON d.user_id = u.id
 					JOIN members m ON u.member_id = m.id
@@ -192,10 +198,7 @@ class Device_Model extends ORM
 					LEFT JOIN towns t ON ap.town_id = t.id
 					LEFT JOIN enum_types e ON d.type = e.id
 					LEFT JOIN translations f ON lang = ? AND e.value = f.original_term
-					LEFT JOIN ifaces i ON i.device_id = d.id
-					LEFT JOIN ip_addresses ip ON ip.iface_id = i.id
-					LEFT JOIN clouds_subnets cs ON cs.subnet_id = ip.subnet_id
-					LEFT JOIN clouds c ON cs.cloud_id = c.id
+					$join_cloud
 				) d
 				$where
 				GROUP BY device_id

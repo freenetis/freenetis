@@ -87,6 +87,23 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 		$('#domicile_town_id').trigger('change');
 	});
 	
+	$('#user_id').live('change', function()
+	{
+		$.ajax({
+			url: '<?php echo url_lang::base() ?>json/get_user_address',
+			async: false,
+			data: {user_id: $(this).val()},
+			dataType: 'json',
+			success: function(data)
+			{
+				$('#town_id').val(data['town_id']).change();
+				$('#street_id').val(data['street_id']);
+				$('#country_id').val(data['country_id']);
+				$('#street_number').val(data['street_number']).change();
+			}
+		});
+	});
+	
 	function town_dropdown_change(el)
 	{
 		var val = parseInt(el.val(), 10);

@@ -797,7 +797,8 @@ class Devices_Controller extends Controller
 		
 		$group_payment->input('payment_rate')
 				->label('Monthly payment rate')
-				->rules('valid_numeric');
+				->rules('valid_numeric')
+				->callback(array($this, 'valid_repayment'));
 		
 		$group_payment->date('buy_date')
 				->label('Buy date')
@@ -872,328 +873,357 @@ class Devices_Controller extends Controller
 			$dm = new Device_Model();
 			
 			$update_allowed_params = array();
-			
-			try
+						
+			// gets number of maximum of acceptable repeating of operation
+			// after reaching of deadlock and time of waiting between
+			// other attempt to make transaction (#254)
+			$transaction_attempt_counter = 0;
+			$max_attempts = max(1, abs(Settings::get('db_trans_deadlock_repeats_count')));
+			$timeout = abs(Settings::get('db_trans_deadlock_repeats_timeout'));
+
+			// try to delete
+			while (TRUE)
 			{
-				$dm->transaction_start();
-				
-				// device //////////////////////////////////////////////////////
-				$dm->user_id = $form_data['user_id'];
-
-				if (!isset($user_id))
+				try
 				{
-					$um = new User_Model($dm->user_id);
-				}
+					$dm->transaction_start();
 
-				if (empty($form_data['device_name']))
-				{
-					$dm->name = $um->login.'_'.$types[$form_data['device_type']];
-				}
-				else 
-				{
-					$dm->name = $form_data['device_name'];
-				}
-				
-				$device_template = new Device_template_Model($form_data['device_template_id']);
+					// device //////////////////////////////////////////////////////
+					$device = new Device_Model();
+					$device->user_id = $form_data['user_id'];
 
-				if ($device_template && $device_template->id)
-				{
-					$dm->trade_name = $device_template->name;
-				}
-				
-				$dm->type = $form_data['device_type'];
-				$dm->PPPoE_logging_in = $form_data['PPPoE_logging_in'];
-
-				if ($this->acl_check_new(get_class($this), 'login'))
-				{
-					$dm->login = $form_data['login'];
-				}
-
-				if ($this->acl_check_new(get_class($this), 'password'))
-				{
-					$dm->password = $form_data['login_password'];
-				}
-
-				$dm->price = $form_data['price'];	
-				$dm->payment_rate = $form_data['payment_rate'];
-				$dm->buy_date = date('Y-m-d', $form_data['buy_date']);	
-				$dm->comment = $form_data['device_comment'];
-
-				// address point ///////////////////////////////////////////////////
-
-				// gps
-				$gpsx = NULL;
-				$gpsy = NULL;
-
-				if (!empty($form_data['gpsx']) && !empty($form_data['gpsy']))
-				{
-					$gpsx = doubleval($form_data['gpsx']);
-					$gpsy = doubleval($form_data['gpsy']);
-
-					if (gps::is_valid_degrees_coordinate($form_data['gpsx']))
+					if (!isset($user_id))
 					{
-						$gpsx = gps::degrees2real($form_data['gpsx']);
+						$um = new User_Model($device->user_id);
 					}
 
-					if (gps::is_valid_degrees_coordinate($form_data['gpsy']))
+					if (empty($form_data['device_name']))
 					{
-						$gpsy = gps::degrees2real($form_data['gpsy']);
+						$device->name = $um->login.'_'.$types[$form_data['device_type']];
 					}
-				}
-
-				$address_point_model = new Address_point_Model();
-
-				$ap = $address_point_model->get_address_point(
-						$form_data['country_id'], $form_data['town_id'],
-						$form_data['street_id'], $form_data['street_number'],
-						$gpsx, $gpsy
-				);
-
-				// add address point if there is no such
-				if (!$ap->id)
-				{
-					$ap->save_throwable();
-				}
-
-				// add GPS
-				if (!empty($gpsx) && !empty($gpsy))
-				{ // save
-					$ap->update_gps_coordinates($ap->id, $gpsx, $gpsy);
-				}
-				else
-				{ // delete gps
-					$ap->gps = '';
-					$ap->save_throwable();
-				}
-
-				$dm->address_point_id = $ap->id;
-				$dm->save_throwable();
-
-				// device engineer ////////////////////////////////////////////
-				
-				$device_engineer = new Device_engineer_Model();
-				$device_engineer->device_id = $dm->id;
-				$device_engineer->user_id = $form_data['first_engineer_id'];
-				$device_engineer->save();
-				
-				// ifaces //////////////////////////////////////////////////////
-
-				$post_use = isset($_POST['use']) ? $_POST['use'] : array();
-				
-				foreach ($post_use as $i => $v)
-				{
-					// skip not used
-					if ($v != 1)
+					else 
 					{
-						continue;
+						$device->name = $form_data['device_name'];
 					}
-					// save iface
-					$im = new Iface_Model();
-					$im->device_id = $dm->id;
-					$im->name = htmlspecialchars($_POST['name'][$i]);
-					$im->comment = htmlspecialchars($_POST['comment'][$i]);
-					$im->type = intval($_POST['type'][$i]);
-					
-					if ($im->type == Iface_Model::TYPE_PORT)
+
+					$device_template = new Device_template_Model($form_data['device_template_id']);
+
+					if ($device_template && $device_template->id)
 					{
-						$im->number = intval($_POST['number'][$i]);
-						$im->port_mode = intval($_POST['port_mode'][$i]);
+						$device->trade_name = $device_template->name;
 					}
-					else
+
+					$device->type = $form_data['device_type'];
+					$device->PPPoE_logging_in = $form_data['PPPoE_logging_in'];
+
+					if ($this->acl_check_new(get_class($this), 'login'))
 					{
-						$im->mac = htmlspecialchars($_POST['mac'][$i]);
+						$device->login = $form_data['login'];
 					}
-					
-					if ($im->type == Iface_Model::TYPE_WIRELESS)
+
+					if ($this->acl_check_new(get_class($this), 'password'))
 					{
-						$im->wireless_antenna = intval($_POST['wireless_antenna'][$i]);
-						$im->wireless_mode = intval($_POST['wireless_mode'][$i]);
+						$device->password = $form_data['login_password'];
 					}
-					
-					// can autosave?
-					$autosave_may = TRUE;
-					
-					if (isset($_POST['connected_iface'][$i]))
+
+					$device->price = $form_data['price'];	
+					$device->payment_rate = $form_data['payment_rate'];
+					$device->buy_date = date('Y-m-d', $form_data['buy_date']);	
+					$device->comment = $form_data['device_comment'];
+
+					// address point ///////////////////////////////////////////////////
+
+					// gps
+					$gpsx = NULL;
+					$gpsy = NULL;
+
+					if (!empty($form_data['gpsx']) && !empty($form_data['gpsy']))
 					{
-						// restrict blank fields
-						if (!(Iface_Model::type_has_ip_address($im->type) &&
-							Iface_Model::type_has_mac_address($im->type) &&
-							empty($im->mac) && (
-									!isset($_POST['ip'][$i]) ||
-									empty($_POST['ip'][$i]) ||
-									!valid::ip_address($_POST['ip'][$i])
-							)))
+						$gpsx = doubleval($form_data['gpsx']);
+						$gpsy = doubleval($form_data['gpsy']);
+
+						if (gps::is_valid_degrees_coordinate($form_data['gpsx']))
 						{
-							// connected iface
-							$im_connect_to = new Iface_Model($_POST['connected_iface'][$i]);
+							$gpsx = gps::degrees2real($form_data['gpsx']);
+						}
 
-							// save link
-							if (Iface_Model::type_has_link($im->type) &&
-								$im_connect_to && $im_connect_to->id)
-							{
-								// disable autosave
-								$autosave_may = FALSE;
-								
-								$roaming = new Link_Model();
-								$link_id = $_POST['link_id'][$i];
-								$roaming_id = $roaming->get_roaming();
-								$roaming = $roaming->find($roaming_id);
-								$name = $_POST['link_name'][$i];
-								$medium = $_POST['medium'][$i];
-								
-								// don not connect to roaming
-								if ($link_id == $roaming_id)
-								{
-									$link_id = NULL;
-									// fix name
-									if (trim($name) == trim($roaming->name))
-									{
-										if ($im->type == Iface_Model::TYPE_WIRELESS)
-										{
-											$name = __('air') . ' ';
-										}
-										else
-										{
-											$name = __('cable') . ' ';
-										}
-										
-										if ($im_connect_to->type == Iface_Model::TYPE_WIRELESS &&
-											$im_connect_to->wireless_mode == Iface_Model::WIRELESS_MODE_AP)
-										{
-											$name .= $im_connect_to->device->name;
-											$name .= ' - ' . $dm->name;
-										}
-										else
-										{
-											$name .= $dm->name . ' - ';
-											$name .= $im_connect_to->device->name;
-										}
-										
-										// fix medium
-										if ($medium == Link_Model::MEDIUM_ROAMING)
-										{
-											if ($im->type == Iface_Model::TYPE_WIRELESS)
-											{
-												$medium = Link_Model::MEDIUM_AIR;
-											}
-											else
-											{
-												$medium = Link_Model::MEDIUM_CABLE;
-											}
-										}
-									}
-								}
-								
-								$lm = new Link_Model($link_id);
-								$lm->name = htmlspecialchars($name);
-								$lm->medium = intval($medium);
-								$lm->comment = htmlspecialchars($_POST['link_comment'][$i]);
-								$lm->bitrate = network::str2bytes($_POST['bitrate'][$i]);
-								$lm->duplex = ($_POST['duplex'][$i] == 1);
-
-								if ($im->type == Iface_Model::TYPE_WIRELESS)
-								{
-									$lm->wireless_ssid = htmlspecialchars($_POST['wireless_ssid'][$i]);
-									$lm->wireless_norm = intval($_POST['wireless_norm'][$i]);
-									$lm->wireless_frequency = intval($_POST['wireless_frequency'][$i]);
-									$lm->wireless_channel = intval($_POST['wireless_channel'][$i]);
-									$lm->wireless_channel_width = intval($_POST['wireless_channel_width'][$i]);
-									$lm->wireless_polarization = intval($_POST['wireless_polarization'][$i]);
-								}
-
-								$lm->save_throwable();
-								
-								// restrict count of connected devices to link
-								$max = Link_Model::get_max_ifaces_count($im->type);
-								
-								if ($lm->id != $roaming_id &&
-									$max <= 2) // delete connected (port, eth)
-								{
-									foreach ($lm->ifaces as $i_del)
-									{
-										$i_del->link_id = null;
-										$i_del->save_throwable();
-									}
-								}
-								
-								$im->link_id = $lm->id;
-								$im_connect_to->link_id = $lm->id;
-								$im_connect_to->save_throwable();
-							}
+						if (gps::is_valid_degrees_coordinate($form_data['gpsy']))
+						{
+							$gpsy = gps::degrees2real($form_data['gpsy']);
 						}
 					}
-					
-					// autosave (add) link
-					if (isset($_POST['link_autosave'][$i]) &&
-						$_POST['link_autosave'][$i] && $autosave_may)
+
+					$address_point_model = new Address_point_Model();
+
+					$ap = $address_point_model->get_address_point(
+							$form_data['country_id'], $form_data['town_id'],
+							$form_data['street_id'], $form_data['street_number'],
+							$gpsx, $gpsy
+					);
+
+					// add address point if there is no such
+					if (!$ap->id)
 					{
-						$lm = new Link_Model();
-						$lm->name = htmlspecialchars($_POST['link_name'][$i]);
-						$lm->medium = intval($_POST['medium'][$i]);
-						$lm->comment = htmlspecialchars($_POST['link_comment'][$i]);
-						$lm->bitrate = network::str2bytes($_POST['bitrate'][$i]);
-						$lm->duplex = ($_POST['duplex'][$i] == 1);
+						$ap->save_throwable();
+					}
+
+					// add GPS
+					if (!empty($gpsx) && !empty($gpsy))
+					{ // save
+						$ap->update_gps_coordinates($ap->id, $gpsx, $gpsy);
+					}
+					else
+					{ // delete gps
+						$ap->gps = '';
+						$ap->save_throwable();
+					}
+
+					$device->address_point_id = $ap->id;
+					$device->save_throwable();
+
+					// device engineer ////////////////////////////////////////////
+
+					$device_engineer = new Device_engineer_Model();
+					$device_engineer->device_id = $device->id;
+					$device_engineer->user_id = $form_data['first_engineer_id'];
+					$device_engineer->save();
+
+					// ifaces //////////////////////////////////////////////////////
+
+					$update_allowed_params = array();// reset
+					$post_use = isset($_POST['use']) ? $_POST['use'] : array();
+
+					foreach ($post_use as $i => $v)
+					{
+						// skip not used
+						if ($v != 1)
+						{
+							continue;
+						}
+						// save iface
+						$im = new Iface_Model();
+						$im->device_id = $device->id;
+						$im->name = htmlspecialchars($_POST['name'][$i]);
+						$im->comment = htmlspecialchars($_POST['comment'][$i]);
+						$im->type = intval($_POST['type'][$i]);
+
+						if ($im->type == Iface_Model::TYPE_PORT)
+						{
+							$im->number = intval($_POST['number'][$i]);
+							$im->port_mode = intval($_POST['port_mode'][$i]);
+						}
+						else
+						{
+							$im->mac = htmlspecialchars($_POST['mac'][$i]);
+						}
 
 						if ($im->type == Iface_Model::TYPE_WIRELESS)
 						{
-							$lm->wireless_ssid = htmlspecialchars($_POST['wireless_ssid'][$i]);
-							$lm->wireless_norm = intval($_POST['wireless_norm'][$i]);
-							$lm->wireless_frequency = intval($_POST['wireless_frequency'][$i]);
-							$lm->wireless_channel = intval($_POST['wireless_channel'][$i]);
-							$lm->wireless_channel_width = intval($_POST['wireless_channel_width'][$i]);
-							$lm->wireless_polarization = intval($_POST['wireless_polarization'][$i]);
+							$im->wireless_antenna = intval($_POST['wireless_antenna'][$i]);
+							$im->wireless_mode = intval($_POST['wireless_mode'][$i]);
 						}
 
-						$lm->save_throwable();
-						$im->link_id = $lm->id;
+						// can autosave?
+						$autosave_may = TRUE;
+
+						if (isset($_POST['connected_iface'][$i]))
+						{
+							// restrict blank fields
+							if (!(Iface_Model::type_has_ip_address($im->type) &&
+								Iface_Model::type_has_mac_address($im->type) &&
+								empty($im->mac) && (
+										!isset($_POST['ip'][$i]) ||
+										empty($_POST['ip'][$i]) ||
+										!valid::ip_address($_POST['ip'][$i])
+								)))
+							{
+								// connected iface
+								$im_connect_to = new Iface_Model($_POST['connected_iface'][$i]);
+
+								// save link
+								if (Iface_Model::type_has_link($im->type) &&
+									$im_connect_to && $im_connect_to->id)
+								{
+									// disable autosave
+									$autosave_may = FALSE;
+
+									$roaming = new Link_Model();
+									$link_id = $_POST['link_id'][$i];
+									$roaming_id = $roaming->get_roaming();
+									$roaming = $roaming->find($roaming_id);
+									$name = $_POST['link_name'][$i];
+									$medium = $_POST['medium'][$i];
+
+									// don not connect to roaming
+									if ($link_id == $roaming_id)
+									{
+										$link_id = NULL;
+										// fix name
+										if (trim($name) == trim($roaming->name))
+										{
+											if ($im->type == Iface_Model::TYPE_WIRELESS)
+											{
+												$name = __('air') . ' ';
+											}
+											else
+											{
+												$name = __('cable') . ' ';
+											}
+
+											if ($im_connect_to->type == Iface_Model::TYPE_WIRELESS &&
+												$im_connect_to->wireless_mode == Iface_Model::WIRELESS_MODE_AP)
+											{
+												$name .= $im_connect_to->device->name;
+												$name .= ' - ' . $device->name;
+											}
+											else
+											{
+												$name .= $device->name . ' - ';
+												$name .= $im_connect_to->device->name;
+											}
+
+											// fix medium
+											if ($medium == Link_Model::MEDIUM_ROAMING)
+											{
+												if ($im->type == Iface_Model::TYPE_WIRELESS)
+												{
+													$medium = Link_Model::MEDIUM_AIR;
+												}
+												else
+												{
+													$medium = Link_Model::MEDIUM_CABLE;
+												}
+											}
+										}
+									}
+
+									$lm = new Link_Model($link_id);
+									$lm->name = htmlspecialchars($name);
+									$lm->medium = intval($medium);
+									$lm->comment = htmlspecialchars($_POST['link_comment'][$i]);
+									$lm->bitrate = network::str2bytes($_POST['bitrate'][$i]);
+									$lm->duplex = ($_POST['duplex'][$i] == 1);
+
+									if ($im->type == Iface_Model::TYPE_WIRELESS)
+									{
+										$lm->wireless_ssid = htmlspecialchars($_POST['wireless_ssid'][$i]);
+										$lm->wireless_norm = intval($_POST['wireless_norm'][$i]);
+										$lm->wireless_frequency = intval($_POST['wireless_frequency'][$i]);
+										$lm->wireless_channel = intval($_POST['wireless_channel'][$i]);
+										$lm->wireless_channel_width = intval($_POST['wireless_channel_width'][$i]);
+										$lm->wireless_polarization = intval($_POST['wireless_polarization'][$i]);
+									}
+
+									$lm->save_throwable();
+
+									// restrict count of connected devices to link
+									$max = Link_Model::get_max_ifaces_count($im->type);
+
+									if ($lm->id != $roaming_id &&
+										$max <= 2) // delete connected (port, eth)
+									{
+										foreach ($lm->ifaces as $i_del)
+										{
+											$i_del->link_id = null;
+											$i_del->save_throwable();
+										}
+									}
+
+									$im->link_id = $lm->id;
+									$im_connect_to->link_id = $lm->id;
+									$im_connect_to->save_throwable();
+								}
+							}
+						}
+
+						// autosave (add) link
+						if (isset($_POST['link_autosave'][$i]) &&
+							$_POST['link_autosave'][$i] && $autosave_may)
+						{
+							$lm = new Link_Model();
+							$lm->name = htmlspecialchars($_POST['link_name'][$i]);
+							$lm->medium = intval($_POST['medium'][$i]);
+							$lm->comment = htmlspecialchars($_POST['link_comment'][$i]);
+							$lm->bitrate = network::str2bytes($_POST['bitrate'][$i]);
+							$lm->duplex = ($_POST['duplex'][$i] == 1);
+
+							if ($im->type == Iface_Model::TYPE_WIRELESS)
+							{
+								$lm->wireless_ssid = htmlspecialchars($_POST['wireless_ssid'][$i]);
+								$lm->wireless_norm = intval($_POST['wireless_norm'][$i]);
+								$lm->wireless_frequency = intval($_POST['wireless_frequency'][$i]);
+								$lm->wireless_channel = intval($_POST['wireless_channel'][$i]);
+								$lm->wireless_channel_width = intval($_POST['wireless_channel_width'][$i]);
+								$lm->wireless_polarization = intval($_POST['wireless_polarization'][$i]);
+							}
+
+							$lm->save_throwable();
+							$im->link_id = $lm->id;
+						}
+
+						$im->save_throwable();
+
+						if (isset($_POST['ip'][$i]) && valid::ip_address($_POST['ip'][$i]))
+						{
+							// save IP address
+							$ipm = new Ip_address_Model();
+							$ipm->iface_id = $im->id;
+							$ipm->subnet_id = intval($_POST['subnet'][$i]);
+							$ipm->member_id = NULL;
+							$ipm->ip_address = htmlspecialchars($_POST['ip'][$i]);
+							$ipm->dhcp = ($_POST['dhcp'][$i] == 1);
+							$ipm->gateway = ($_POST['gateway'][$i] == 1);
+							$ipm->service = ($_POST['service'][$i] == 1);
+							$ipm->save_throwable();
+
+							// allowed subnet to added IP
+							$update_allowed_params[] = array
+							(
+								'member_id' => $device->user->member_id,
+								'to_enable' => array($ipm->subnet_id)
+							);
+						}
 					}
+
+					// done
+					$dm->transaction_commit();
+
+					//Update allowed subnets after transaction is successfully commited
+					$error_added = TRUE; // throw error?
 					
-					$im->save_throwable();
-					
-					if (isset($_POST['ip'][$i]) && valid::ip_address($_POST['ip'][$i]))
+					foreach ($update_allowed_params as $params)
 					{
-						// save IP address
-						$ipm = new Ip_address_Model();
-						$ipm->iface_id = $im->id;
-						$ipm->subnet_id = intval($_POST['subnet'][$i]);
-						$ipm->member_id = NULL;
-						$ipm->ip_address = htmlspecialchars($_POST['ip'][$i]);
-						$ipm->dhcp = ($_POST['dhcp'][$i] == 1);
-						$ipm->gateway = ($_POST['gateway'][$i] == 1);
-						$ipm->service = ($_POST['service'][$i] == 1);
-						$ipm->save_throwable();
-
-						// allowed subnet to added IP
-						$update_allowed_params[] = array
-						(
-							'member_id' => $dm->user->member_id,
-							'to_enable' => array($ipm->subnet_id)
-						);
+						try
+						{
+							Allowed_subnets_Controller::update_enabled(
+									$params['member_id'], $params['to_enable'],
+									array(), array(), $error_added
+							);
+						}
+						catch (Exception $e)
+						{
+							$error_added = FALSE;
+							status::warning('Error - cannot update allowed subnets of member.');
+						}
 					}
-				}
 
-				// done
-				unset($form_data);
-				$dm->transaction_commit();
-				
-				//Update allowed subnets after transaction is successfully commited
-				foreach ($update_allowed_params as $params)
-				{
-					Allowed_subnets_Controller::update_enabled(
-							$params['member_id'],
-							$params['to_enable']
-					);
+					status::success('Device has been successfully saved.');
+					url::redirect('devices/show/'.$device->id);
 				}
-				
-				status::success('Device has been successfully saved.');
-				url::redirect('devices/show/'.$dm->id);
+				catch (Exception $e) // failed => rollback and wait 100ms before next attempt
+				{
+					$dm->transaction_rollback();
+					
+					if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
+					{
+						Log::add_exception($e);
+						status::error('Device has not been successfully saved.');
+						break;
+					}
+
+					usleep($timeout);
+				}
 			}
-			catch (Exception $e)
-			{
-				$dm->transaction_rollback();			
-				Log::add_exception($e);
-				status::error('Device has not been successfully saved.');
-			}		
 		}
 		
 		if (isset($user_id))
@@ -1293,8 +1323,6 @@ class Devices_Controller extends Controller
 			{
 				$selected_engineer = $found_engineer->id;
 			}
-			
-			$arr_users[$um->id] = $um->get_name_with_login();
 		}
 		else
 		{
@@ -1304,12 +1332,12 @@ class Devices_Controller extends Controller
 			$selected_street_id = 0;
 			$selected_street_number = '';
 			$selected_town_id = 0;
-			
-			$arr_users = array
-			(
-				NULL => '----- '.__('select user').' -----'
-			) + $um->select_list_grouped();
 		}
+		
+		$arr_users = array
+		(
+			NULL => '----- '.__('select user').' -----'
+		) + $um->select_list_grouped();
 		
 		// enum types for device
 		$enum_type_model = new Enum_type_Model();
@@ -1411,7 +1439,8 @@ class Devices_Controller extends Controller
 		
 		$group_payment->input('payment_rate')
 				->label('Monthly payment rate')
-				->rules('valid_numeric');
+				->rules('valid_numeric')
+				->callback(array($this, 'valid_repayment'));
 		
 		$group_payment->date('buy_date')
 				->label('Buy date')
@@ -1741,7 +1770,8 @@ class Devices_Controller extends Controller
 		$group_payment->input('payment_rate')
 				->label('Monthly payment rate')
 				->rules('valid_numeric')
-				->value($device->payment_rate ? $device->payment_rate : '');
+				->value($device->payment_rate ? $device->payment_rate : '')
+				->callback(array($this, 'valid_repayment'));
 		
 		$group_payment->date('buy_date')
 				->label('Buy date')
@@ -2005,18 +2035,49 @@ class Devices_Controller extends Controller
 			$linkback = 'devices/show_all';
 		}
 		
-		if ($device->delete())
-		{
-			Allowed_subnets_Controller::update_enabled($mid, NULL, NULL, $subnets);
-			status::success('Device has been successfully deleted.');
-		}
-		else
-		{
-			status::error('Error - cant delete device.');
-		}
+		// gets number of maximum of acceptable repeating of operation
+		// after reaching of deadlock and time of waiting between
+		// other attempt to make transaction (#254)
+		$transaction_attempt_counter = 0;
+		$max_attempts = max(1, abs(Settings::get('db_trans_deadlock_repeats_count')));
+		$timeout = abs(Settings::get('db_trans_deadlock_repeats_timeout'));
 		
-		// redirect
-		url::redirect($linkback);		
+		// try to delete
+		while (TRUE)
+		{
+			try // try to make DB transction
+			{
+				$device->transaction_start();
+				$device->delete_throwable();
+				$device->transaction_commit();
+				
+				try
+				{
+					Allowed_subnets_Controller::update_enabled($mid, NULL, NULL, $subnets, TRUE);
+				}
+				catch (Exception $e)
+				{
+					status::warning('Error - cannot update allowed subnets of member.');
+				}
+				
+				// redirect
+				status::success('Device has been successfully deleted.');
+				$this->redirect($linkback);
+			}
+			catch (Exception $e) // failed => rollback and wait 100ms before next attempt
+			{
+				$device->transaction_rollback();
+				
+				if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
+				{
+					Log::add_exception($e);
+					status::error('Error - cant delete device.');
+					$this->redirect($linkback);
+				}
+				
+				usleep($timeout);
+			}
+		}		
 	}
 	
 	/**
@@ -2960,6 +3021,27 @@ class Devices_Controller extends Controller
 			->type('number');
 		
 		return $filter_form;
+	}
+	
+	/**
+	 * Validate repayment of device
+	 * 
+	 * @param Form_Field $input
+	 */
+	public function valid_repayment($input = NULL)
+	{
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
+		
+		$price = $this->input->post('price');
+		$rate = $input->value;
+		
+		if (!empty($price) && doubleval($rate) <= 0)
+		{
+			$input->add_error('required', __('Must be greater than zero'));
+		}
 	}
 
 }

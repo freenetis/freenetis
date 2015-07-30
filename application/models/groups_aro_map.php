@@ -50,6 +50,8 @@ class Groups_aro_map_Model extends ORM
 	 *
 	 * @author Ondřej Fibich
 	 * @staticvar array $cache			Cache of access
+	 * @staticvar array $cache_aro_user Cache of ACL parent tree
+	 * @staticvar array $cache_aro_hierarchy Cache of ACL parent tree
 	 * @param integer $user_id			User to check access
 	 * @param string $aco_value			ACO value - action (view_all, new_own, ...)
 	 * @param string $axo_section_value	AXO section value - Controller name
@@ -59,8 +61,67 @@ class Groups_aro_map_Model extends ORM
 	public function has_access(
 			$user_id, $aco_value, $axo_section_value, $axo_value)
 	{
-		// Cahce
+		// Cache
 		static $cache = array();
+		static $cache_aro_hierarchy = NULL;
+		static $cache_aro_user = array();
+		
+		// This codes calculates all predecesors of ARO group for hieararchy of
+		// access rights.
+		if ($cache_aro_hierarchy === NULL)
+		{
+////////////////////////////////////////////////////////////////////////////////
+//			// Debug for testing (benchmark)
+//			$start_time = microtime(); 
+////////////////////////////////////////////////////////////////////////////////
+			
+			// Gets all groups id with relation to parent
+			$aro_groups = ORM::factory('aro_group')->select_list('id', 'parent_id', 'id');
+			// Go throught groupd
+			foreach ($aro_groups as $i => $v)
+			{
+				// Final set of all parents (recursive) of group
+				$final_set = array($i);
+				// Stack for recursive walk throught groups
+				$stack = ($v == 0) ? array() : array($v);
+				// Go recursive throught parents
+				while (($top = array_pop($stack)) !== NULL)
+				{
+					// End of tree?
+					if ($aro_groups[$top] != 0)
+					{
+						// Add parents to stack
+						array_push($stack, $aro_groups[$top]);
+						// Add current to final set
+						$final_set[] = $top;
+					}
+				}
+				// Add to cache
+				$cache_aro_hierarchy[$i] = array_unique($final_set);
+			}
+			
+////////////////////////////////////////////////////////////////////////////////
+//			// Debug for testing
+//			
+//			$diff = microtime() - $start_time;
+//			echo 'It tooks: ' . $diff . 'ms <br>';
+//			
+//			foreach ($cache_acl as $i => $v)
+//			{
+//				echo '<b>' . ORM::factory('aro_group', $i)->name . '</b>: ';
+//				sort($v);
+//				
+//				foreach ($v as $id)
+//				{
+//					echo ORM::factory('aro_group', $id)->name . ', ';
+//				}
+//				
+//				echo "<br><br>";
+//			}
+//			
+//			die();
+////////////////////////////////////////////////////////////////////////////////
+		}
 		
 		// Cache key
 		$key = "$user_id#$aco_value#$axo_section_value#$axo_value";
@@ -68,24 +129,52 @@ class Groups_aro_map_Model extends ORM
 		// Is in cache?
 		if (!array_key_exists($key, $cache))
 		{
+			// Fill in user cache?
+			if (!array_key_exists($user_id, $cache_aro_user))
+			{
+				// Get all ARO groups of user
+				$user_in_groups = $this->where('aro_id', $user_id)
+						->select_list('group_id', 'aro_id');
+				// Set cache
+				$cache_aro_user[$user_id] = array();
+				// Add all parents for users group and set it to cache
+				foreach ($user_in_groups as $group_id => $aro_id)
+				{
+					$cache_aro_user[$user_id] = array_merge(
+							$cache_aro_user[$user_id],
+							$cache_aro_hierarchy[$group_id]
+					);
+				}
+				// Discart not unique values
+				$cache_aro_user[$user_id] = array_unique($cache_aro_user[$user_id]);
+			}
+			
+			// Is user in any group?
+			if (count($cache_aro_user[$user_id]))
+			{
 			// Check and add to cache
 			$cache[$key] = $this->db->query("
 					SELECT COUNT(*) AS count
-					FROM groups_aro_map
-					LEFT JOIN aro_groups ON aro_groups.id = groups_aro_map.group_id
+						FROM aro_groups
 					LEFT JOIN aro_groups_map ON aro_groups_map.group_id = aro_groups.id
 					LEFT JOIN acl ON acl.id = aro_groups_map.acl_id
 					LEFT JOIN aco_map ON aco_map.acl_id = acl.id
 					LEFT JOIN aco ON aco.value = aco_map.value
 					LEFT JOIN axo_map ON axo_map.acl_id = acl.id
-					WHERE groups_aro_map.aro_id = ? AND
+						WHERE aro_groups.id IN(" . implode(',', $cache_aro_user[$user_id]) . ") AND
 						aco.value = ? AND
 						axo_map.section_value = ? AND
 						axo_map.value = ?
 			", array
 			(
-				$user_id, $aco_value, $axo_section_value, $axo_value
+					$aco_value, $axo_section_value, $axo_value
 			))->current()->count > 0;
+		}
+			// No group, no access :-)
+			else
+			{
+				$cache[$key] = FALSE;
+			}
 		}
 		
 		// Return access info

@@ -8,17 +8,13 @@
 <?php echo html::stylesheet('media/css/jquery-ui.css') ?>
 <?php echo html::stylesheet('media/css/jquery.autocomplete.css') ?>
 <?php echo html::stylesheet('media/css/jquery.validate.password.css') ?>
-<?php echo html::script('media/js/messages_cs', FALSE) ?>
 <?php echo html::script('media/js/jquery.min', FALSE) ?>
 <?php echo html::script('media/js/jquery-ui.min', FALSE) ?>
-<?php echo html::script('media/js/js', FALSE) ?>
 <?php echo html::script('media/js/jquery.min', FALSE) ?>
 <?php echo html::script('media/js/jquery-ui.min', FALSE) ?>
 <?php echo html::script('media/js/jquery.autocomplete.min', FALSE) ?>
 <?php echo html::script('media/js/jquery.validate.min', FALSE) ?>
 <?php echo html::script('media/js/jquery.validate.password', FALSE) ?>
-<?php echo html::script('media/js/jquery.metadata', FALSE) ?>
-<?php echo html::script('media/js/jquery.tablesorter.min', FALSE) ?>
 <?php echo html::script('media/js/messages_cs', FALSE) ?>
 <?php echo html::script('media/js/php.min', FALSE) ?>
 <script type="text/javascript">
@@ -32,12 +28,13 @@
 	}
 
 	$('form').validate();
+	$('#inst_done').hide();
 	
 	$('form').submit(function ()
 	{
 		if ($(this).valid())
 		{
-			$(this).after('<?php echo html::image(array('src' => 'media/images/icons/animations/ajax-loader-big.gif')) ?>');
+			$('#inst_done').show();
 			$(this).hide();
 			$('p.info_text').hide();
 		}
@@ -61,6 +58,7 @@
 		</p>
 		<br />
 		<?php echo  $form ?>
+		<img src="<?php echo url::base() ?>media/images/icons/animations/ajax-loader-big.gif" alt="Installed" id="inst_done" />
 	    </div>
 		<div class="clear"></div>
 	</div>

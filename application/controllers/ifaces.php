@@ -435,7 +435,7 @@ class Ifaces_Controller extends Controller
 				if ($this->acl_check_new(get_class($this), 'iface', $member_id))
 				{
 					$grid->add_new_button(
-							'ifaces/add/' . $device->id, 'Add new interface'
+							'ifaces/add/' . $iface->device->id, 'Add new interface'
 					);
 				}
 
@@ -512,6 +512,10 @@ class Ifaces_Controller extends Controller
 				
 				$grid->datasource($vlans);
 				$detail = $grid;
+				break;
+			case Iface_Model::TYPE_INTERNAL:
+				$detail = new View('ifaces/detail');
+				$detail->ip_addresses = $grid_ip_addresses;
 				break;
 		};
 		
@@ -674,6 +678,7 @@ class Ifaces_Controller extends Controller
 					->label('VLAN')
 					->options($vlan_ifaces)
 					->rules('required')
+					->add_button('vlans')
 					->style('width:200px');
 				
 				$vlan_form->dropdown('parent_iface_id')
@@ -1468,6 +1473,7 @@ class Ifaces_Controller extends Controller
 				->label('VLAN')
 				->options($vlans)
 				->selected($vlan_id)
+				->add_button('vlans')
 				->style('width:200px');
 
 			$vlan_form->dropdown('parent_iface_id')
@@ -1749,6 +1755,8 @@ class Ifaces_Controller extends Controller
 			try
 			{
 				$iface->transaction_start();
+				
+				$old_type = $iface->type;
 
 				$iface->name = $form_data['name'];
 				$iface->type = $form_data['itype'];
@@ -1848,9 +1856,23 @@ class Ifaces_Controller extends Controller
 						$im_connect_to->link_id = $lm->id;
 						$im_connect_to->save_throwable();
 					}
+					// disconnect
 					else if (isset($_POST['change_link']) && $_POST['change_link'])
 					{
 						$iface->link_id = null;
+					}
+					// do not changes link commonly, but if type changed we must
+					// look if the current link can be used on new type
+					// this code resolves (#310)
+					else if ($old_type != $iface->type)
+					{
+						$mediums = $iface->get_types_has_link_with_medium($iface->type);
+						
+						if ($iface->link_id && 
+							!array_key_exists($iface->link->medium, $mediums))
+						{
+							$iface->link_id = null;
+						}
 					}
 				}
 				else

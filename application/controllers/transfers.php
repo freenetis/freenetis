@@ -168,7 +168,7 @@ class Transfers_Controller extends Controller
 		
 		$grid->order_link_field('da_id')
 				->link('transfers/show_by_account', 'da_name')
-				->label('Origin account');
+				->label('Destination account');
 		
 		$grid->order_field('da_attribute')
 				->label(__('Type'));
@@ -332,13 +332,16 @@ class Transfers_Controller extends Controller
 		));
 
 		// payment cash link
-		if ($this->acl_check_new('Accounts_Controller', 'transfers', $account->member_id))
+		if ($this->acl_check_new('Accounts_Controller', 'transfers'))
 		{
 			$transfers_grid->add_new_button(
 					'transfers/add_member_fee_payment_by_cash/' .
 					$account->member->id, __('Payment by cash')
 			);
-			
+		}
+		
+		if ($this->acl_check_new('Accounts_Controller', 'transfers', $account->member_id))
+		{	
 			$transfers_grid->add_new_button(
 					'transfers/add_from_account/' . $account_id,
 					__('Send money to other account'),
@@ -960,7 +963,7 @@ class Transfers_Controller extends Controller
 				__('Back to transfers of account')
 		);
 		
-		$headline = __('Add new VoIP transfer');
+		$headline = __('Charge VoIP credit');
 		$info[] = __('Information') . ' : ' . __('Transfer will be effected within 15 minutes.');
 		$view = new View('main');
 		$view->title = $headline;
@@ -1262,7 +1265,6 @@ class Transfers_Controller extends Controller
 			$last_datetime = $transfer_model->find_last_transfer_datetime_by_type(
 					Transfer_Model::DEDUCT_MEMBER_FEE
 			);
-			echo $last_datetime;
 			
 			if ($last_datetime)
 				$max_date = date_parse($last_datetime);
@@ -1288,6 +1290,10 @@ class Transfers_Controller extends Controller
 		)->find();
 		// creation datetime of transfers
 		$creation_datetime = date('Y-m-d H:i:s');
+		
+		// status message
+		$message = '';
+		
 		try
 		{
 			$db = new Transfer_Model();
@@ -1305,7 +1311,10 @@ class Transfers_Controller extends Controller
 				if ($fee && $fee->id)
 					$default_fee = $fee->fee;
 				else
-					throw new Exception(__('Fatal error'), __('Fees have not been set!'));
+				{
+					$message = __('Error').': '.url_lang::lang('texts.Default fee for date %s have not been set!', $date);
+					throw new Exception($message);
+				}
 				// finds regular member fee for this member and this month
 				$fee = $fee_model->get_fee_by_member_date_type(
 						$account->member_id, $date, 'regular member fee'
@@ -1357,7 +1366,7 @@ class Transfers_Controller extends Controller
 		{
 			$db->transaction_rollback();
 			Log::add_exception($e);
-			status::error('Error - some fees have not been recounted.');
+			status::error($message);
 		}
 		url::redirect('transfers/show_by_account/' . $account_id);
 	}
@@ -1394,6 +1403,9 @@ class Transfers_Controller extends Controller
 			$db->transaction_start();
 			foreach ($credit_accounts as $ca)
 			{
+				// if member is not member yet, then no deduct is made (fixes #324)
+				if (empty($ca->entrance_date) || ($ca->entrance_date == '0000-00-00'))
+					continue;
 				// if member's entrance fee is 0, then no transfer is generated
 				if ($ca->entrance_fee == 0)
 					continue;

@@ -1563,6 +1563,7 @@ class Works_Controller extends Controller
 				->style('width:600px');
 		
 		$form->date('date')
+				->label('Date')
 				->years(date('Y') - 10, date('Y'))
 				->rules('required');
 		

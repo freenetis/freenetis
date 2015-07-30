@@ -3,17 +3,18 @@
 # Script for debianization of FreenetIS rSSH keys
 # (c) Ondrej Fibich, 2012
 #
-# Takes two arguments (version of package - FreenetIS).
+# Takes two arguments (version of package - FreenetIS and debian version).
 #
 ################################################################################
 
-if [ $# -ne 1 ]; then
+if [ $# -ne 2 ]; then
     echo "Wrong arg count.. Terminating"
     exit 1
 fi
 
 NAME=freenetis-ssh-keys
 VERSION=$1
+DEBIAN=$2
 
 # create dirs ##################################################################
 mkdir deb_packages/tmp
@@ -43,7 +44,7 @@ find * -type f ! -regex '^DEBIAN/.*' -exec md5sum {} \; >> DEBIAN/md5sums
 # create package info
 
 echo "Package: ${NAME}" >> DEBIAN/control
-echo "Version: ${VERSION}" >> DEBIAN/control
+echo "Version: ${VERSION}-${DEBIAN}" >> DEBIAN/control
 echo "Installed-Size: ${SIZE}" >> DEBIAN/control
 cat ../../${NAME}/control >> DEBIAN/control
 
@@ -81,7 +82,7 @@ sudo chown -hR root:root *
 sudo chmod g-w tmp/etc/cron.d/freenetis-ssh-keys
 
 # make package
-sudo dpkg-deb -b tmp ${NAME}_${VERSION}_all.deb
+sudo dpkg-deb -b tmp ${NAME}_${VERSION}+${DEBIAN}.deb
 
 # clean-up mess ################################################################
 

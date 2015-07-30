@@ -6,8 +6,8 @@
  */
 
 // IDE complementation
-if (FALSE): ?><script type='text/javascript'><?php endif
-
+if (FALSE): ?><script type='text/javascript'><?php endif;
+	$etm = new Enum_type_Model();
 ?>
 	var device_id = $('#device_id').val();
 	var depth = 2;
@@ -35,72 +35,52 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			'types' : {
 	            'valid_children' : [ 'root' ],
 	            'types' : {
-	                '<?php echo Device_Model::TYPE_PC ?>' : {
+	                '<?php echo $etm->get_type_id('pc', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/pc.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_CLIENT ?>' : {
+					'<?php echo $etm->get_type_id('client', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/client.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_ROUTER ?>' : {
+					'<?php echo $etm->get_type_id('router', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/router.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_SWITCH ?>' : {
+					'<?php echo $etm->get_type_id('switch', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/switch.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_NOTEBOOK ?>' : {
+					'<?php echo $etm->get_type_id('notebook', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/notebook.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_HOMEAP ?>' : {
+					'<?php echo $etm->get_type_id('home ap', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/homeap.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_VOIP ?>' : {
+					'<?php echo $etm->get_type_id('voip', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/voip.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_AP ?>' : {
+					'<?php echo $etm->get_type_id('ap', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/ap.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_MOBILE ?>' : {
-	                    'icon' : {
-	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/mobile.png'
-	                    }
-	                },
-					'<?php echo Device_Model::TYPE_TV ?>' : {
-	                    'icon' : {
-	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/tv.png'
-	                    }
-	                },
-					'<?php echo Device_Model::TYPE_CAMERA ?>' : {
-	                    'icon' : {
-	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/camera.png'
-	                    }
-	                },
-					'<?php echo Device_Model::TYPE_TABLET ?>' : {
+					'<?php echo $etm->get_type_id('tablet', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/tablet.png'
 	                    }
 	                },
-					'<?php echo Device_Model::TYPE_PRINTER ?>' : {
-	                    'icon' : {
-	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/printer.png'
-	                    }
-	                },
-					'<?php echo Device_Model::TYPE_SERVER ?>' : {
+					'<?php echo $etm->get_type_id('server', Enum_type_Model::DEVICE_TYPE_ID) ?>' : {
 	                    'icon' : {
 	                        'image' : '<?php echo url::base() ?>media/images/icons/devices/server.png'
 	                    }

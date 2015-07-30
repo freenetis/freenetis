@@ -70,20 +70,21 @@ class Contact_Model extends ORM
 	/**
 	 * Search for relation between users and countacts (users_contacts)
 	 * 
+	 * @param integer $contact_id
 	 * @return integer  Number of relation
 	 */
-	public function count_all_users_contacts_relation()
+	public function count_all_users_contacts_relation($contact_id = NULL)
 	{
-		if (!$this->id)
+		if ($contact_id == NULL && $this)
 		{
-			return 0;
+			$contact_id = $this->id;
 		}
 		
 		return $this->db->query("
 				SELECT COUNT(contact_id) AS count
 				FROM users_contacts
 				WHERE contact_id = ?
-		", $this->id, $this->id)->current()->count;
+		", $contact_id)->current()->count;
 	}
 
 	/**
@@ -189,6 +190,22 @@ class Contact_Model extends ORM
 		", $type, $value);
 
 		return ($query->count() > 0) ? $query->current()->id : FALSE;
+	}
+
+	/**
+	 * Find for contacts
+	 * 
+	 * @param string $type   Type of contact
+	 * @param string $value  Value of contact
+	 * @return Mysql_Result
+	 */
+	public function find_contacts($type, $value)
+	{
+		return $this->db->query("
+				SELECT c.*
+				FROM contacts c
+				WHERE c.type = ? AND c.value = ?
+		", $type, $value);
 	}
 
 	/**

@@ -183,13 +183,19 @@ class Enum_type_Model extends ORM
 	 * @param $value
 	 * @return integer
 	 */
-	public function get_type_id($value)
+	public function get_type_id($value, $type_id = NULL)
 	{
+		$where_type = '';
+		
+		if (!is_null($type_id))
+		{
+			$where_type = "AND type_id = " . intval($type_id);
+		}
+		
 		$result = $this->db->query("
 			SELECT id
 			FROM enum_types
-			WHERE value = ?
-			COLLATE utf8_general_ci
+			WHERE value LIKE ? $where_type
 		", $value);
 		
 		if ($result && $result->count())

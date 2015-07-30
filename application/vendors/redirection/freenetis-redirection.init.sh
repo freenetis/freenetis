@@ -20,7 +20,7 @@
 # Email   sevcik.roman@slfree.net                                              #
 #																		       #
 # Name    freenetis-redirection.init.sh		     							   #
-# Version 1.9.1                                                                #
+# Version 1.9.2                                                                #
 #                                                                              #
 ################################################################################
 
@@ -77,10 +77,10 @@ start_redirection ()
 		$IPTABLES -i $INPUT_INTERFACE -t nat -A PREROUTING -m set --set ranges src -p tcp --dport $PORT_WEB -j REDIRECT --to-port $PORT_REDIRECT
 
 		#If IP is allowed then it is not redirected
-		$IPTABLES -i $INPUT_INTERFACE -I FORWARD 2 -m set --set allowed src -j ACCEPT
+		$IPTABLES -i $INPUT_INTERFACE -I FORWARD 1 -m set --set allowed src -j ACCEPT
 
 		#Else everything drop
-		$IPTABLES -i $INPUT_INTERFACE -I FORWARD 3 -m set --set ranges src -j DROP
+		$IPTABLES -i $INPUT_INTERFACE -I FORWARD 2 -m set --set ranges src -j DROP
 
 		#Run update script on background
 		nohup $REDIRECTION_SYNCFILE >> "$LOG_FILE" 2>&1 &

@@ -118,7 +118,7 @@ class Members_traffic_Model extends Model
 	public function add_daily_partition()
 	{
 		$partition_name = date('Y_m_d', time());
-		$partition_date = date('Y-m-d', time() + 86400);
+		$partition_date = date('Y-m-d', strtotime('+1 day', time()));
 
 		$this->db->query("
 			ALTER TABLE members_traffics_daily

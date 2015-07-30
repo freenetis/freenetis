@@ -3,17 +3,18 @@
 # Script for debianization of FreenetIS redirection and QoS package
 # (c) Ondrej Fibich, 2012
 #
-# Takes two arguments (version of package - FreenetIS).
+# Takes two arguments (version of package - FreenetIS and debian version).
 #
 ################################################################################
 
-if [ $# -ne 1 ]; then
+if [ $# -ne 2 ]; then
     echo "Wrong arg count.. Terminating"
     exit 1
 fi
 
 NAME=freenetis-redirection
 VERSION=$1
+DEBIAN=$2
 
 # create dirs ##################################################################
 mkdir deb_packages/tmp
@@ -44,8 +45,15 @@ find * -type f ! -regex '^DEBIAN/.*' -exec md5sum {} \; >> DEBIAN/md5sums
 # create package info
 
 echo "Package: ${NAME}" >> DEBIAN/control
-echo "Version: ${VERSION}" >> DEBIAN/control
+echo "Version: ${VERSION}-${DEBIAN}" >> DEBIAN/control
 echo "Installed-Size: ${SIZE}" >> DEBIAN/control
+
+if [ "$DEBIAN" = lenny ] || [ "$DEBIAN" = squeeze ]; then
+	echo "Depends: coreutils, ipset, wget, grep, procps, python, ipset-source, module-assistant, lsb-release" >> DEBIAN/control
+else
+	echo "Depends: coreutils, ipset, wget, grep, procps, python, lsb-release" >> DEBIAN/control
+fi
+
 cat ../../${NAME}/control >> DEBIAN/control
 
 # change log
@@ -82,7 +90,7 @@ cd ..
 sudo chown -hR root:root *
 
 # make package
-sudo dpkg-deb -b tmp ${NAME}_${VERSION}_all.deb
+sudo dpkg-deb -b tmp ${NAME}_${VERSION}+${DEBIAN}.deb
 
 # clean-up mess ################################################################
 

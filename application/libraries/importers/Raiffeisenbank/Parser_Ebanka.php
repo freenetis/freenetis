@@ -118,11 +118,19 @@ class Parser_Ebanka extends Parser_Html_Table
 
 		// save date from
 		$this->from = date('Y-m-d', $from_timestamp);
-		$to_arr = array_map('intval', explode(".", $dates[1]));
-		$to_timestamp = mktime(0, 0, 0, $to_arr[1], $to_arr[0], $to_arr[2]);
+		
+		// date to is set
+		if (isset($dates[1]))
+		{
+			$to_arr = array_map('intval', explode(".", $dates[1]));
+			$to_timestamp = mktime(0, 0, 0, $to_arr[1], $to_arr[0], $to_arr[2]);
 
-		// save date to
-		$this->to = date('Y-m-d', $to_timestamp);
+			// save date to
+			$this->to = date('Y-m-d', $to_timestamp);
+		}
+		else
+		// date to is not set, date from will be used
+			$this->to = $this->from;
 	}
 
 	/**

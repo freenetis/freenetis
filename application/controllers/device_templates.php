@@ -243,7 +243,7 @@ class Device_templates_Controller extends Controller
 			
 			// parse values
 			$this->validate_form_value($vals);
-			$default = isset($form_data['default']);
+			$default = isset($form_data['default']) && $form_data['default'];
 			
 			// model
 			$device_template_model = new Device_template_Model();

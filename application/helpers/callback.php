@@ -79,12 +79,6 @@ class callback
 		// don't print days
 		unset($interval['days']);
 		
-		// remove all empty keys 
-		while (current($interval) == 0)
-		{
-			array_shift($interval);
-		}
-		
 		$units = array
 		(
 				'y' => 'year',
@@ -101,6 +95,12 @@ class callback
 		$pieces = array();
 		foreach ($interval as $unit => $val)
 		{	
+			// do not work with empty values (fixes #412)
+			if (empty($val))
+			{
+				continue;
+			}
+			
 			// make plural (if needed) and translate
 			$unit = strtolower(__($units[$unit]. (($val > 1) ? 's' : '')));
 
@@ -194,7 +194,7 @@ class callback
 	 * @param type $name
 	 * @param type $args 
 	 */
-	public function not_empty($item, $name, $args = array())
+	public static function not_empty($item, $name, $args = array())
 	{
 		if ($item->$name === NULL)
 		{
@@ -480,7 +480,7 @@ class callback
 	{
 		if (empty($item->message_id))
 		{
-			echo '&nbsp;';
+			echo '&nbsp;-&nbsp;';
 		}
 		else
 		{
@@ -953,20 +953,20 @@ class callback
 	public static function message_field($item, $name)
 	{
 		// system messages
-		if ($item->type >= 0)
+		if ($item->type > 0)
 		{
 			// system messages
 			echo __($item->message);
 		}
-		elseif ($item->type == 0)
+		else if ($item->type === NULL)
 		{
-			// user messages
-			echo $item->message;
+			// null value means no message
+			echo '<span style="color: #999">' . __('No redirection') . '</span>';
 		}
 		else
 		{
-			// null value means no message
-			echo __('No redirection');
+			// user messages
+			echo $item->message;
 		}
 	}
 
@@ -1183,7 +1183,7 @@ class callback
 		
 		if ($message->type == Message_Model::CONTACT_INFORMATION ||
 			$message->type == Message_Model::CANCEL_MESSAGE ||
-				$message->type == Message_Model::UNKNOWN_DEVICE_MESSAGE)
+			$message->type == Message_Model::UNKNOWN_DEVICE_MESSAGE)
 		{
 			echo '&nbsp;';
 		}
@@ -1248,10 +1248,17 @@ class callback
 	{
 		$message = new Message_Model($item->id);
 		
-		echo html::anchor(
-				url::base().'redirection/?id='.$message->id,
-				__('Preview'), array('target' => '_blank')
-		);
+		if (empty($message->text))
+		{
+			echo '<span class="red">' . __('Empty') . '</span>';
+		}
+		else
+		{
+			echo html::anchor(
+					url::base().'redirection/?id='.$message->id,
+					__('Preview'), array('target' => '_blank')
+			);
+		}
 	}
 	
 	/**
@@ -1558,7 +1565,7 @@ class callback
 	 * @param type $item
 	 * @param type $name 
 	 */
-	public function port_mode_field($item, $name)
+	public static function port_mode_field($item, $name)
 	{
 		echo Iface_Model::get_port_mode($item->port_mode);
 	}

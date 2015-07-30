@@ -7,7 +7,7 @@
 # email   sevcik.roman@slfree.net                                              #
 #                                                                              #
 # name    freenetis-redirection-sync.sh                                        #
-# version 1.9.1                                                                #
+# version 1.9.2                                                                #
 #                                                                              #
 ################################################################################
 

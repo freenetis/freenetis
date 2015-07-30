@@ -132,6 +132,12 @@ class Js_Controller extends Controller
 		$this->views['devices_add']->arr_devices = $device->select_list_device_with_user($user_id);
 	}
 	
+	private function _js_devices_add_simple()
+	{
+		$this->address_point_streets();
+		$this->address_point_gps();
+	}
+	
 	private function _js_devices_add_filter()
 	{		
 		$this->views['devices_add'] = View::factory('js/devices_add_filter');
@@ -199,6 +205,7 @@ class Js_Controller extends Controller
 		$this->address_point_streets();
 		$this->address_point_gps();
 		$this->domicile_toogle();
+		$this->member_type();
 	}
 	
 	private function _js_members_edit()
@@ -206,6 +213,7 @@ class Js_Controller extends Controller
 		$this->address_point_streets();
 		$this->address_point_gps();
 		$this->domicile_toogle();
+		$this->member_type();
 	}
 	
 	private function _js_members_fees_add($member_id = NULL, $fee_type_id = NULL)
@@ -369,6 +377,17 @@ class Js_Controller extends Controller
 	{
 		$this->views['__pieces_domicile'] =
 				View::factory('js/__pieces/domicile')->render();
+	}
+	
+	/**
+	 * Adds javascript for handling of member type. (Form is changed according to type)
+	 * 
+	 * @author Ondřej Fibich
+	 */
+	private function member_type()
+	{
+		$this->views['__pieces_member_type'] =
+				View::factory('js/__pieces/member_type')->render();
 	}
 	
 	/**

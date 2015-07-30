@@ -60,7 +60,7 @@ class Aro_groups_Controller extends Controller
 
 			$count = $model_groups_aro_map->count_rows_by_group_id($group->id);
 
-			if ($group->id == 21)
+			if ($group->id == Aro_group_Model::ALL)
 			{
 				$rows[$i + 1] = '<tr><td style="width:400px">'
 					. $ret . __('' . $group->name)
@@ -434,10 +434,17 @@ class Aro_groups_Controller extends Controller
 			Controller::error(RECORD);
 		
 		// cannot delete group with some childrens
+		if (!$group->is_deletable())
+		{
+			status::warning('Cannot delete group - this group is protected against deletion');
+			url::redirect('aro_groups/show_all');
+		}
+		
+		// cannot delete group with some childrens
 		if ($group->count_childrens())
 		{
 			status::warning('Cannot delete group - it has at least one children group');
-			url::redirect('access_rights/show_groups');
+			url::redirect('aro_groups/show_all');
 		}
 		
 		$group->transaction_start();

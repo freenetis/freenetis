@@ -88,14 +88,14 @@ class Email_queue_Model	extends ORM
 				LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 				LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 				LEFT JOIN users tu ON tuc.user_id = tu.id
-				WHERE eq.state = ?";
+				WHERE eq.state = ?
+				GROUP BY eq.id";
 		
 		// filter
 		if (empty($filter_sql))
 		{
 			return $this->db->query("
 				$body
-				GROUP BY eq.id
 				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
 				LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
 			", $args);
@@ -148,6 +148,7 @@ class Email_queue_Model	extends ORM
 			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 			LEFT JOIN users tu ON tuc.user_id = tu.id
 			WHERE eq.state = ?
+            GROUP BY eq.id
 			$having
 		", array
 		(
@@ -190,6 +191,7 @@ class Email_queue_Model	extends ORM
 				LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 				LEFT JOIN users tu ON tuc.user_id = tu.id
 				WHERE eq.state = ?
+				GROUP BY eq.id
 				$having
 			) eq
 		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK);
@@ -222,6 +224,7 @@ class Email_queue_Model	extends ORM
 			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 			LEFT JOIN users tu ON tuc.user_id = tu.id
 			WHERE eq.state = ?
+            GROUP BY eq.id
 			$having
 		", array
 		(
@@ -275,6 +278,7 @@ class Email_queue_Model	extends ORM
 			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 			LEFT JOIN users tu ON tuc.user_id = tu.id
 			WHERE eq.state <> ?
+            GROUP BY eq.id
 			$having
 			ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
 			LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
@@ -317,7 +321,8 @@ class Email_queue_Model	extends ORM
 			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 			LEFT JOIN users tu ON tuc.user_id = tu.id
-			WHERE eq.state <> ? 
+			WHERE eq.state <> ?
+            GROUP BY eq.id
 			$having
 		", array
 		(

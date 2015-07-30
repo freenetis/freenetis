@@ -774,6 +774,14 @@ class Settings_Controller extends Controller
 		$this->form->checkbox('former_member_auto_device_remove')
 				->label('Enable automatical deletion of devices of former members')
 				->checked(Settings::get('former_member_auto_device_remove'));
+        
+        $this->form->checkbox('user_phone_duplicities_enabled')
+                ->label('Enable multiple users to have assigned same phone contact')
+				->checked(Settings::get('user_phone_duplicities_enabled'));
+
+        $this->form->checkbox('user_email_duplicities_enabled')
+                ->label('Enable multiple users to have assigned same e-mail contact')
+				->checked(Settings::get('user_email_duplicities_enabled'));
 		
 		$this->form->group('Security');
 		

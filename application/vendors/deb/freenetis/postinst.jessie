@@ -1,0 +1,299 @@
+#!/bin/bash
+# FreenetIS DEB: actions after installing of package
+
+set -e
+. /usr/share/debconf/confmodule
+
+SERVER=apache2
+CONFIGFILE=/etc/freenetis/freenetis.conf
+CONFIG_SAMPLE_PHP=/usr/share/freenetis/config-sample.php
+
+# Generate config file, if it doesn’t exist.
+# An alternative is to copy in a template
+# file from elsewhere.
+
+if [ ! -e $CONFIGFILE ]; then
+	mkdir /etc/freenetis/
+    echo "# Config file for FreenetIS" > $CONFIGFILE
+    echo "SERVERNAME=\"localhost/freenetis\"" >> $CONFIGFILE
+    echo "PROTOCOL=\"http\"" >> $CONFIGFILE
+fi
+
+# load configure file
+. $CONFIGFILE || true
+
+# Version 1.1 is located in /usr/share/freenetis but previous versions were
+# located in /var/www/freeenetis, we try to use old config files if they are
+# exists. The old configuration must not replace new configuration!
+
+OLD_PATH=/var/www/freenetis
+CURRENT_PATH=/usr/share/freenetis
+
+# DB config
+if [ -f "${OLD_PATH}/config.php" ] && [ ! -f "${CURRENT_PATH}/config.php" ]; then
+	echo "Copying old DB configuration from ${OLD_PATH}/config.php file"
+	cp "${OLD_PATH}/config.php" "${CURRENT_PATH}/config.php"
+fi
+
+# .htaccess
+if [ -f "${OLD_PATH}/.htaccess" ] && [ ! -f "${CURRENT_PATH}/.htaccess" ]; then
+	echo "Copying old apache configuration from ${OLD_PATH}/.htaccess file"
+	cp "${OLD_PATH}/.htaccess" "${CURRENT_PATH}/.htaccess"
+	chmod 0666 "${CURRENT_PATH}/.htaccess" || true
+fi
+
+# Substitute in the values from the debconf db.
+# There are obvious optimizations possible here.
+# The cp before the sed ensures we do not mess up
+# the config file’s ownership and permissions.
+
+db_get freenetis/server_type
+SERVER_TYPE="$RET"
+
+db_get freenetis/servername
+SERVERNAME="$RET"
+
+db_get freenetis/protocol
+PROTOCOL="$RET"
+
+db_get freenetis/https_add_redir
+HTTPS_ADD_REDIR="$RET"
+
+cp -a -f $CONFIGFILE $CONFIGFILE.tmp
+
+# h@ck for enable reloading vars from config file
+db_set freenetis/hack_reload true
+db_go || true
+
+# If the admin deleted or commented some variables but then set
+# them via debconf, (re-)add them to the conffile.
+
+test -z "$SERVERNAME" || grep -Eq '^ *SERVERNAME=' $CONFIGFILE || echo "SERVERNAME=" >> $CONFIGFILE
+test -z "$PROTOCOL" || grep -Eq '^ *PROTOCOL=' $CONFIGFILE || echo "PROTOCOL=" >> $CONFIGFILE
+
+SERVERNAME_ESCAPED="${SERVERNAME//\//\\/}"
+sed -e "s/^ *SERVERNAME=.*/SERVERNAME=\"$SERVERNAME_ESCAPED\"/" \
+	-e "s/^ *PROTOCOL=.*/PROTOCOL=\"$PROTOCOL\"/" < $CONFIGFILE > $CONFIGFILE.tmp
+
+mv -f $CONFIGFILE.tmp $CONFIGFILE
+
+# check server name
+if [ -z "$SERVERNAME" ]; then
+	echo "Wrong server name, configuration failed!"
+	exit 3
+fi
+
+# check protocol
+if [ -z "$PROTOCOL" ]; then
+	echo "Wrong protocol, configuration failed!"
+	exit 3
+fi
+
+# check SSL keys
+if [ "$PROTOCOL" = "https" ]; then
+
+	if [ ! -f "$SSL_CERTIFICATE_FILE" ]; then
+		echo "SSL certificate file and key file not set properly."
+		echo "File $SSL_CERTIFICATE_FILE does not exists"
+		echo " => switching protocol from https to http"
+		PROTOCOL="http"
+	fi
+
+	if [ ! -f "$SSL_CERTIFICATE_KEY_FILE" ]; then
+		echo "SSL certificate file and key file not set properly."
+		echo "File $SSL_CERTIFICATE_KEY_FILE does not exists"
+		echo " => switching protocol from https to http"
+		PROTOCOL="http"
+	fi
+
+fi
+
+# Make post install things
+
+# 0) Access rights to some directories
+chmod ugo+w /usr/share/freenetis
+chmod ugo+w /usr/share/freenetis/upload
+mkdir -m 0777 /usr/share/freenetis/logs 2>/dev/null || true
+
+# 1) Apache config
+echo "Preparing Apache"
+
+A2CF=/etc/$SERVER/conf-enabled/freenetis.conf
+
+# activate redirection
+a2enmod rewrite > /dev/null
+
+# activate SSL if https selected
+if [ "$PROTOCOL" = "https" ]; then
+	a2enmod ssl > /dev/null
+fi
+
+# PHP settings
+php_settings="
+                # PHP settings
+                php_flag register_globals Off
+                php_flag magic_quotes_gpc Off
+                php_flag magic_quotes_runtime Off
+                php_flag file_uploads On
+                php_flag short_open_tag On
+                # large inputs (fixes #358, #410)
+                php_value max_input_vars 100000
+                php_admin_value suhosin.post.max_vars 100000
+                php_admin_value suhosin.request.max_vars 100000"
+
+# make config for FN
+if [ "$SERVER_TYPE" = localhost ]; then
+
+	echo "Alias /freenetis /usr/share/freenetis" > $A2CF
+	echo "<Directory /usr/share/freenetis>" >> $A2CF
+	echo "        Options Indexes FollowSymLinks MultiViews" >> $A2CF
+	echo "        AllowOverride All" >> $A2CF
+	echo "        Order allow,deny" >> $A2CF
+	echo "        allow from all" >> $A2CF
+	echo "        ${php_settings}" >> $A2CF
+	echo "</Directory>"	>> $A2CF
+
+else
+
+	if [ "$PROTOCOL" = "https" ]; then
+		echo "NameVirtualHost *:443" > $A2CF
+		echo "<VirtualHost *:443>" >> $A2CF
+	else
+		echo "NameVirtualHost *:80" > $A2CF
+		echo "<VirtualHost *:80>" >> $A2CF
+	fi
+
+	echo "        ServerName ${SERVERNAME}" >> $A2CF
+	echo "        ServerAlias www.${SERVERNAME}" >> $A2CF
+	echo "        DocumentRoot /usr/share/freenetis" >> $A2CF
+	echo "        <Directory /usr/share/freenetis>" >> $A2CF
+	echo "                Options Indexes FollowSymLinks MultiViews" >> $A2CF
+	echo "                AllowOverride All" >> $A2CF
+	echo "                Order allow,deny" >> $A2CF
+	echo "                allow from all" >> $A2CF
+	echo "                ${php_settings}" >> $A2CF
+	echo "        </Directory>"	>> $A2CF
+	echo "        ErrorLog $ERROR_LOG_FILE" >> $A2CF
+	echo "        CustomLog $CUSTOM_LOG_FILE common" >> $A2CF
+
+	if [ "$PROTOCOL" = "https" ]; then
+		echo "        SSLEngine on" >> $A2CF
+		echo "        SSLProtocol all -SSLv2" >> $A2CF
+		echo "        SSLCipherSuite ALLADHEXPORTSSLv2:RC4+RSA:+HIGH:+MEDIUM" >> $A2CF
+
+		if [ -f "$SSL_CERTIFICATE_FILE" ]; then
+			echo "        SSLCertificateFile $SSL_CERTIFICATE_FILE" >> $A2CF
+		fi
+
+		if [ -f "$SSL_CERTIFICATE_KEY_FILE" ]; then
+			echo "        SSLCertificateKeyFile $SSL_CERTIFICATE_KEY_FILE" >> $A2CF
+		fi
+
+		if [ -f "$SSL_CERTIFICATE_CHAIN_FILE" ]; then
+			echo "        SSLCertificateChainFile $SSL_CERTIFICATE_CHAIN_FILE" >> $A2CF
+		fi
+
+		if [ -f "$SSL_CA_CERTIFICATE_FILE" ]; then
+			echo "        SSLCACertificateFile $SSL_CA_CERTIFICATE_FILE" >> $A2CF
+		fi
+
+		echo "        SetEnvIf User-Agent \".*MSIE.*\" nokeepalive ssl-unclean-shutdown" >> $A2CF
+	fi
+
+	echo "</VirtualHost>" >> $A2CF
+
+	# redirection from http to https
+	if [ "$PROTOCOL" = "https" ] && [ "$HTTPS_ADD_REDIR" = true ]; then
+		echo "<VirtualHost *:80>" >> $A2CF
+		echo "        ServerName ${SERVERNAME}" >> $A2CF
+		echo "        ServerAlias www.${SERVERNAME}" >> $A2CF
+		echo "        KeepAlive Off" >> $A2CF
+		echo "        RewriteEngine On" >> $A2CF
+		echo "        RewriteRule ^/(.*) https://${SERVERNAME}/\$1 [L,R=301]" >> $A2CF
+		echo "</VirtualHost>" >> $A2CF
+	fi
+fi
+
+# pre-configure protocol
+sed -e "s/^ *\$config\['protocol'\] *=.*/\$config['protocol'] = '$PROTOCOL';/" < $CONFIG_SAMPLE_PHP > $CONFIG_SAMPLE_PHP.tmp
+mv -f $CONFIG_SAMPLE_PHP.tmp $CONFIG_SAMPLE_PHP
+
+# restart
+if [ -x /usr/sbin/invoke-rc.d ]; then
+	invoke-rc.d apache2 restart 3>/dev/null || true
+else
+	/etc/init.d/apache2 restart 3>/dev/null || true
+fi
+
+# 2) CRON
+
+echo "Preparing CRON"
+
+echo "# /etc/cron.d/freenetis: Regular CRON file for freenetis package (triggered each minute)" > /etc/cron.d/freenetis
+echo "" >> /etc/cron.d/freenetis
+echo "SHELL=/bin/sh" >> /etc/cron.d/freenetis
+echo "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin" >> /etc/cron.d/freenetis
+echo "* *     * * *   root    wget -O /dev/null ${PROTOCOL}://${SERVERNAME}/index.php/cs/scheduler/run --no-check-certificate -q" >> /etc/cron.d/freenetis
+
+chmod g-w /etc/cron.d/freenetis
+
+if [ -x /usr/sbin/invoke-rc.d ]; then
+	invoke-rc.d cron restart 3>/dev/null || true
+else
+	/etc/init.d/cron restart 3>/dev/null || true
+fi
+
+# 3) locales
+
+echo "Preparing locales"
+
+# list of required locales for FreenetIS -> add some for different language mutation
+locales=(en_US.UTF-8 cs_CZ.UTF-8)
+locales_lowered=(en_US.utf8 cs_CZ.utf8)
+
+# is reconfigure of locales required?
+reconfigure=0
+debian=1
+
+for index in ${!locales[*]}
+do
+
+	loc=${locales[index]}
+	loc_lowered=${locales_lowered[index]}
+
+	set +e
+	locale -a | grep "^$loc_lowered$" > /dev/null
+	ret=$?
+	set -e
+
+	# locale not present
+	if [ $ret -ne 0 ]; then
+		reconfigure=1
+		encoding=`echo $loc | cut -f2 -d'.'`
+		loc_str="$loc $encoding"
+
+		if [ -f "/etc/locale.gen" ]; then # Debian
+			loc_str_esc="${loc_str//\//\\/}"
+			sed -e "s/^# $loc_str_esc/$loc_str_esc/" < /etc/locale.gen > /etc/locale.gen.tmp
+			mv -f /etc/locale.gen.tmp /etc/locale.gen
+		elif [ -d "/var/lib/locales/supported.d" ]; then # Ubuntu
+			debian=0
+			short_cut=`echo $loc | cut -f1 -d'_'`
+			touch /var/lib/locales/supported.d/${short_cut}
+			echo $loc_str >> /var/lib/locales/supported.d/${short_cut}
+		else
+			echo "Unknown locale generation, cannot generate locales"
+			exit 5
+		fi
+	fi
+
+done
+
+# reconfigure locales if any missing
+if [ $reconfigure -eq 1 ]; then
+	if [ $debian -eq 1 ]; then # Debian
+		locale-gen
+	else # Ubuntu
+		dpkg-reconfigure locales
+	fi
+fi

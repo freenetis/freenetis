@@ -703,5 +703,29 @@ class Account_Model extends ORM
 				->where('account_attribute_id', $account_attribute_id)
 				->find();
 	}
+
+    /**
+     * Select list of accounts without accounts whose attribute IDs are in
+     * passed argument.
+     *
+     * @param int|array $account_attribute_id
+     */
+    public function select_list_without_types($account_attribute_id)
+    {
+        if (!is_array($account_attribute_id))
+        {
+            $account_attribute_id = array($account_attribute_id);
+        }
+
+		$concat = "CONCAT(
+				COALESCE(name, ''),
+				' - " . __('Account ID') . " ',
+				id,
+                CONCAT(', ', account_attribute_id)
+		)";
+		$aaids = array_map('intval', $account_attribute_id);
+		return $this->in('account_attribute_id', $aaids, TRUE)
+				->select_list('id', $concat, 'account_attribute_id');
+    }
 	
 }

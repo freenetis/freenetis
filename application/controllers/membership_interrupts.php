@@ -120,7 +120,7 @@ class Membership_interrupts_Controller extends Controller
 		
 		$grid->order_callback_field('member_id')
 				->label('Member')
-				->callback('callback::member_field');
+				->callback('callback::member_field_with_id');
 		
 		$grid->order_field('from')
 				->label('Date from');

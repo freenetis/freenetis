@@ -4104,7 +4104,7 @@
             <attributes/>
             <values>
                 <input/>
-				
+
                 <input>
 					<param type="post" name="login" value="unit_tester____"/>
 					<param type="post" name="password" value="qwertzuiop7"/>
@@ -12581,22 +12581,6 @@
                 </input>
             </values>
         </method>
-        <method name="get_phones_and_names_of_subnet" autogenerate="off">
-            <attributes>
-                <attribute name="subnet_id" default_value=""/>
-            </attributes>
-            <values>
-                <input>
-                    <param value=""/>
-                </input>
-                <input>
-                    <param value="1"/>
-                </input>
-                <input>
-                    <param value="1'+1"/>
-                </input>
-            </values>
-        </method>
         <method name="get_phones_of_subnet" autogenerate="off">
             <attributes>
                 <attribute name="subnet_id" default_value=""/>
@@ -13612,21 +13596,6 @@
         </method>
     </model>
     <model name="users_contacts">
-        <method name="get_all_contacts_by_type" autogenerate="on">
-            <attributes>
-                <attribute name="type" default_value="" />
-                <attribute name="ignore_whitelisted" default_value="FALSE" />
-            </attributes>
-            <values>
-                <input>
-                    <param value="" />
-                </input>
-                <input>
-                    <param value="" />
-                    <param value="FALSE" />
-                </input>
-            </values>
-        </method>
         <method name="get_redirected_email_boxes_of" autogenerate="on">
             <attributes>
                 <attribute name="user_id" default_value="" />
@@ -16032,32 +16001,6 @@
                     <param value="" />
                     <param value="" />
                     <param value="" />
-                </input>
-            </values>
-        </method>
-        <method name="arithmetic_arr" autogenerate="off">
-            <attributes>
-                <attribute name="unit" default_value=""/>
-                <attribute name="number" default_value=""/>
-            </attributes>
-            <values>
-            </values>
-        </method>
-        <method name="arithmetic" autogenerate="on">
-            <attributes>
-                <attribute name="date" default_value="" />
-                <attribute name="unit" default_value="" />
-                <attribute name="number" default_value="1" />
-            </attributes>
-            <values>
-                <input>
-                    <param value="" />
-                    <param value="" />
-                </input>
-                <input>
-                    <param value="" />
-                    <param value="" />
-                    <param value="1" />
                 </input>
             </values>
         </method>

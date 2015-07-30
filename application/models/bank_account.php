@@ -172,7 +172,7 @@ class Bank_account_Model extends ORM
 					m.name AS member_name, ba.member_id, ba.type, ba.settings
 				FROM bank_accounts ba
 				LEFT JOIN members m ON m.id = ba.member_id
-				WHERE ba.member_id <> 1 $where
+				WHERE (ba.member_id <> 1 OR ba.member_id IS NULL) $where
 				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
 				LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
 		");	
@@ -194,7 +194,7 @@ class Bank_account_Model extends ORM
 		return $this->db->query("
 				SELECT COUNT(*) AS total
 				FROM bank_accounts ba
-				WHERE ba.member_id <> 1 $where"
+				WHERE (ba.member_id <> 1 OR ba.member_id IS NULL) $where"
 		)->current()->total;	
 	}	
 	

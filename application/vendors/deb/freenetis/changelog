@@ -1,3 +1,14 @@
+freenetis (1.1.10) stable; urgency=hight
+  * New configuration option that allows duplicates in phone and e-mail contacts
+  * New variable symbol generator that generates member ID
+  * Member table displays member interrupt info in member type column
+  * New form for editing of bank account that is not owned by association
+  * New form for assigning of unidentified transfer to any account
+  * Member ID is displayed in membership interrupt table in member column
+  * Fixes of members fee recalculation if deduct day is last day in month
+  * Fixes issue with hidden bank accounts that do not have owner
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 16 Apr 2015 22:45:27 +0200
+
 freenetis (1.1.9) stable; urgency=hight
   * Fix release of invalid DEB package
  -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 03 Mar 2015 18:18:18 +0100

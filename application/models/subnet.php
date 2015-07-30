@@ -357,29 +357,6 @@ class Subnet_Model extends ORM
 				WHERE s.network_address LIKE ? COLLATE utf8_general_ci
 		", "$ip_prefix%");
 	}
-	
-	/**
-	 * Function gets phone numbers and names of users of subnet to export address book.
-	 * 
-	 * @author Lubomir Buben
-	 * @param integer $subnet_id
-	 * @return Mysql_Result
-	 */
-	public function get_phones_and_names_of_subnet($subnet_id)
-	{
-		return $this->db->query("
-				SELECT DISTINCT(co.value) as phone, CONCAT(u.surname,' ',u.name) as name, u.id
-				FROM subnets su
-				LEFT JOIN ip_addresses ip ON ip.subnet_id = su.id
-				LEFT JOIN ifaces i ON i.id = ip.iface_id
-				LEFT JOIN devices d ON d.id = i.device_id
-				LEFT JOIN users u ON u.id = d.user_id
-				LEFT JOIN members m ON m.id = u.member_id
-				LEFT JOIN users_contacts uc ON uc.user_id = u.id
-				LEFT JOIN contacts co ON co.id = uc.contact_id
-				WHERE su.id = ? AND co.type = ? AND m.id <> 1 AND m.locked <> 1;
-		", array($subnet_id, Contact_Model::TYPE_PHONE));
-	}
 
 	/**
 	 * Function gets phone numbers of users of subnet.

@@ -1659,16 +1659,17 @@ class Transfers_Controller extends Controller
 					if (!$date)
 						$date = $entrance_date;
 					
-					$date = date_parse($date);
-					
-					$year = $date['year'];
-					$month = $date['month'];
-					$day = $date['day'];
+					$date = date::get_closses_deduct_date_to($date);
 					
 					$amount = ($account->balance + $form_data['amount'] - $transfer_fee);
 					
 					while (true)
 					{
+                        $date_arr = date_parse($date);
+                        $year = $date_arr['year'];
+                        $month = $date_arr['month'];
+                        $day = $date_arr['day'];
+
 						$amount -= $fee_model->get_regular_member_fee_by_member_date($account->member_id, date::create($day, $month, $year));
 						
 						if (isset($payments[$year][$month]))
@@ -1676,8 +1677,8 @@ class Transfers_Controller extends Controller
 						
 						if ($amount < 0)
 							break;
-						
-						date::arithmetic_arr($day, $month, $year, 'month', 1);
+
+                        $date = date::get_next_deduct_date_to($date);
 					}
 					
 					if (!$text)
@@ -1689,7 +1690,7 @@ class Transfers_Controller extends Controller
 				
 				case 'amount':
 					
-					$date = date::arithmetic($transfer_model->find_last_transfer_datetime_by_type(Transfer_Model::DEDUCT_MEMBER_FEE), 'month', 1);
+					$date = date::get_next_deduct_date_to($transfer_model->find_last_transfer_datetime_by_type(Transfer_Model::DEDUCT_MEMBER_FEE));
 					
 					$amount = ($account->balance + $entrance_fee_paid + $devices_fee_paid - $transfer_fee) * -1;
 					
@@ -1699,7 +1700,7 @@ class Transfers_Controller extends Controller
 					{						
 						$amount += $fee_model->get_regular_member_fee_by_member_date($account->member_id, $date);
 						
-						$date = date::arithmetic($date, 'month', 1);
+						$date = date::get_next_deduct_date_to($date);
 					}
 					
 					foreach ($payments as $year => $year_payments)

@@ -1,0 +1,33 @@
+#!/bin/sh
+# FreenetIS DEB: actions after uninstalling of package
+
+set -e
+
+CONFIGFILE=/etc/freenetis/freenetis.conf
+
+# remove from Apache config
+rm -rf /etc/apache2/conf-enabled/freenetis.conf
+
+# remove all configuration if purge
+if [ "$1" = purge ]; then
+	# remove defconf values
+	if [ -e /usr/share/debconf/confmodule ]; then
+		. /usr/share/debconf/confmodule
+		db_purge
+	fi
+	# remove config files
+	rm -rf $CONFIGFILE
+	# remove all files
+	rm -rf /usr/share/freenetis
+	# remove dir if empty
+	[ "$(ls -A /etc/freenetis)" ] || rm -rf /etc/freenetis
+# restart apache
+else
+	if [ -x /usr/sbin/invoke-rc.d ]; then
+		invoke-rc.d apache2 reload 3>/dev/null || true
+	else
+		/etc/init.d/apache2 reload 3>/dev/null || true
+	fi
+fi
+
+exit 0

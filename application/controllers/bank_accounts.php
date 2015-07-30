@@ -234,6 +234,14 @@ class Bank_accounts_Controller extends Controller
 						->url('bank_transfers/show_by_bank_account')
 						->label('Show transfers');
 			}
+
+            if ($this->acl_check_edit('Accounts_Controller', 'bank_accounts'))
+            {
+                $actions->add_conditional_action('id')
+                        ->icon_action('edit')
+                        ->url('bank_accounts/edit')
+                        ->class('popup_link');
+            }
 			
 			$grid->datasource($ba);
 		}
@@ -428,12 +436,29 @@ class Bank_accounts_Controller extends Controller
 		$bank_account = new Bank_account_Model($bank_account_id);
 		
 		// exists?
-		if (!$bank_account || !$bank_account->id ||
-			$bank_account->member_id != Member_Model::ASSOCIATION)
+		if (!$bank_account || !$bank_account->id)
 		{
 			self::error(RECORD);
 		}
-		
+
+        // different logic for bank account of association
+        if ($bank_account->member_id == Member_Model::ASSOCIATION)
+        {
+            $this->edit_association($bank_account);
+        }
+        else
+        {
+            $this->edit_non_association($bank_account);
+        }
+    }
+
+    /**
+     * Edit form for bank account of association.
+     *
+     * @param Bank_account_Model $bank_account
+     */
+    private function edit_association(Bank_account_Model $bank_account)
+    {
 		try
 		{
 			$ba_driver = Bank_Account_Settings::factory($bank_account->type);
@@ -549,6 +574,77 @@ class Bank_accounts_Controller extends Controller
 		$view->content->headline = $headline;
 		$view->content->form = $form->html();
 		$view->render(TRUE);	
+	}
+
+    /**
+     * Edit form for bank account that do not belongs to association.
+     *
+     * @param Bank_account_Model $bank_account
+     */
+    private function edit_non_association(Bank_account_Model $bank_account)
+    {
+        $members =  array
+		(
+			NULL => '--- ' . __('Without owner') . ' ---'
+		) + ORM::factory('member')->select_list_grouped(FALSE);
+        unset($members[Member_Model::ASSOCIATION]); // remove association
+
+		// form
+		$form = new Forge();
+
+		$form->group('Basic information');
+
+        $form->input('name')
+                ->rules('required')
+                ->value($bank_account->name)
+				->style('width:200px');
+
+		$form->dropdown('member_id')
+                ->label('Owner')
+				->options($members)
+				->selected($bank_account->member_id)
+				->style('width:200px');
+
+		// submit button
+		$form->submit('Edit');
+
+		// validation
+		if ($form->validate())
+		{
+			$form_data = $form->as_array();
+
+			// real bank account
+			$bank_account->name = $form_data['name'];
+			$bank_account->member_id = $form_data['member_id'];
+
+			$bank_account->save();
+
+			// redirection
+			$this->redirect('bank_accounts/show_all');
+		}
+        else
+        {
+            $headline = __('Edit bank account');
+
+            // breadcrubs
+            $breadcrumbs = breadcrumbs::add()
+                    ->link('members/show/1', 'Profile of association',
+                            $this->acl_check_view('Members_Controller', 'members'))
+                    ->link('bank_accounts/show_all', 'Bank accounts')
+                    ->disable_translation()
+                    ->text($bank_account->account_nr . '/' . $bank_account->bank_nr)
+                    ->text($headline)
+                    ->html();
+
+            // view
+            $view = new View('main');
+            $view->title = $headline;
+            $view->breadcrumbs = $breadcrumbs;
+            $view->content = new View('form');
+            $view->content->headline = $headline;
+            $view->content->form = $form->html();
+            $view->render(TRUE);
+        }
 	}
 	
 }

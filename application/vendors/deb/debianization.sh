@@ -22,7 +22,7 @@ fi
 
 NAMES=(freenetis freenetis-monitoring freenetis-redirection freenetis-dhcp \
 	   freenetis-ssh-keys freenetis-qos)
-DEBIANS=(lenny squeeze wheezy)
+DEBIANS=(lenny squeeze wheezy jessie)
 VERSION=$1
 
 if [ $# -eq 2 ] || [ $# -eq 3 ]; then
@@ -70,7 +70,7 @@ do
 		if [ -f "$deb_sh" ]; then
 			cd "$deb_dir_sh"
 			./debianization.sh "$VERSION" "$debian"
-			
+
 			if [ $? -eq 0 ]; then
 				green_echo ">>>> [$name+$debian] debianized"
 				# move builded packages
@@ -81,7 +81,7 @@ do
 			else
 				red_echo ">>>> [$name+$debian] an error occured during debianization"
 			fi
-			
+
 			cd "$root_dir"
 		else
 			red_echo ">>>> [$name+$debian] not debianized (debianization utility is missing)"

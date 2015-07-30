@@ -599,7 +599,19 @@ class Contacts_Controller extends Controller
 		else
 		{
 			$contact_model = new Contact_Model();
-			
+
+            // do not search if duplicies enabled (#968)
+            if ($type == Contact_Model::TYPE_EMAIL &&
+                    Settings::get('user_email_duplicities_enabled'))
+            {
+                return;
+            }
+            if ($type == Contact_Model::TYPE_PHONE &&
+                    Settings::get('user_phone_duplicities_enabled'))
+            {
+                return;
+            }
+
 			// search for contacts
 			$duplicip_contacts = $contact_model->find_contacts($type, trim($input->value));
 			

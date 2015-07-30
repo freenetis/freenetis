@@ -233,54 +233,6 @@ class Users_contacts_Model extends Model
 	}
 	
 	/**
-	 * Returns all contacts by given type
-	 * 
-	 * @author Michal Kliment
-	 * @param integer $type
-	 * @param bool $ignore_whitelisted
-	 * @return Mysql_Result
-	 */
-	public function get_all_contacts_by_type ($type, $ignore_whitelisted = FALSE)
-	{
-		$whitelisted = '';
-		
-		if (!$ignore_whitelisted)
-		{
-			$whitelisted = "AND m.id NOT IN
-				(
-					SELECT mw.member_id
-					FROM members_whitelists mw
-					WHERE mw.since <= CURDATE() AND mw.until >= CURDATE()
-				)";
-		}
-		
-		return $this->db->query("
-			SELECT c.value, a.balance, m.id AS member_id, m.name AS member_name,
-				(
-					SELECT GROUP_CONCAT(vs.variable_symbol) AS variable_symbol
-					FROM variable_symbols vs
-					WHERE vs.account_id = a.id
-				) AS variable_symbol, u.login, cou.country_code
-			FROM contacts c
-			JOIN users_contacts uc ON uc.contact_id = c.id
-			JOIN users u ON uc.user_id = u.id
-			JOIN members m ON u.member_id = m.id
-			JOIN accounts a ON a.member_id = m.id
-			LEFT JOIN contacts_countries cc ON cc.contact_id = c.id
-			LEFT JOIN countries cou ON cou.id = cc.country_id
-			WHERE m.type <> ? AND c.type = ? $whitelisted AND m.id NOT IN
-			(
-				SELECT mi.member_id
-				FROM membership_interrupts mi
-				JOIN members_fees mf ON mi.members_fee_id = mf.id
-				WHERE mf.activation_date <= CURDATE() AND
-					mf.deactivation_date >= CURDATE()
-			)
-			GROUP BY c.id
-		", array(Member_Model::TYPE_FORMER, $type));
-	}
-	
-	/**
 	 * Finds e-mail boxes of the given user on which the inner user mail may
 	 * be redirected.
 	 * 

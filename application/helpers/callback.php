@@ -1435,6 +1435,33 @@ class callback
 			echo '&nbsp';
 		}
 	}
+
+	/**
+	 * Callback field for member name and member ID. Leaves blank name if needed.
+	 *
+	 * @author Ondřej Fibich
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function member_field_with_id($item, $name, $args = array())
+	{
+		if ($item->member_id)
+		{
+            if ($item->member_name)
+            {
+                $title = $item->member_name . ' (' . $item->member_id . ')';
+            }
+            else
+            {
+                $title = $item->member_id;
+            }
+            echo html::anchor("members/show/$item->member_id", $title);
+		}
+		else
+		{
+			echo '&nbsp';
+		}
+	}
 	
 	/**
 	 * Callback function to print type of member
@@ -1446,6 +1473,11 @@ class callback
 	public static function member_type_field ($item, $name)
 	{
 		echo Member_Model::get_type($item->$name);
+        // redirection flag
+        if (property_exists($item, 'interrupt') && $item->interrupt)
+        {
+            echo ' (' . __('I') . ')';
+        }
 	}
 	
 	/**

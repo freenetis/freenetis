@@ -483,7 +483,7 @@ class Bank_transfers_Controller extends Controller
 			$grid->grouped_action_field()
 					->add_action('id')
 					->icon_action('money_add')
-					->url('bank_transfers/assign_transfer')
+					->url('bank_transfers/show_unidentified_transfer')
 					->label('Assign');
 		}
 		
@@ -505,11 +505,63 @@ class Bank_transfers_Controller extends Controller
 		$view->render(TRUE);
 	} // end of unidentified_transfers function
 
+    /**
+     * Shows detail of unidentified transfer and options that are available for
+     * its assigning.
+     * 
+     * @param integer $trans_id
+     */
+    public function show_unidentified_transfer($trans_id = NULL)
+    {
+		// access rights
+		if (!$this->acl_check_view('Accounts_Controller', 'unidentified_transfers'))
+		{
+            self::error(ACCESS);
+        }
+
+		if (!isset($trans_id))
+		{
+            self::warning(PARAMETER);
+        }
+
+		if (!is_numeric($trans_id))
+		{
+            self::error(RECORD);
+        }
+
+        $t_model = new Transfer_Model($trans_id);
+
+		$bt_model = new Bank_transfer_Model();
+		$bt = $bt_model->get_bank_transfer($trans_id);
+
+		if (!is_object($bt) || !$t_model->id || $t_model->member_id ||
+            $t_model->origin->account_attribute_id != Account_attribute_Model::MEMBER_FEES)
+		{
+            self::error(RECORD);
+        }
+
+		$breadcrumbs = breadcrumbs::add()
+				->link('bank_accounts/show_all', 'Bank accounts',
+						$this->acl_check_view('Accounts_Controller', 'bank_accounts'))
+				->link('bank_transfers/unidentified_transfers', 'Unidentified transfers')
+                ->disable_translation()
+				->text($trans_id)
+				->html();
+
+		$view = new View('main');
+		$view->title = __('Unidentified transfer');
+		$view->breadcrumbs = $breadcrumbs;
+		$view->content = new View('bank_transfers/show_unidentified_transfer');
+        $view->content->heading = __('Unidentified transfer');
+		$view->content->mt = $bt;
+		$view->render(TRUE);
+    } // end show_unidentified_transfer function
+
 	/**
 	 * @author Jiri Svitak, Tomas Dulik
 	 * @param integer $trans_id id of a transfer from table transfers
 	 */
-	public function assign_transfer($trans_id = NULL)
+	public function assign_member_transfer($trans_id = NULL)
 	{
 		// access rights 
 		if (!$this->acl_check_edit('Accounts_Controller', 'unidentified_transfers'))
@@ -537,12 +589,17 @@ class Bank_transfers_Controller extends Controller
 		(
 			NULL => '----- '.__('Select').' -----'
 		) + $arr_accounts;
+
+        $t_model = new Transfer_Model($trans_id);
 		
 		$bt_model = new Bank_transfer_Model();
 		$bt = $bt_model->get_bank_transfer($trans_id);
 		
-		if (!is_object($bt))
-			Controller::error(RECORD);
+		if (!is_object($bt) || !$t_model->id || $t_model->member_id ||
+            $t_model->origin->account_attribute_id != Account_attribute_Model::MEMBER_FEES)
+        {
+            Controller::error(RECORD);
+        }
 		
 		$fee_model = new Fee_Model();
 		// penalty
@@ -560,7 +617,7 @@ class Bank_transfers_Controller extends Controller
 		else
 			$transfer_fee = 0;
 		// form
-		$form = new Forge('bank_transfers/assign_transfer/'.$trans_id);
+		$form = new Forge('bank_transfers/assign_member_transfer/'.$trans_id);
 		
 		$form->group('Payment');
 		
@@ -702,17 +759,142 @@ class Bank_transfers_Controller extends Controller
 				->link('bank_accounts/show_all', 'Bank accounts',
 						$this->acl_check_view('Accounts_Controller', 'bank_accounts'))
 				->link('bank_transfers/unidentified_transfers', 'Unidentified transfers')
+                ->link('bank_transfers/show_unidentified_transfer/' . $trans_id, $trans_id)
+				->text(__('Assign transfer as member payment'))
+				->html();		
+		
+		$view = new View('main');
+		$view->title = __('Assign transfer');
+		$view->breadcrumbs = $breadcrumbs;
+		$view->content = new View('form');
+		$view->content->headline = __('Assign transfer as member payment');
+		$view->content->form = $form->html();
+		$view->render(TRUE);
+	} // end of assign_member_transfer function
+
+    /**
+	 * @author Ondrej Fibich
+	 * @param integer $trans_id id of a transfer from table transfers
+	 */
+	public function assign_other_transfer($trans_id = NULL)
+	{
+		// access rights 
+		if (!$this->acl_check_edit('Accounts_Controller', 'unidentified_transfers'))
+		{
+            self::error(ACCESS);
+        }
+		
+		if (!isset($trans_id))
+		{
+            self::warning(PARAMETER);
+        }
+		
+		if (!is_numeric($trans_id))
+		{
+            self::error(RECORD);
+        }
+
+        $t_model = new Transfer_Model($trans_id);
+
+		$bt_model = new Bank_transfer_Model();
+		$bt = $bt_model->get_bank_transfer($trans_id);
+		
+		if (!is_object($bt) || !$t_model->id || $t_model->member_id ||
+            $t_model->origin->account_attribute_id != Account_attribute_Model::MEMBER_FEES)
+		{
+            self::error(RECORD);
+        }
+        
+        $not_accepted_types = array
+        (
+            Account_attribute_Model::BANK,
+            Account_attribute_Model::CREDIT,
+            Account_attribute_Model::MEMBER_FEES,
+            Account_attribute_Model::BANK_FEES
+        );
+		
+		$arr_accounts = array
+		(
+			NULL => '----- '.__('Select').' -----'
+		) + ORM::factory('account')->select_list_without_types($not_accepted_types);
+
+		// form
+		$form = new Forge('bank_transfers/assign_other_transfer/'.$trans_id);
+
+		$form->group('Payment');
+
+		$form->dropdown('origin_id')
+				->label('Origin account')
+				->rules('required')
+				->options($arr_accounts);
+
+		$form->input('text')
+				->rules('required')
+				->value(__('Assigning of unidentified payment'));
+		
+		$form->submit('Assign');
+		
+		// validation
+		if ($form->validate())
+		{
+			$form_data = $form->as_array();
+			// check account
+			$origin_acc = new Account_Model($form_data['origin_id']);
+			if (!$origin_acc->id || 
+                in_array($origin_acc->account_attribute_id, $not_accepted_types))
+			{
+				self::error(RECORD);
+			}
+            // assign
+			try
+			{
+                $db = new Transfer_Model();
+				$db->transaction_start();
+                
+                // load transfer
+                $t = new Transfer_Model($trans_id);
+                $amount = $t->amount;
+                // update balance of old origin account
+                $old_origin_acc = new Account_Model($t->origin_id);
+                $old_origin_acc->balance += $amount;
+                $old_origin_acc->save_throwable();
+                // change source of transfer and text
+                $t->origin_id = $origin_acc->id;
+                $t->text = $form_data['text'];
+                $t->save_throwable();
+                // update balance of new origin account
+                $origin_acc->balance -= $amount;
+                $origin_acc->save_throwable();
+                
+				$db->transaction_commit();
+				status::success('Transfer has been successfully assigned.');
+			}
+			catch (Exception $e)
+			{
+				$db->transaction_rollback();
+				Log::add_exception($e);
+				status::error('Error - cannot assign transfer.', $e);
+			}
+			url::redirect('bank_transfers/unidentified_transfers');
+		}
+		
+		$breadcrumbs = breadcrumbs::add()
+				->link('bank_accounts/show_all', 'Bank accounts',
+						$this->acl_check_view('Accounts_Controller', 'bank_accounts'))
+				->link('bank_transfers/unidentified_transfers', 'Unidentified transfers')
+                ->link('bank_transfers/show_unidentified_transfer/' . $trans_id, $trans_id)
 				->text(__('Assign transfer'))
 				->html();		
 		
 		$view = new View('main');
 		$view->title = __('Assign transfer');
 		$view->breadcrumbs = $breadcrumbs;
-		$view->content = new View('bank_transfers/assign_transfer');
+		$view->content = new View('form');
+		$view->content->headline = __('Assign transfer');
 		$view->content->mt = $bt;		
 		$view->content->form = $form->html();
 		$view->render(TRUE);
-	} // end of assign_transfer function
+	} // end of assign_other_transfer function
 
 	/**
 	 * Function enables adding of bank transfers manually.

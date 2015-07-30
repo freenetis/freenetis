@@ -257,6 +257,10 @@ class Settings
 		
 		// javascript is enabled by default
 		'use_javascript'					=> 1,
+
+        // contact duplicities
+        'user_email_duplicities_enabled'    => FALSE,
+        'user_phone_duplicities_enabled'    => FALSE,
 		
 		// username regex #360
 		'username_regex'					=> '/^[a-z][a-z0-9_]{4,}$/',

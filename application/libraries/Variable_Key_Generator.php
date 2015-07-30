@@ -48,6 +48,12 @@ abstract class Variable_Key_Generator
 			'name'		=> 'Checksum variable key generator',
 			'class'		=> 'Checksum_Variable_Key_Generator',
 		),
+        'member_id' => array
+        (
+			'id'		=> 'member_id',
+			'name'		=> 'Member ID variable key generator',
+			'class'		=> 'Member_Id_Variable_Key_Generator',
+        ),
 	);
 	
 	/**

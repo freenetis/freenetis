@@ -2522,6 +2522,7 @@ class Members_Controller extends Controller
 		
 		$form->input('email')
 				->rules('valid_email')
+                ->callback(array($this, 'valid_unique_email'))
 				->style('width:250px');
 		
 		if (Settings::get('finance_enabled'))
@@ -2813,13 +2814,13 @@ class Members_Controller extends Controller
 					$contact_model = new Contact_Model();
 
 					// search for contacts
-					$contact_id = $contact_model->find_contact_id(
+					$p_contact_id = $contact_model->find_contact_id(
 							Contact_Model::TYPE_PHONE, $form_data['phone']
 					);
 
-					if ($contact_id)
+					if ($p_contact_id)
 					{
-						$contact_model = ORM::factory('contact', $contact_id);
+						$contact_model = ORM::factory('contact', $p_contact_id);
 						$contact_model->add($user);
 						$contact_model->save_throwable();
 					}
@@ -2842,11 +2843,25 @@ class Members_Controller extends Controller
 					// email
 					if (!empty($form_data['email']))
 					{
-						$contact_model->type = Contact_Model::TYPE_EMAIL;
-						$contact_model->value = $form_data['email'];
-						$contact_model->save_throwable();
-						$contact_model->add($user);
-						$contact_model->save_throwable();
+                        // search for contacts
+                        $e_contact_id = $contact_model->find_contact_id(
+                                Contact_Model::TYPE_EMAIL, $form_data['email']
+                        );
+
+                        if ($e_contact_id)
+                        {
+                            $contact_model = ORM::factory('contact', $e_contact_id);
+                            $contact_model->add($user);
+                            $contact_model->save_throwable();
+                        }
+                        else
+                        { // add whole contact
+                            $contact_model->type = Contact_Model::TYPE_EMAIL;
+                            $contact_model->value = $form_data['email'];
+                            $contact_model->save_throwable();
+                            $contact_model->add($user);
+                            $contact_model->save_throwable();
+                        }
 					}
 
 					// saving account
@@ -4532,18 +4547,43 @@ class Members_Controller extends Controller
 			self::error(PAGE);
 		}
 		
-		$user_model=new User_Model();
+		$user_model = new User_Model();
 		$value = trim($input->value);
 		
 		if (!preg_match("/^[0-9]{9,9}$/",$value))
 		{
 			$input->add_error('required', __('Bad phone format.'));
 		}
-		else if ($user_model->phone_exist($value))
+		else if (!Settings::get('user_phone_duplicities_enabled') &&
+                $user_model->phone_exist($value))
 		{
 			$input->add_error('required', __('Phone already exists in database.'));
 		}
 	}
+
+    /**
+     * Check if non empty email is unique.
+     *
+     * @param object $input
+     */
+    public function valid_unique_email($input = NULL)
+    {
+		// validators cannot be accessed
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
+
+		$user_model = new User_Model();
+		$value = trim($input->value);
+
+        // not required by default
+        if ($value && !Settings::get('user_email_duplicities_enabled') &&
+                $user_model->email_exist($value))
+        {
+            $input->add_error('required', __('Email already exists in database.'));
+        }
+    }
 
 	/**
 	 * Entrance has to be before current date.

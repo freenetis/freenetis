@@ -109,7 +109,7 @@ chmod 644 usr/share/doc/${NAME}/changelog usr/share/doc/${NAME}/changelog.Debian
 		  usr/share/doc/${NAME}/copyright
 
 # compress doc
-gzip --best usr/share/doc/${NAME}/changelog 
+gzip --best usr/share/doc/${NAME}/changelog
 gzip --best usr/share/doc/${NAME}/changelog.Debian
 
 # count size
@@ -131,9 +131,17 @@ cat ../../${NAME}/control >> DEBIAN/control
 # scripts ######################################################################
 
 cp -a -f ../../${NAME}/preinst DEBIAN/preinst
-cp -a -f ../../${NAME}/postinst DEBIAN/postinst
+if [ $DEBIAN = "jessie" ]; then
+    cp -a -f ../../${NAME}/postinst.jessie DEBIAN/postinst
+else
+    cp -a -f ../../${NAME}/postinst DEBIAN/postinst
+fi
 cp -a -f ../../${NAME}/prerm DEBIAN/prerm
-cp -a -f ../../${NAME}/postrm DEBIAN/postrm
+if [ $DEBIAN = "jessie" ]; then
+    cp -a -f ../../${NAME}/postrm.jessie DEBIAN/postrm
+else
+    cp -a -f ../../${NAME}/postrm DEBIAN/postrm
+fi
 cp -a -f ../../${NAME}/templates DEBIAN/templates
 cp -a -f ../../${NAME}/config DEBIAN/config
 cp -a -f ../../${NAME}/conffiles DEBIAN/conffiles

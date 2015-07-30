@@ -586,7 +586,7 @@ class Accounts_Controller extends Controller
 
 					$entrance_fee_left -= $amount;
 
-					$date = date::arithmetic($date, 'month');
+                    $date = date::get_next_deduct_date_to($date);
 				}
 			}
 			
@@ -687,7 +687,7 @@ class Accounts_Controller extends Controller
 						);
 					}
 
-					$date = date::arithmetic($date, 'month');
+                    $date = date::get_next_deduct_date_to($date);
 				}
 			}
 			
@@ -794,7 +794,7 @@ class Accounts_Controller extends Controller
 						);
 					}
 
-					$date = date::arithmetic($date, 'month');
+                    $date = date::get_next_deduct_date_to($date);
 				}
 			}
 			

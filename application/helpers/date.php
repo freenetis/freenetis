@@ -528,8 +528,34 @@ class date
         // returns boundary date of month
 		return date('Y-m-d', mktime(0, 0, 0, $month, $deduct_day2, $year));
 	}
-	
-	/**
+
+    /**
+     * Function returns next date of deduct from the given date.
+     * Next means that next mmonth deduct date is calculated.
+     *
+     * @author Ondřej Fibich <fibich@freenetis.org>
+     * @since 1.1.10
+     *
+     * @param string $date input deduct date
+     * @return string next deduct date from next month
+     */
+    public static function get_next_deduct_date_to($date)
+    {
+        $d_arr = date_parse($date);
+        // increase month
+        $d_arr['month']++;
+        if ($d_arr['month'] > 12)
+        {
+            $d_arr['month'] = 1;
+            $d_arr['year']++;
+        }
+        // get deduct day for increased month
+        $d_arr['day'] = date::get_deduct_day_to($d_arr['month'], $d_arr['year']);
+        // create new date
+        return date::create($d_arr['day'], $d_arr['month'], $d_arr['year']);
+    }
+
+    /**
 	 * Calculate deduct day of given month. 
 	 * 
 	 * @author Ondrej Fibich
@@ -964,66 +990,6 @@ class date
 		}
 		$timestamp = mktime(0, 0, 0, $month, $day, $year);
 		return date('Y-m-d', $timestamp);
-	}
-	
-	/**
-	 * Performs arithmetic on date
-	 * 
-	 * @author Michal Kliment
-	 * @param integer $day
-	 * @param integer $month
-	 * @param integer $year
-	 * @param string $unit
-	 * @param integer $number
-	 * @return type 
-	 */
-	public static function arithmetic_arr(&$day, &$month, &$year, $unit, $number)
-	{	
-		if ($unit != 'day' && $unit != 'month' && $unit != 'year')
-			return;
-		
-		$$unit += $number;
-		
-		$middle = date::get_deduct_day_to($month, $year);
-		
-		$year += floor($month/12);
-		$month = ($month %12 + 12) % 12;
-		
-		if ($month == 0)
-		{
-			$month = 12;
-			$year--;
-		}
-		
-		while ($day <= 0)
-		{
-			date::arithmetic_arr($middle, $month, $year, 'month', -1);
-			$day += date::days_of_month($month, $year);
-		}
-		
-		while ($day > date::days_of_month($month, $year))
-		{
-			$day -= date::days_of_month($month, $year);
-			date::arithmetic_arr($middle, $month, $year, 'month', 1);
-		}
-	}
-	
-	/**
-	 * Performs arithmetic on date
-	 * Silimar to arithmetic_arr, but returns string
-	 * 
-	 * @param string $date
-	 * @param string $unit
-	 * @param integer $number
-	 * @return type 
-	 */
-	public static function arithmetic($date, $unit, $number = 1)
-	{
-		$pd = date_parse($date);
-		
-		date::arithmetic_arr($pd['day'], $pd['month'], $pd['year'], $unit, $number);
-		
-		return date('Y-m-d', mktime(0, 0, 0, $pd['month'], $pd['day'], $pd['year']));
 	}
 
 } // End date

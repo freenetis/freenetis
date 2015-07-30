@@ -1,8 +1,8 @@
-<h2><?php echo __('Assign transfer')?></h2>
+<h2><?php echo $heading ?></h2>
 <br />
 <table class="extended" style="float:left">
 	<tr>
-		<th colspan="2"><?php echo  __('Payment information') ?></th>
+		<th colspan="2"><?php echo  __('Transfer information') ?></th>
 	</tr>
 	<tr>
 		<th><?php echo __('Transfer ID')?></th>
@@ -67,4 +67,20 @@
 </table>
 <br class="clear" />
 <br />
-<?php echo $form; ?>
+
+<h3><?php echo __('Options for assigning (match) transfer') ?></h3>
+
+<p style="margin: 5px 2px 15px 2px;"><?php echo url_lang::lang('help.assign_payment') ?></p>
+
+<a href="<?php echo url_lang::site() ?>/bank_transfers/assign_member_transfer/<?php echo $mt->id ?>"
+   class="submit" style="text-decoration: none; color: white">
+    <?php echo __('Transfer is member payment') ?>
+</a>
+
+<br />
+<br />
+
+<a href="<?php echo url_lang::site() ?>/bank_transfers/assign_other_transfer/<?php echo $mt->id ?>" 
+   class="submit" style="text-decoration: none; color: white">
+    <?php echo __('Transfer is not member payment') ?>
+</a>

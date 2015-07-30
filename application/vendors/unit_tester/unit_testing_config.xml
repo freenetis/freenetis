@@ -1006,30 +1006,6 @@
                 </input>
             </values>
         </method></controller>
-    <controller name="comments_threads">
-        <method name="add" autogenerate="off">
-            <attributes>
-                <attribute name="type" default_value=""/>
-                <attribute name="fk_id" default_value=""/>
-            </attributes>
-            <values>
-                <input/>
-                <input>
-                    <param value=""/>
-                </input>
-                <input>
-                    <param value=""/>
-                    <param value=""/>
-                </input>
-                <input>
-                    <param value="job"/>
-                </input>
-                <input>
-                    <param value="job"/>
-                    <param value="1"/>
-                </input>
-            </values>
-        </method></controller>
     <controller name="connection_requests">
         <method name="index" autogenerate="on">
             <attributes></attributes>
@@ -1458,34 +1434,6 @@
             <attributes></attributes>
             <values>
                 <input></input>
-            </values>
-        </method>
-        <method name="show_iface" autogenerate="off">
-            <attributes>
-                <attribute name="iface_id" default_value=""/>
-            </attributes>
-            <values>
-                <input/>
-                <input>
-                    <param value=""/>
-                </input>
-                <input>
-                    <param value="1"/>
-                </input>
-                <input>
-                    <param value="'"/>
-                </input>
-            </values>
-        </method>
-        <method name="show_ip_address" autogenerate="on">
-            <attributes>
-                <attribute name="ip_address_id" default_value="" />
-            </attributes>
-            <values>
-                <input></input>
-                <input>
-                    <param value="" />
-                </input>
             </values>
         </method>
         <method name="topology" autogenerate="on">

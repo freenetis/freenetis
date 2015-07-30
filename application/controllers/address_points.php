@@ -216,7 +216,7 @@ class Address_points_Controller extends Controller
 		$members = array
 		(
 			NULL => '----- '.__('Select member').' -----'
-		) + Member_Model::select_list_grouped();
+		) + ORM::factory('member')->select_list_grouped();
 		
 		// form to group by type
 		$form = new Forge(url::base(TRUE).url::current(TRUE));

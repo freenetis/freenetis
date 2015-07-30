@@ -71,8 +71,8 @@ echo implode(' | ', $arr_links);
 	<?php foreach ($ivals[Iface_Model::TYPE_WIRELESS]['items'] as $item): ?>
 	<tr>
 		<td><?php echo $item['name'] ?></td>
-		<td><?php echo $iface_model->get_wireless_mode(@$item['wireless_mode']) ?></td>
-		<td><?php echo $iface_model->get_wireless_antenna(@$item['wireless_antenna']) ?></td>
+        <td><?php echo Iface_Model::get_wireless_mode(@$item['wireless_mode']) ?></td>
+		<td><?php echo Iface_Model::get_wireless_antenna(@$item['wireless_antenna']) ?></td>
 	</tr>
 	<?php endforeach; ?>
 </table>
@@ -98,7 +98,7 @@ echo implode(' | ', $arr_links);
 	<tr>
 		<td><?php echo $item['name'] ?></td>
 		<td><?php echo __('Port') ?> <?php echo $item['number'] ?></td>
-		<td><?php echo $iface_model->get_port_mode($item['port_mode']) ?></td>
+        <td><?php echo Iface_Model::get_port_mode($item['port_mode']) ?></td>
 	</tr>
 	<?php endforeach; ?>
 </table>

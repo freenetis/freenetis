@@ -263,7 +263,7 @@ class Ip_addresses_Controller extends Controller
 		}
 		else
 		{
-			if (url_lang::current(TRUE) == 'devices')
+			if (url::slice(url_lang::uri(Path::instance()->previous()), 0, 1) != 'ip_addresses')
 			{
 				$iface = $ip_address->iface;
 				$device_name = $iface->device->name;
@@ -320,7 +320,7 @@ class Ip_addresses_Controller extends Controller
 						)
 					)
 					->link(
-						'devices/show_iface/'.$iface->id,
+						'ifaces/show/'.$iface->id,
 						$iface_name, $this->acl_check_view(
 							'Ifaces_Controller', 'iface',
 							$iface->device->user->member_id

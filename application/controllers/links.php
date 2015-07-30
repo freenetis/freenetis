@@ -75,7 +75,7 @@ class Links_Controller extends Controller
 		
 		$filter_form->add('medium')
 			->type('select')
-			->values($link_model->get_medium_types());
+			->values(Link_Model::get_medium_types());
 		
 		$filter_form->add('bitrate')
 			->type('number');

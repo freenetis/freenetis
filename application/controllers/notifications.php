@@ -1541,7 +1541,7 @@ class Notifications_Controller extends Controller
 		}
 		// activate redirection
 		if (module::e('redirection') && $activate_redir &&
-			$message->has_redirection_content($message->type))
+            Message_Model::has_redirection_content($message->type))
 		{
 			try
 			{
@@ -1566,7 +1566,7 @@ class Notifications_Controller extends Controller
 		}
 		// activate E-mail notification
 		if (module::e('email') && $activate_email &&
-			$message->has_email_content($message->type))
+            Message_Model::has_email_content($message->type))
 		{
 			try
 			{
@@ -1600,7 +1600,7 @@ class Notifications_Controller extends Controller
 		}
 		// activate SMS notification
 		if (module::e('sms') && $activate_sms &&
-			$message->has_sms_content($message->type))
+            Message_Model::has_sms_content($message->type))
 		{
 			try
 			{

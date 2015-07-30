@@ -246,7 +246,7 @@ class Js_Controller extends Controller
 		
 		if ($iface && $iface->id)
 		{
-			if (!ORM::factory('iface')->get_type($type))
+			if (!Iface_Model::get_type($type))
 			{
 				$type = $iface->type;
 			}

@@ -487,7 +487,7 @@ class callback
 			echo ' '.html::anchor(
 					($item->a_comments_thread_id) ? 
 						'comments/add/'.$item->a_comments_thread_id :
-						'comments_threads/add/account/'.$item->aid,
+						'comments/add_thread/account/'.$item->aid,
 					html::image('media/images/icons/ico_add.gif'), array
 					(
 						'title' => __('Add comment to financial state of member')
@@ -969,7 +969,7 @@ class callback
 		{
 			$url = (isset($item->a_comments_thread_id) && $item->a_comments_thread_id) ? 
 						'comments/add/'.$item->a_comments_thread_id :
-						'comments_threads/add/connection_request/'.$item->id;
+						'comments/add_thread/connection_request/'.$item->id;
 			
 			echo html::anchor($url, html::image('media/images/icons/ico_add.gif'), array
 			(
@@ -1148,7 +1148,7 @@ class callback
 			if (url_lang::current(1) == 'devices')
 			{
 				echo html::anchor(
-					"devices/show_ip_address/$item->ip_address_id",
+					"ip_addresses/show/$item->ip_address_id",
 					$ip_address, array('class' => $class, 'title' => $title)
 				);
 			}
@@ -2108,7 +2108,7 @@ class callback
 		{
 			$url = (isset($item->a_comments_thread_id) && $item->a_comments_thread_id) ? 
 						'comments/add/'.$item->a_comments_thread_id :
-						'comments_threads/add/log_queue/'.$item->id;
+						'comments/add_thread/log_queue/'.$item->id;
 			
 			echo ' ' . html::anchor($url, html::image('media/images/icons/ico_add.gif'), array
 			(

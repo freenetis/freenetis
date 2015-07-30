@@ -232,7 +232,7 @@
 			}
 
 			if ($this->acl_check_view ('Members_Controller','comment',$member->id))
-					echo html::anchor(($account->comments_thread_id ? (url_lang::base().'comments/add/'.$account->comments_thread_id) : (url_lang::base().'comments_threads/add/account/'.$account->id)), html::image(array('src' => url::base().'media/images/icons/comment_add.png', 'width' => 16, 'height' => 16)), array('title' => __('Add comment to financial state of member'), 'class' => 'action-icon popup_link'));
+					echo html::anchor(($account->comments_thread_id ? (url_lang::base().'comments/add/'.$account->comments_thread_id) : (url_lang::base().'comments/add_thread/account/'.$account->id)), html::image(array('src' => url::base().'media/images/icons/comment_add.png', 'width' => 16, 'height' => 16)), array('title' => __('Add comment to financial state of member'), 'class' => 'action-icon popup_link'));
 			?>
 		</td>
 	</tr>

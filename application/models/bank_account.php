@@ -164,15 +164,18 @@ class Bank_account_Model extends ORM
 		// filter
 		if (!empty($filter_sql))
 		{
-			$where = "AND $filter_sql";
+			$where = "WHERE $filter_sql";
 		}
 		// query
 		return $this->db->query("
-				SELECT ba.id, ba.name AS baname, ba.account_nr, ba.bank_nr,
-					m.name AS member_name, ba.member_id, ba.type, ba.settings
-				FROM bank_accounts ba
-				LEFT JOIN members m ON m.id = ba.member_id
-				WHERE (ba.member_id <> 1 OR ba.member_id IS NULL) $where
+                SELECT ba.* FROM (
+                    SELECT ba.id, ba.name AS baname, ba.account_nr, ba.bank_nr,
+                        m.name AS member_name, ba.member_id, ba.type, ba.settings
+                    FROM bank_accounts ba
+                    LEFT JOIN members m ON m.id = ba.member_id
+                    WHERE (ba.member_id <> 1 OR ba.member_id IS NULL)
+                ) ba
+                $where
 				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
 				LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
 		");	
@@ -188,13 +191,18 @@ class Bank_account_Model extends ORM
 		// filter
 		if (!empty($filter_sql))
 		{
-			$where = "AND $filter_sql";
+			$where = "WHERE $filter_sql";
 		}
 		// query
 		return $this->db->query("
-				SELECT COUNT(*) AS total
-				FROM bank_accounts ba
-				WHERE (ba.member_id <> 1 OR ba.member_id IS NULL) $where"
+				SELECT COUNT(ba.id) AS total FROM (
+                    SELECT ba.id, ba.name AS baname, ba.account_nr, ba.bank_nr,
+                        m.name AS member_name, ba.member_id
+                    FROM bank_accounts ba
+                    LEFT JOIN members m ON m.id = ba.member_id
+                    WHERE (ba.member_id <> 1 OR ba.member_id IS NULL)
+                ) ba
+				$where"
 		)->current()->total;	
 	}	
 	

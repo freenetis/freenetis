@@ -1,6 +1,15 @@
+freenetis (1.1.12) stable; urgency=hight
+  * Support for new lbilling NFX VoIP API
+  * Fix hybrid method issue on PHP 5.6 (Jessie)
+  * Fix sorting by type in the table of members
+  * Added validator for disabling filling dot in database name during setup
+  * VoIP settings fix that allows to not fill leaved numbers
+  * Fix the device form state change on a device template add through pop-up
+  * Filter for bank account owner in bank account table
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 04 Jun 2015 22:08:34 +0200
+
 freenetis (1.1.11) stable; urgency=hight
   * Double-entry transfer may be added to 684000 account by user
-  * Support for new lbilling NFX VoIP API
   * Improved double-entry account lists in forms that allows to add new transfer
   * New filter for member ID in users and member interrupts grids
   * Fix win1250 encoding issue in CSV export

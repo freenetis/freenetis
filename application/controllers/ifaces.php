@@ -282,7 +282,7 @@ class Ifaces_Controller extends Controller
 		{
 			$actions->add_action()
 					->icon_action('show')
-					->url('devices/show_ip_address');
+					->url('ip_addresses/show');
 		}
 		
 		if ($this->acl_check_edit(
@@ -481,7 +481,7 @@ class Ifaces_Controller extends Controller
 				{
 					$actions->add_action('id')
 							->icon_action('show')
-							->url('devices/show_iface')
+							->url('ifaces/show')
 							->class('popup_link');
 				}
 
@@ -635,7 +635,7 @@ class Ifaces_Controller extends Controller
 			$im = new Iface_Model();
 			
 			// iface type doesn't exist
-			if (!$im->get_type($type))
+			if (!Iface_Model::get_type($type))
 			{
 				Controller::error(RECORD);
 			}
@@ -1412,7 +1412,7 @@ class Ifaces_Controller extends Controller
 		}
 		
 		// iface type doesn't exist
-		if (!$iface->get_type($type))
+		if (!Iface_Model::get_type($type))
 		{
 			// some wrong added ifaces from the past may have type set to zero
 			if ($type == 0)
@@ -1903,7 +1903,7 @@ class Ifaces_Controller extends Controller
 					// this code resolves (#310)
 					else if ($old_type != $iface->type)
 					{
-						$mediums = $iface->get_types_has_link_with_medium($iface->type);
+						$mediums = Iface_Model::get_types_has_link_with_medium($iface->type);
 						
 						if ($iface->link_id && 
 							!array_key_exists($iface->link->medium, $mediums))
@@ -2123,7 +2123,7 @@ class Ifaces_Controller extends Controller
 					)
 				)
 				->link(
-					'devices/show_iface/'.$iface->id,
+					'ifaces/show/'.$iface->id,
 					$name, $this->acl_check_view(
 						'Ifaces_Controller', 'iface',
 						$iface->device->user->member->id

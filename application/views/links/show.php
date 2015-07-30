@@ -45,7 +45,7 @@
 		<?php if ($link->wireless_norm != ''): ?>
 		<tr>
 			<th><?php echo __('Norm') ?></th>
-			<td><?php echo $link->get_wireless_norm() ?></td>
+            <td><?php echo Link_Model::get_wireless_norm($link->wireless_norm) ?></td>
 		</tr>
 		<?php endif ?>
 		<?php if ($link->wireless_channel != ''): ?>
@@ -69,7 +69,7 @@
 		<?php if ($link->wireless_polarization != ''): ?>
 		<tr>
 			<th><?php echo __('Polarization') ?></th>
-			<td><?php echo $link->get_wireless_polarization() ?></td>
+            <td><?php echo Link_Model::get_wireless_polarization($link->wireless_polarization) ?></td>
 		</tr>
 		<?php endif ?>
 	</table>

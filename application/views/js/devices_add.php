@@ -1371,8 +1371,8 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	// on change type update form to proper functionality
 	$('#device_type').change(function ()
 	{
-		var value = $(this).val();
-		var text = $(this).find('option:selected').text();
+		var value = $(this).val(),
+            text = (value) ? $(this).find('option:selected').text() : false;
 		
 		// reload devices templates
 		$('#device_template_id').html('<option><?php echo __('Loading data, please wait') ?>...</option>');
@@ -1399,7 +1399,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			
 			if (name_parts.length <= 2)
 			{
-				$('#device_name').val(name_parts[0] + ' ' + text);
+				$('#device_name').val(name_parts[0] + (text ? ' ' + text : ''));
 			}
 			
 			// trigger change

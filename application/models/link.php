@@ -138,13 +138,8 @@ class Link_Model extends ORM
 	 * @param integer $norm
 	 * @return string 
 	 */
-	public function get_wireless_norm ($norm = NULL)
+	public static function get_wireless_norm ($norm)
 	{
-		if (!$norm && isset($this))
-		{
-			$norm = $this->wireless_norm;
-		}
-		
 		if (array_key_exists($norm, self::$wireless_norms))
 		{
 			return self::$wireless_norms[$norm];
@@ -159,7 +154,7 @@ class Link_Model extends ORM
 	 * @author Michal Kliment
 	 * @return array 
 	 */
-	public function get_wireless_norms ()
+	public static function get_wireless_norms ()
 	{		
 		return self::$wireless_norms;
 	}
@@ -171,13 +166,8 @@ class Link_Model extends ORM
 	 * @param integer $polarization
 	 * @return string 
 	 */
-	public function get_wireless_polarization ($polarization = NULL)
+	public static function get_wireless_polarization ($polarization)
 	{
-		if (!$polarization)
-		{
-			$polarization = $this->wireless_polarization;
-		}
-		
 		if (array_key_exists($polarization, self::$wireless_polarizations))
 		{
 			return __(self::$wireless_polarizations[$polarization]);
@@ -192,7 +182,7 @@ class Link_Model extends ORM
 	 * @author Michal Kliment
 	 * @return array 
 	 */
-	public function get_wireless_polarizations()
+	public static function get_wireless_polarizations()
 	{
 		return array_map('__', self::$wireless_polarizations);
 	}
@@ -204,13 +194,8 @@ class Link_Model extends ORM
 	 * @param integer $norm
 	 * @return integer 
 	 */
-	public function get_wireless_max_bitrate($norm = NULL)
+	public static function get_wireless_max_bitrate($norm = NULL)
 	{
-		if (!$norm)
-		{
-			$norm = $this->wireless_norm;
-		}
-		
 		if (array_key_exists($norm, self::$wireless_max_bitrates))
 		{
 			return self::$wireless_max_bitrates[$norm];
@@ -226,7 +211,7 @@ class Link_Model extends ORM
 	 * @param integer $norm
 	 * @return integer 
 	 */
-	public function get_wireless_max_bitrates()
+	public static function get_wireless_max_bitrates()
 	{
 		return self::$wireless_max_bitrates;
 	}
@@ -257,13 +242,8 @@ class Link_Model extends ORM
 	 * @param integer $iface_type
 	 * @return integer
 	 */
-	public static function get_max_ifaces_count ($iface_type = NULL)
+	public static function get_max_ifaces_count ($iface_type)
 	{
-		if (!$iface_type)
-		{
-			return NULL;
-		}
-		
 		if (array_key_exists($iface_type, self::$ifaces_count))
 		{
 			return self::$ifaces_count[$iface_type];

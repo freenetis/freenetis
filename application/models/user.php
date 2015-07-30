@@ -769,7 +769,7 @@ class User_Model extends ORM
 	 * 
 	 * @return array[string]
 	 */
-	public static function select_list_grouped($optgroup = TRUE)
+	public function select_list_grouped($optgroup = TRUE)
 	{
 		$list = array();
 		

@@ -160,18 +160,26 @@ class Bank_accounts_Controller extends Controller
 			// Create filter form
 			$filter_form = new Filter_form();
 
-			$filter_form->add('name')
+			$filter_form->add('baname')
 					->label('Account name')
-					->table('ba')
 					->callback('json/bank_account_name');
 
 			$filter_form->add('account_nr')
 					->label('Account number');
 
 			$filter_form->add('bank_nr')
-					->label('Bank code');
+					->label('Bank code')
+					->type('number');
 
-			// bank accounts			
+            $filter_form->add('member_name')
+                    ->label('Owner')
+                    ->callback('json/member_name');
+
+            $filter_form->add('member_id')
+                    ->label('Owner ID')
+                    ->type('number');
+
+			// bank accounts
 			$total_baccounts = $bank_account_model->count_bank_accounts($filter_form->as_sql());
 			
 			if (($sql_offset = ($page - 1) * $limit_results) > $total_baccounts)

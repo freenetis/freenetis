@@ -904,7 +904,7 @@ class Requests_Controller extends Controller
 
 			$url = ($request->comments_thread_id) ?
 					'comments/add/'.$request->comments_thread_id :
-					'comments_threads/add/request/'.$request->id;
+					'comments/add_thread/request/'.$request->id;
 
 			$comments_grid->add_new_button(
 					$url, __('Add comment to request'),

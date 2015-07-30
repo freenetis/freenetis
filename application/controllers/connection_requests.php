@@ -374,7 +374,7 @@ class Connection_Requests_Controller extends Controller
 
 		$url = ($cr_model->comments_thread_id) ?
 				'comments/add/'.$cr_model->comments_thread_id :
-				'comments_threads/add/connection_request/'.$cr_model->id;
+				'comments/add_thread/connection_request/'.$cr_model->id;
 
 		if ($this->acl_check_edit('Connection_Requests_Controller', 'request'))
 		{

@@ -51,7 +51,7 @@
 	</tr>
 	<tr>
 		<th><?php echo __('Payment type') ?></th>
-		<td><?php echo $work_report_model->get_name_of_payment_type() ?></td>
+        <td><?php echo Job_report_Model::get_name_of_payment_type($work_report_model->payment_type) ?></td>
 	</tr>
 	<tr>
 		<th><?php echo __('Date from') ?></th>

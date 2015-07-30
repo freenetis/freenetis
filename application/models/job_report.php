@@ -83,13 +83,8 @@ class Job_report_Model extends ORM
 	 * @param integer $type
 	 * @return string
 	 */
-	public function get_name_of_payment_type($type = NULL)
+	public static function get_name_of_payment_type($type)
 	{
-		if ($type === NULL && $this->id)
-		{
-			$type = $this->payment_type;
-		}
-		
 		if (array_key_exists($type, self::$PAYMENT_TYPES))
 		{
 			return __(self::$PAYMENT_TYPES[$type]);

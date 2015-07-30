@@ -185,6 +185,7 @@ class Setup_config_Controller extends Controller
 				->label('Database name')
 				->value('freenetis')
 				->rules('required')
+				->callback(array($this, 'valid_db_name'))
 				->help('The name of the database you want to run FreenetIS in.');
 		
 		$form->input('db_user')
@@ -356,6 +357,29 @@ class Setup_config_Controller extends Controller
 		}
 		
 		return array('state' => $ok, 'html' => $html);
+	}
+
+    /**
+	 * Callback function validator for DB name.
+	 *
+	 * @param object $input
+	 */
+	public function valid_db_name($input = NULL)
+	{
+		// validators cannot be accessed
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
+
+		$value = $input->value;
+
+		if (!empty($value) && !preg_match('/^[a-z0-9_-]+$/i', $value))
+		{
+			$input->add_error('required', __(
+					'Only alpha numeric characters, \'-\' and \'_\' allowed.'
+			));
+		}
 	}
 
 }

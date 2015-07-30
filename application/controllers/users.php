@@ -1152,17 +1152,6 @@ class Users_Controller extends Controller
 	} // end of change password function
 	
 	/**
-	 * Shows login logs of user
-	 * 
-	 * @author Michal Kliment
-	 * @param integer $user_id 
-	 */
-	public function show_login_logs($user_id = NULL)
-	{
-		Login_logs_Controller::show_by_user($user_id);
-	}
-	
-	/**
 	 * Gets list of users
 	 */
     public function get_users()

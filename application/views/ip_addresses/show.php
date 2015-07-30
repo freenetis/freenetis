@@ -43,7 +43,7 @@ echo implode(' | ', $links);
 	<?php if (url_lang::current(TRUE) == 'devices'): ?>
 	<tr>
 		<th><?php echo  __('Interface') ?></th>
-		<td><?php echo  html::anchor('devices/show_iface/'.$iface->id, $iface_name) ?></td>
+		<td><?php echo  html::anchor('ifaces/show/'.$iface->id, $iface_name) ?></td>
 	</tr>
 	<?php else: ?>
 	<tr>

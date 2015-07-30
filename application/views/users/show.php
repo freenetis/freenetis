@@ -25,7 +25,7 @@ if ($this->acl_check_edit('Users_Controller', 'application_password', $user_data
 	$links[] = html::anchor('users/change_application_password/'.$user_data->id, __('Change application password'), array('class' => 'popup_link'));
 
 if ($this->acl_check_view('Login_logs_Controller', 'logs', $user_data->member_id))
-	$links[] = html::anchor('users/show_login_logs/'.$user_data->id, __('Show login logs'));
+	$links[] = html::anchor('login_logs/show_by_user/'.$user_data->id, __('Show login logs'));
 	
 echo implode (' | ', $links);
 

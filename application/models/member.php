@@ -253,7 +253,7 @@ class Member_Model extends ORM
 		return $this->db->query("
 				SELECT id, id AS member_id, name AS member_name, registration, registrations,
 					name, street, street_number, town, quarter, variable_symbol, aid, balance,
-					a_comment, a_comments_thread_id, type, entrance_date, leaving_date,
+					a_comment, a_comments_thread_id, type, type_name, entrance_date, leaving_date,
 					redirect_type_id, GROUP_CONCAT(DISTINCT redirect_type SEPARATOR ', ') AS redirect,
 					GROUP_CONCAT(DISTINCT redirect_type_text SEPARATOR ', \n') AS redirect_text,
 					notification_by_redirection, notification_by_email, notification_by_sms,
@@ -266,7 +266,8 @@ class Member_Model extends ORM
 						vs.variable_symbol, a.id AS aid,
 						a.balance, a_comment,
 						a.comments_thread_id AS a_comments_thread_id,
-						m.type, m.entrance_date, m.leaving_date, redirect_type,
+						m.type, IFNULL(f.translated_term, e.value) AS type_name,
+                        m.entrance_date, m.leaving_date, redirect_type,
 						redirect_type_id, redirect_type_text, whitelisted,
 						m.notification_by_redirection, m.notification_by_email,
 						m.notification_by_sms, interrupt $select_cloud
@@ -1153,7 +1154,7 @@ class Member_Model extends ORM
 	 * 
 	 * @return array[string]
 	 */
-	public static function select_list_grouped($optgroup = TRUE)
+	public function select_list_grouped($optgroup = TRUE)
 	{
 		$list = array();
 		

@@ -1567,9 +1567,9 @@ class Settings_Controller extends Controller
 					try
 					{
 						// creates helper functions
-						$voip_sip->create_functions();
+						Voip_sip_Model::create_functions();
 						// create views
-						$voip_sip->create_views();
+						Voip_sip_Model::create_views();
 					}
 					catch (Exception $e)
 					{
@@ -2698,9 +2698,16 @@ class Settings_Controller extends Controller
 		{
 			self::error(PAGE);
 		}
+
+        $value = $input->value;
+
+        // do not check empty
+        if (empty($value)) {
+            return;
+        }
 		
 		// parse interval to array of VoIP numbers
-		$numbers = explode(';', $input->value);
+		$numbers = explode(';', $value);
 		// check if count of numbers is smaller or longer than 2 
 		// (123456789, 987654321; NOT 123456,654321,987654)
 

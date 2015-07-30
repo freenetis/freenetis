@@ -232,8 +232,7 @@ class Account_Model extends ORM
             {
                 $name .= ' - ' . $a->member_name . ' (' . $a->member_id . ')';
             }
-			$arr_accounts[$a->id] = $a->name . ' (' . $a->id . ', '
-                    . $a->account_attribute_id . ', ' . $a->member_id . ')';
+			$arr_accounts[$a->id] = $name;
 		}
         return $arr_accounts;
     }

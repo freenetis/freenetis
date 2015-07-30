@@ -455,7 +455,7 @@ class Transfers_Controller extends Controller
 
 			$url = ($account->comments_thread_id) ?
 						'comments/add/' . $account->comments_thread_id :
-						'comments_threads/add/account/' . $account->id;
+						'comments/add_thread/account/' . $account->id;
 			
 			$comments_grid->add_new_button(
 					$url, __('Add comment to financial state of member')

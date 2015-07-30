@@ -227,7 +227,7 @@ class Members_Controller extends Controller
 				->callback('callback::registration_field');
 		}
 
-		$grid->order_callback_field('type')
+		$grid->order_callback_field('type', 'type_name')
 				->callback('callback::member_type_field');
 
 		$grid->order_field('name');

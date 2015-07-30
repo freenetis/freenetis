@@ -215,7 +215,7 @@ class Log_queues_Controller extends Controller
 		{
 			$url = ($lq_model->comments_thread_id) ?
 					'comments/add/'.$lq_model->comments_thread_id :
-					'comments_threads/add/log_queue/'.$lq_model->id;
+					'comments/add_thread/log_queue/'.$lq_model->id;
 
 			$comments_grid->add_new_button(
 					$url, 'Add comment',

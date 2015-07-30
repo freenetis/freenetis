@@ -421,13 +421,8 @@ class Iface_Model extends ORM
 	 * @param integer $type
 	 * @return string 
 	 */
-	public function get_type($type = NULL)
+	public static function get_type($type)
 	{
-		if (empty($type) && isset($this) && $this->id)
-		{
-			$type = $this->type;
-		}
-		
 		if (is_numeric($type) && array_key_exists($type, self::$types))
 		{
 			return __(self::$types[$type]);
@@ -511,13 +506,8 @@ class Iface_Model extends ORM
 	 * @param integer $type
 	 * @return string 
 	 */
-	public function get_default_name($type = NULL)
+	public static function get_default_name($type)
 	{
-		if (empty($type) && isset($this) && $this->id)
-		{
-			$type = $this->type;
-		}
-		
 		if (!empty($type) && array_key_exists($type, self::$default_names))
 		{
 			return self::$default_names[$type];
@@ -532,7 +522,7 @@ class Iface_Model extends ORM
 	 * @author Michal Kliment
 	 * @return array
 	 */
-	public function get_default_names()
+	public static function get_default_names()
 	{
 		return self::$default_names;
 	}
@@ -544,13 +534,8 @@ class Iface_Model extends ORM
 	 * @param integer $mode
 	 * @return string 
 	 */
-	public function get_wireless_mode($mode = NULL)
+	public static function get_wireless_mode($mode = NULL)
 	{
-		if (!$mode && isset($this) && get_class($this) == __CLASS__ && $this->id)
-		{
-			$mode = $this->wireless_mode;
-		}
-		
 		if (array_key_exists($mode, self::$wireless_modes))
 		{
 			return __(self::$wireless_modes[$mode]);
@@ -575,16 +560,11 @@ class Iface_Model extends ORM
 	 * Returns antenna of current wireless interface
 	 * 
 	 * @author Michal Kliment
-	 * @param integer $mode
+	 * @param integer $antenna
 	 * @return string 
 	 */
-	public function get_wireless_antenna($antenna = NULL)
+	public static function get_wireless_antenna($antenna)
 	{
-		if ($antenna === NULL)
-		{
-			$antenna = $this->wireless_antenna;
-		}
-		
 		if (array_key_exists($antenna, self::$wireless_antennas))
 		{
 			return __(self::$wireless_antennas[$antenna]);

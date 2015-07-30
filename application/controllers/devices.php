@@ -483,7 +483,7 @@ class Devices_Controller extends Controller
 		$base_grid->field('type');
 	
 		$base_grid->link_field('iface_id')
-				->link('devices/show_iface', 'mac');
+				->link('ifaces/show', 'mac');
 		
 		$base_grid->callback_field('connected_to_device')
 				->callback('callback::device_connected_to_device')
@@ -3247,29 +3247,6 @@ class Devices_Controller extends Controller
 	}
 	
 	/**
-	 * Shows iface
-	 *
-	 * @author Michal Kliment
-	 * @param integer $iface_id 
-	 */
-	public function show_iface($iface_id = NULL)
-	{
-		Ifaces_Controller::show($iface_id);
-	}
-	
-	/**
-	 *
-	 * Shows IP address
-	 * 
-	 * @author Michal Kliment
-	 * @param integer $ip_address_id 
-	 */
-	public function show_ip_address($ip_address_id = NULL)
-	{
-		Ip_addresses_Controller::show($ip_address_id);
-	}
-	
-	/**
 	 * Create grids of interfaces and ip addresses of given device.
 	 * 
 	 * @param Device_Model $device
@@ -3394,7 +3371,7 @@ class Devices_Controller extends Controller
 		{
 			$actions->add_action('id')
 					->icon_action('show')
-					->url('devices/show_iface')
+					->url('ifaces/show')
 					->class('popup_link');
 		}
 			
@@ -3453,7 +3430,7 @@ class Devices_Controller extends Controller
 			{
 				$actions->add_action('id')
 						->icon_action('show')
-						->url('devices/show_iface')
+						->url('ifaces/show')
 						->class('popup_link');
 			}
 
@@ -3516,7 +3493,7 @@ class Devices_Controller extends Controller
 			{
 				$actions->add_action('id')
 						->icon_action('show')
-						->url('devices/show_iface')
+						->url('ifaces/show')
 						->class('popup_link');
 			}
 
@@ -3585,7 +3562,7 @@ class Devices_Controller extends Controller
 			{
 				$actions->add_action('id')
 						->icon_action('show')
-						->url('devices/show_iface')
+						->url('ifaces/show')
 						->class('popup_link');
 			}
 
@@ -3744,7 +3721,7 @@ class Devices_Controller extends Controller
 			{
 				$actions->add_action('id')
 						->icon_action('show')
-						->url('devices/show_iface')
+						->url('ifaces/show')
 						->class('popup_link');
 			}
 
@@ -3805,7 +3782,7 @@ class Devices_Controller extends Controller
 			{
 				$actions->add_action('id')
 						->icon_action('show')
-						->url('devices/show_iface')
+						->url('ifaces/show')
 						->class('popup_link');
 			}
 

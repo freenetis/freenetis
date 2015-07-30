@@ -311,7 +311,7 @@ class Redirect_Controller extends Controller
 					)
 				)
 				->link(
-					'devices/show_iface/'.$iface->id,
+					'ifaces/show/'.$iface->id,
 					$iface_name,
 					$this->acl_check_view(
 						'Ifaces_Controller',
@@ -321,7 +321,7 @@ class Redirect_Controller extends Controller
 				)
 				->disable_translation()
 				->link(
-					'devices/show_ip_address/'.$ip->id,
+					'ip_addresses/show/'.$ip->id,
 					$ip->ip_address,
 					$this->acl_check_view(
 						'Ip_addresses_Controller',

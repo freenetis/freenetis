@@ -35,7 +35,7 @@ echo implode(' | ', $links);
 	</tr>
 	<tr>
 		<th><?php echo  __('Type') ?></th>
-		<td><?php echo  $iface->get_type() ?></td>
+        <td><?php echo  Iface_Model::get_type($iface->type) ?></td>
 	</tr>
 	<?php if (isset($iface->number)): ?>
 	<tr>

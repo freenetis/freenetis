@@ -1038,7 +1038,7 @@ class Works_Controller extends Controller
 
 			$url = ($work->comments_thread_id) ?
 					url_lang::base().'comments/add/'.$work->comments_thread_id :
-					url_lang::base().'comments_threads/add/job/'.$work->id;
+					url_lang::base().'comments/add_thread/job/'.$work->id;
 
 			$comments_grid->add_new_button($url, __('Add comment to work'));
 
@@ -1240,7 +1240,7 @@ class Works_Controller extends Controller
 
 			$url = ($work->comments_thread_id) ?
 					'comments/add/'.$work->comments_thread_id :
-					'comments_threads/add/job/'.$work->id;
+					'comments/add_thread/job/'.$work->id;
 
 			$comments_grid->add_new_button($url, __('Add comment to work'));
 

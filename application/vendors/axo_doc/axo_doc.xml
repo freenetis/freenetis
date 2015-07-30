@@ -409,9 +409,6 @@
             <axo usage_type="access-partial" section="Comments_Controller" value="works" action="delete" own="true"></axo>
             <axo usage_type="access-partial" section="Comments_Controller" value="requests" action="edit" own="false"></axo>
         </method></object>
-    <object name="comments_threads" type="controller" comment-en="Comment threads" comment-cs="Vlákna komentářů">
-        <method name="add" comment-en="Add a new item" comment-cs="Přidání položky"></method>
-    </object>
     <object name="connection_requests" type="controller" comment-en="Connection requests" comment-cs="Požadavky o připojení">
         <method name="index" hide="true"></method>
         <method name="show_all" comment-en="Show all items" comment-cs="Zobrazuje všechny položky">
@@ -719,8 +716,6 @@
             <axo usage_type="breadcrumbs" section="Devices_Controller" value="devices" action="edit" own="true"></axo>
         </method>
         <method name="get_map"></method>
-        <method name="show_iface"></method>
-        <method name="show_ip_address"></method>
         <method name="topology">
             <axo usage_type="access" section="Devices_Controller" value="topology" action="view" own="true"></axo>
             <axo usage_type="breadcrumbs" section="Members_Controller" value="members" action="view" own="false"></axo>

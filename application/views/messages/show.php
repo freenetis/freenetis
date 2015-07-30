@@ -36,7 +36,7 @@
 	<?php if (module::e('sms') && $message->sms_text): ?>
 	<tr>
 		<th><?php echo __('Content of the message for SMS') ?></th>
-		<td class="notification_message_content"><?php echo $message->sms_text ?></td>
+        <td class="notification_message_content"><?php echo html::specialchars($message->sms_text) ?></td>
 	</tr>
 	<?php endif ?>
 </table>

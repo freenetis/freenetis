@@ -345,8 +345,12 @@ class Settings_Controller extends Controller
 			// Delete body and html tags
 			$html = preg_replace('/<html.*?>.*?<body.*?>/is', '', $html);
 			$html = preg_replace('/<\/body><\/html>/is', '', $html);
-			$html = preg_replace('/table border="0"/is', 'table class="extended"', $html);
-			$html = preg_replace('/width="600"/is', 'width="720" style="table-layout:fixed; overflow: hidden"', $html);
+            if (PHP_VERSION_ID >= 50600) {
+                $html = preg_replace('/<table>/is', '<table class="extended" width="720" style="table-layout:fixed; overflow: hidden">', $html);
+            } else {
+                $html = preg_replace('/table border="0"/is', 'table class="extended"', $html);
+                $html = preg_replace('/width="600"/is', 'width="720" style="table-layout:fixed; overflow: hidden"', $html);
+            }
 		}
 		
 		$table = new View('table_2_columns');

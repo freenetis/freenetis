@@ -317,7 +317,7 @@ class Messages_Controller extends Controller
 				if (module::e('sms') &&
 					Message_Model::has_sms_content($message->type))
 				{
-					$sms_text = trim(text::cs_utf2ascii(strip_tags($form_data['sms_text'])));
+					$sms_text = trim(text::cs_utf2ascii($form_data['sms_text']));
 					$message->sms_text = empty($sms_text) ? NULL : $sms_text;
 				}
 				
@@ -543,7 +543,7 @@ class Messages_Controller extends Controller
 				Message_Model::has_sms_content($message->type))
 			{
 				// sms text
-				$sms_text = trim(text::cs_utf2ascii(strip_tags($form_data['sms_text'])));
+				$sms_text = trim(text::cs_utf2ascii($form_data['sms_text']));
 				// set var
 				$message->sms_text = empty($sms_text) ? NULL : $sms_text;
 			}

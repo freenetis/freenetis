@@ -26,12 +26,12 @@ $(document).ready(function(){
 	/**
 	 * Type of filter changed
 	 *
-	 * @author Michal Kliment
+	 * @author Ondřej Fibich
 	 */
 	$(".t").die("change").live("change", function (){
 		// filter items
 		var $op = $(this).parent().find("select.o");
-		var $val = $(this).parent().find(":input.v");console.log($val.length);
+		var $val = $(this).parent().find(":input.v");
 		// value
 		var val = $(this).val();
 		var name = $val.attr("name");
@@ -91,8 +91,14 @@ $(document).ready(function(){
 		
 		// set CSS classes
 		$val.addClass('v')
-			.addClass(types[val]['classes'].join(' '))
-			.addClass(types[val]['css_classes'].join(' '));
+		
+		if (types[val]['classes'] && types[val]['classes'].length) {
+			$val.addClass(types[val]['classes'].join(' '));
+		}
+		
+		if (types[val]['css_classes'] && types[val]['css_classes'].length) {
+			$val.addClass(types[val]['css_classes'].join(' '));
+		}
 		
 		// type has callback
 		if (types[val]['callback'] != null)

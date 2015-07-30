@@ -11,11 +11,12 @@ if ($#ARGV != 1) {
   exit 0;
 }
 
-use SOAP::Lite +autodispatch =>
-   uri => "http://sip.nfx.czf/lBilling",
-   proxy => 'https://'.$ARGV[0].':'.$ARGV[1].'@sip.nfx.czf/cgi-bin/admin/lbilling/soap.pl';
+$ENV{PERL_LWP_SSL_VERIFY_HOSTNAME}=0;
 
-my $lbilling = lBilling->new();
+use SOAP::Lite;
+my $lbilling = SOAP::Lite
+   -> uri("http://sip.nfx.czf/lBilling")
+   -> proxy('https://'.$ARGV[0].':'.$ARGV[1].'@sip.nfx.czf/cgi-bin/admin/lbilling/soap.pl');
 
 unless ( $lbilling ) {
   print "Could not create SOAP instance", "\n";

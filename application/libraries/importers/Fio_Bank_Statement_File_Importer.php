@@ -88,10 +88,13 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 			$statement->bank_account_id = $ba->id;
 			$statement->user_id = $this->get_user_id();
 			$statement->type = $this->get_importer_name();
-			$statement->from = $header->dateStart;
-			$statement->to = $header->dateEnd;
-			$statement->opening_balance = $header->openingBalance;
-			$statement->closing_balance = $header->closingBalance;
+            if ($header != NULL)
+            {
+                $statement->from = $header->dateStart;
+                $statement->to = $header->dateEnd;
+                $statement->opening_balance = $header->openingBalance;
+                $statement->closing_balance = $header->closingBalance;
+            }
 			$statement->save_throwable();
 
 			/* transactions */

@@ -180,17 +180,19 @@ class Account_Model extends ORM
 	public function get_some_doubleentry_account_names($origin = null, $account_attribute_id = null)
 	{
 		// conditions
-		$cond_origin = "";
-		$where = "";
+		$where = $cond_origin = '';
 		// make origin condition
 		if ($origin !== null)
 		{
-			$cond_origin = "AND a.id <> " . intval($origin) . "
-				AND (a.account_attribute_id = ".Account_attribute_Model::CREDIT."
-				OR a.account_attribute_id = ".Account_attribute_Model::OPERATING."
-				OR a.account_attribute_id = ".Account_attribute_Model::PROJECT.")";
+            $allowed_types = array(Account_attribute_Model::CREDIT,
+                Account_attribute_Model::OPERATING,
+                Account_attribute_Model::PROJECT,
+                Account_attribute_Model::MEMBER_FEES);
+			$cond_origin = "AND a.id <> " . intval($origin)
+                    . " AND a.account_attribute_id IN (" 
+                    . implode(', ', array_map('intval', $allowed_types)) . ")";
 		}
-		// make account confition
+		// make account attribute condition
 		if ($account_attribute_id)
 		{
 			$where = 'WHERE a.account_attribute_id=' . intval($account_attribute_id);
@@ -198,17 +200,43 @@ class Account_Model extends ORM
 		// query
 		return $this->db->query("
 			SELECT a.id, a.name, a.member_id, a.account_attribute_id,
-				IF(t.quarter IS NULL, concat(t.town, ' ', p.street_number),
-									  concat(t.town, '-', t.quarter, ' ', p.street_number)) AS addr
+                m.name as member_name
 			FROM accounts a
-			JOIN members m ON
-				a.member_id=m.id
-				$cond_origin
-			JOIN address_points p ON m.address_point_id=p.id
-			JOIN towns t ON t.id=p.town_id $where
+			JOIN members m ON a.member_id=m.id $cond_origin
+			$where
 			ORDER BY a.name
 		");
 	}
+
+    /**
+     * Select some double entry accounts for select. If origin is supplied than
+     * account with origin ID is not in list. If account attribute ID is
+     * supplied than only account with given attribute ID are listed.
+     *
+     * @author Ondřej Fibich <fibich@freenetis.org>
+     * @param integer $origin optional origin account ID to be ignored
+     * @param type $account_attribute_id optional account attribute ID for filter
+     * @return array associative array with account ID as key and text
+     *      reprezentation of account as value (name, ID, attribute ID, owner
+     *      member ID)
+     */
+    public function select_some_list($origin = NULL, $account_attribute_id = NULL)
+    {
+        $accounts = $this->get_some_doubleentry_account_names($origin,
+                $account_attribute_id);
+        $arr_accounts = array();
+		foreach ($accounts as $a)
+		{
+			$name = $a->name . ' (' . $a->id . ', ' . $a->account_attribute_id . ')';
+            if ($a->account_attribute_id == Account_attribute_Model::CREDIT)
+            {
+                $name .= ' - ' . $a->member_name . ' (' . $a->member_id . ')';
+            }
+			$arr_accounts[$a->id] = $a->name . ' (' . $a->id . ', '
+                    . $a->account_attribute_id . ', ' . $a->member_id . ')';
+		}
+        return $arr_accounts;
+    }
 
 	/**
 	 * It gets balance of account.

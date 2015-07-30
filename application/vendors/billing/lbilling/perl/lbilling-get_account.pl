@@ -11,23 +11,28 @@ if ($#ARGV != 2) {
   exit 0;
 }
 
-my $account = {"billingid" => $ARGV[2]};
+$ENV{PERL_LWP_SSL_VERIFY_HOSTNAME}=0;
 
-use SOAP::Lite +autodispatch =>
-   uri => "http://sip.nfx.czf/lBilling",
-   proxy => 'https://'.$ARGV[0].':'.$ARGV[1].'@sip.nfx.czf/cgi-bin/admin/lbilling/soap.pl';
-
-my $lbilling = lBilling->new();
+use SOAP::Lite;
+my $lbilling = SOAP::Lite
+   -> uri("http://sip.nfx.czf/lBilling")
+   -> proxy('https://'.$ARGV[0].':'.$ARGV[1].'@sip.nfx.czf/cgi-bin/admin/lbilling/soap.pl');
 
 unless ( $lbilling ) {
   print "Could not create SOAP instance", "\n";
   exit 0;
 }
 
+my $account = {"billingid" => $ARGV[2]};
+
 my $result;
 my $i;
 
-if ( $result = $lbilling->get_account($account) ) {
+$result = $lbilling->get_account($account)->result;
+
+if ( exists($result->{"status"}) and $result->{"status"} ) {
+   $result = $result->{"data"};
+
    print $result->{"valid_to"}, ";";
    print $result->{"valid_from"}, ";";
    print $result->{"descr"}, ";";
@@ -61,11 +66,13 @@ if ( $result = $lbilling->get_account($account) ) {
    }
    exit 1;
 } else {
-   my $error = $lbilling->get_error();
-   my $errcount = @{$lbilling->get_error()};
-   for ($i=0; $i<$errcount; $i++)
-   {
-      print $lbilling->get_error()->[$i], "\n";
+   if ( exists($result->{"error"}) ) {
+        my $error = $result->{"error"};
+        my $errcount = @{$result->{"error"}};
+        for ($i=0; $i<$errcount; $i++)
+        {
+            print $result->{"error"}->[$i], "\n";
+        } 
    }
    exit 0;
 }

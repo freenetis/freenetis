@@ -60,6 +60,9 @@ class Users_Controller extends Controller
 		$filter_form->add('login')
 				->label(__('Login name'))
 				->callback('json/user_login');
+        
+        $filter_form->add('member_id')
+                ->type('number');
 		
 		$filter_form->add('member_name')
 				->type('combo')

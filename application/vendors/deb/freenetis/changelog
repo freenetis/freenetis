@@ -1,3 +1,12 @@
+freenetis (1.1.11) stable; urgency=hight
+  * Double-entry transfer may be added to 684000 account by user
+  * Support for new lbilling NFX VoIP API
+  * Improved double-entry account lists in forms that allows to add new transfer
+  * New filter for member ID in users and member interrupts grids
+  * Fix win1250 encoding issue in CSV export
+  * Fix DEB package dependency to CRON and locales
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Fri, 15 May 2015 19:39:51 +0200
+
 freenetis (1.1.10) stable; urgency=hight
   * New configuration option that allows duplicates in phone and e-mail contacts
   * New variable symbol generator that generates member ID

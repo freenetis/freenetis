@@ -609,20 +609,17 @@ class Transfers_Controller extends Controller
 		
 		// destination account, instead of origin one
 		$dst_account_model = new Account_Model();
-		$dst_accounts = $dst_account_model->get_some_doubleentry_account_names($origin_account_id);
-		
-		foreach ($dst_accounts as $dst_account)
-		{	// convert the object into array (used for HTML select list)
-			$arr_dst_accounts[$dst_account->id] = $dst_account->name . ' '
-					. $dst_account->id . ' (' . $dst_account->addr . ')';
-		}
+		$arr_dst_accounts = $dst_account_model->select_some_list($origin_account_id);
 		asort($arr_dst_accounts, SORT_LOCALE_STRING);
 		// default destination account
 		$operating = ORM::factory('account')->where(
 				'account_attribute_id', Account_attribute_Model::OPERATING
 		)->find();
 		// array with only one origin account
-		$arr_orig_accounts[$origin_account->id] = $origin_account->name . ' ' . $origin_account->id;
+		$arr_orig_accounts[$origin_account->id] = $origin_account->name . ' ('
+                . $origin_account->id . ', '
+                . $origin_account->account_attribute_id . ', '
+                . $origin_account->member_id . ')';
 		// account attributes for types of accounts
 		$aa_model = new Account_attribute_Model();
 		$account_attributes = $aa_model->get_account_attributes();
@@ -644,7 +641,7 @@ class Transfers_Controller extends Controller
 		$form->group('Origin account');
 		
 		$form->dropdown('oname')
-				->label('Origin account (account name, account ID)')
+				->label('Origin account (name, ID, type, member ID)')
 				->options($arr_orig_accounts)
 				->rules('required')
 				->style('width:600px');
@@ -657,7 +654,7 @@ class Transfers_Controller extends Controller
 				->style('width:600px');
 		
 		$form->dropdown('aname')
-				->label('Destination account (account name, account ID)')
+				->label('Destination account (name, ID, type, member ID)')
 				->options($arr_dst_accounts)
 				->rules('required')
 				->selected($operating->id)
@@ -755,30 +752,16 @@ class Transfers_Controller extends Controller
 		
 		$account_model = new Account_Model();
 		
-		$accounts = $account_model->get_some_doubleentry_account_names();
-		$origin_accounts = $accounts;
-		$dst_accounts = $accounts;
-		
-		foreach ($dst_accounts as $dst_account)
-		{
-			$arr_dst_accounts[$dst_account->id] = $dst_account->name . ' '
-					. $dst_account->id . ' (' . $dst_account->addr . ')';
-		}
+		$arr_dst_accounts = $account_model->select_some_list();
 		asort($arr_dst_accounts);
 		
 		// array origin accounts for dropdown
 		$arr_orig_accounts = $arr_dst_accounts;
+
 		// default destination account
 		$operating = ORM::factory('account')->where(
 				'account_attribute_id', Account_attribute_Model::OPERATING
 		)->find();
-		// account attributes for types of accounts
-		$aa_model = new Account_attribute_Model();
-		$account_attributes = $aa_model->get_account_attributes();
-		foreach ($account_attributes as $account_attribute)
-		{
-			$arr_attributes[$account_attribute->id] = $dst_account->name . ' ' . $dst_account->id;
-		}
 		
 		// form
 		$form = new Forge('transfers/add');
@@ -787,17 +770,19 @@ class Transfers_Controller extends Controller
 		$form->group('Origin account');
 		
 		$form->dropdown('oname')
-				->label(__('Origin account (account name, account ID)') . ':')
+				->label('Origin account (name, ID, type, member ID)')
 				->options($arr_orig_accounts)
-				->rules('required');
+				->rules('required')
+				->style('width:600px');
 		// destination account
 		$form->group('Destination account');
 		
 		$form->dropdown('aname')
-				->label(__('Destination account (account name, account ID)') . ':')
+				->label('Destination account (name, ID, type, member ID)')
 				->options($arr_dst_accounts)
 				->rules('required')
-				->selected($operating->id);
+				->selected($operating->id)
+				->style('width:600px');
 		
 		// other information
 		$form->group('Transfer');
@@ -881,40 +866,24 @@ class Transfers_Controller extends Controller
 			Controller::error(RECORD);
 		}
 		
-		if (isset($origin_account))
-		{	// transfer from specific account?
-			// save for callback function valid_amount_to_send
-			$this->origin = $origin_account;
-			$origin_acc = new Account_Model($origin_account);
-			
-			if ($origin_acc->id == 0)
-			{
-				Controller::error(RECORD);
-			}
-			
-			if (!$this->acl_check_new('Accounts_Controller', 'transfers', $origin_acc->member_id))
-			{	// does the user have rights for this?
-				Controller::error(ACCESS);
-			}
-			
-			// yes = create object of all accounts except the origin one
-			$dst_account_model = new Account_Model();
-			$dst_accounts = $dst_account_model->get_some_doubleentry_account_names($origin_account);
-		}
-		else
-		{	// transfer from any (arbitrary) account
-			if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-			{ // Does the user have the rights for this?
-				Controller::error(ACCESS);
-			}
-			
-			// yes = create object of all accounts
-			$origin_acc = new Account_Model();
-			$dst_accounts = $origin_accounts = $origin_acc->get_some_doubleentry_account_names();
-		}
-		$arr_orig_accounts[$origin_acc->id] =
-				"$origin_acc->name - " . __('Account ID') . " $origin_acc->name - "
-				. __('Member ID') . " $origin_acc->member_id";
+		// transfer from specific account?
+        // save for callback function valid_amount_to_send
+        $this->origin = $origin_account;
+        $origin_acc = new Account_Model($origin_account);
+
+        if (!$origin_acc->id)
+        {
+            Controller::error(RECORD);
+        }
+
+        if (!$this->acl_check_new('Accounts_Controller', 'transfers', $origin_acc->member_id))
+        {	// does the user have rights for this?
+            Controller::error(ACCESS);
+        }
+
+		$arr_orig_accounts[$origin_acc->id] = $origin_acc->name . ' - '
+                . __('Account ID') . ' ' . $origin_acc->id . ' - '
+				. __('Member ID') . ' ' . $origin_acc->member_id;
 		
 		// form
 		$form = new Forge('transfers/add_voip/' . $origin_account);

@@ -234,7 +234,7 @@ class Export_Controller extends Controller
 						// character encoding
 						if (!$is_utf)
 						{
-							$field = iconv('utf-8', $encoding, $value);
+							$value = iconv('utf-8', $encoding, $value);
 						}
 						// emails body
 						if ($content == 'email_queue_sent' && $key == 'message')

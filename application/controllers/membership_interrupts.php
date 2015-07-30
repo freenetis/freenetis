@@ -62,6 +62,9 @@ class Membership_interrupts_Controller extends Controller
 		
 		$filter_form->add('id')
 				->type('number');
+
+        $filter_form->add('member_id')
+                ->type('number');
 		
 		$filter_form->add('name')
 				->label(__('Member name'))

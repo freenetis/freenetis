@@ -108,7 +108,8 @@ class lbilling
 			$line = 0;
 
 			$acc = explode(";", $output[$line]);
-
+			
+			$account = new stdClass();
 			$account->valid_to = $acc[0];
 			$account->valid_from = $acc[1];
 			$account->desc = $acc[2];
@@ -128,6 +129,8 @@ class lbilling
 			for ($line; $line < $count; $line++)
 			{
 				$acc = explode(";", $output[$line]);
+				
+				$account->subscribers[$i] = new stdClass();
 				$account->subscribers[$i]->valid_to = $acc[0];
 				$account->subscribers[$i]->valid_from = $acc[1];
 				$account->subscribers[$i]->descr = $acc[2];
@@ -174,6 +177,7 @@ class lbilling
 
 			$acc = explode(";", $output[$line]);
 
+			$account = new stdClass();
 			$account->billingid = $acc[0];
 			$account->from = $acc[1];
 			$account->to = $acc[2];
@@ -186,6 +190,7 @@ class lbilling
 			for ($line; $line < $count; $line++)
 			{
 				$acc = explode(";", $output[$line]);
+				$account->calls[$i] = new stdClass();
 				$account->calls[$i]->provider = $acc[0];
 				$account->calls[$i]->rate_vat = $acc[1];
 				$account->calls[$i]->subscriber = $acc[2];
@@ -240,6 +245,7 @@ class lbilling
 
 			$acc = explode(";", $output[$line]);
 
+			$subscriber = new stdClass();
 			$subscriber->billingid = $acc[0];
 			$subscriber->from = $acc[1];
 			$subscriber->to = $acc[2];
@@ -252,6 +258,8 @@ class lbilling
 			for ($line; $line < $count; $line++)
 			{
 				$acc = explode(";", $output[$line]);
+				
+				$subscriber->calls[$i] = new stdClass();
 				$subscriber->calls[$i]->provider = $acc[0];
 				$subscriber->calls[$i]->rate_vat = $acc[1];
 				$subscriber->calls[$i]->subscriber = $acc[2];
@@ -306,6 +314,7 @@ class lbilling
 
 			$acc = explode(";", $output[$line]);
 
+			$partner = new stdClass();
 			$partner->from = $acc[0];
 			$partner->to = $acc[1];
 
@@ -318,6 +327,7 @@ class lbilling
 			{
 				$acc = explode(";", $output[$line]);
 
+				$partner->calls[$i] = new stdClass();
 				$partner->calls[$i]->provider = $acc[0];
 				$partner->calls[$i]->cost_sum = $acc[1];
 				$partner->calls[$i]->subscriber = $acc[2];
@@ -375,6 +385,7 @@ class lbilling
 
 			$acc = explode(";", $output[$line]);
 
+			$call = new stdClass();
 			$call->length = $acc[0];
 			$call->callee = $acc[1];
 			$call->caller = $acc[2];
@@ -391,6 +402,7 @@ class lbilling
 			for ($line; $line < $count; $line++)
 			{
 				$acc = explode(";", $output[$line]);
+				$call->calls[$i] = new stdClass();
 				$call->calls[$i]->provider = $acc[0];
 				$call->calls[$i]->rate_vat = $acc[1];
 				$call->calls[$i]->subscriber = $acc[2];

@@ -70,18 +70,10 @@ class Json_Controller extends Controller
 
 		$id = $this->input->get('id');
 
-		$accounts = ORM::factory('account')->get_some_doubleentry_account_names(
-				$origin_account_id, $id
-		);
+        $account_model = new Account_Model;
+		$accounts = $account_model->select_some_list($origin_account_id, $id);
 
-		$arr_accounts = array();
-		foreach ($accounts as $account)
-		{	// convert the object into array (used for HTML select list)
-			$name = $account->name . ' ' . $account->id . ' (' . $account->addr . ')';
-			$arr_accounts[$name] = $account->id;
-		}
-
-		echo json_encode($arr_accounts);
+		echo json_encode(array_flip($accounts));
 	}
 	
 	/**

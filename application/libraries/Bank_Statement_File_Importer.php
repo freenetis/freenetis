@@ -199,15 +199,19 @@ abstract class Bank_Statement_File_Importer
 		/* check header of statement */
 		$header_data = $driver->get_header_data();
 		
-		if (!$header_data ||
-			$header_data->get_bank_id() != $bank_account->bank_nr ||
-			$header_data->get_account_id() != $bank_account->account_nr)
-		{
-			$an = $header_data->get_account_id() . '/' . $header_data->get_bank_id();
-			$m = __('Bank account number in listing (%s) header does not match ' .
-					'bank account %s in database!', array($an, $acc));
-			throw new Exception($m);
-		}
+		if ($header_data !== NULL)
+        {
+            if (!$header_data ||
+                $header_data->get_bank_id() != $bank_account->bank_nr ||
+                $header_data->get_account_id() != $bank_account->account_nr)
+            {
+                $an = $header_data->get_account_id() . '/' 
+                        . $header_data->get_bank_id();
+                $m = __('Bank account number in listing (%s) header does not ' .
+                        'match bank account %s in database!', array($an, $acc));
+                throw new Exception($m);
+            }
+        } 
 		
 		/* parse file */
 		if (!$driver->parse_file_data())
@@ -537,8 +541,11 @@ abstract class Bank_Statement_File_Importer
 	 * 
 	 * An error in the format may be add into error stack (addError) that is later
 	 * displayed to user if this function returns FALSE.
+     * 
+     * If bank statement file not providing any header information NULL can
+     * be returned to skip assert for bank account match.
 	 * 
-	 * @return Header_Data 
+	 * @return Header_Data|boolean|null
 	 */
 	protected abstract function get_header_data();
 	

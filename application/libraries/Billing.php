@@ -174,7 +174,7 @@ class Billing
 		
 		if ($call && isset($call->descr) && $call->descr == 'OK')
 		{
-			$number = explode('@', $call->calls[0]->callee);
+			$number = explode('@', $call->callee);
 			$number = explode(':', $number[0]);
 			$number = $number[1];
 			

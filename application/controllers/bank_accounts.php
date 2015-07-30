@@ -517,6 +517,11 @@ class Bank_accounts_Controller extends Controller
 
 				$bank_account->settings = $ba_driver->get_column_data();
 			}
+			// empty settings (#877)
+			else
+			{
+				$bank_account->settings = NULL;
+			}
 			
 			$bank_account->save();
 			

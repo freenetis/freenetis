@@ -87,10 +87,6 @@ $(document).ready(function(){
 				// replace pointer to value
 				$val = $(this).parent().find(":input.v");
 			}
-			else
-			{
-				$val.val("");
-			}
 		}
 		
 		// set CSS classes

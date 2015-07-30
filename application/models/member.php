@@ -867,7 +867,7 @@ class Member_Model extends ORM
 			
 			case Message_Model::USER_MESSAGE:
 				// no former or interrupted members for user message
-				$where = "WHERE mi.id IS NULL "
+				$where = "AND mi.id IS NULL "
 						. " AND m.type <> " . Member_Model::TYPE_FORMER;
 				$order_by = 'm.id';
 				break;

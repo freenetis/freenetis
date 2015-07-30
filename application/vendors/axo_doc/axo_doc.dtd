@@ -1,0 +1,58 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<!--
+	DTD for AXO documentation file.
+
+	@author Ondřej Fibich
+	@version 1.0
+-->
+
+<!--
+    An example how to use this DTD from your XML document:
+
+    <?xml version="1.0"?>
+
+    <!DOCTYPE axoDocumentation SYSTEM "axo_doc.dtd">
+
+    <axoDocumentation>
+    ...
+    </axoDocumentation>
+-->
+
+<!--- Root elements that contains objects. -->
+<!ELEMENT axoDocumentation (object)*>
+
+<!--- Object that represents a class of the given type. -->
+<!ELEMENT object (method*,axo*)>
+<!ATTLIST object
+    type (controller|helper|library|view) #REQUIRED
+    name CDATA #REQUIRED
+	hide (true|false) "false"
+	comment-en CDATA #IMPLIED
+	comment-cs CDATA #IMPLIED
+  >
+
+<!--- Method of the object -->
+<!ELEMENT method (axo)*>
+<!ATTLIST method
+    name CDATA #REQUIRED
+	hide (true|false) "false"
+	comment-en CDATA #IMPLIED
+	comment-cs CDATA #IMPLIED
+  >
+
+<!--- An AXO calll -->
+<!ELEMENT axo (comment)*>
+<!ATTLIST axo
+    own (true|false) #REQUIRED
+    value CDATA #REQUIRED
+    section CDATA #REQUIRED
+    action (edit|new|delete|confirm|view) #REQUIRED
+    usage_type (unknown|access|access-partial|breadcrumbs|links|grid-action) #REQUIRED
+  >
+
+<!-- Comment in a defined language for the AXO call -->
+<!ELEMENT comment (#PCDATA)>
+<!ATTLIST comment
+    lang (en|cs) #REQUIRED
+  >

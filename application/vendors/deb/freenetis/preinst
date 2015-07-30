@@ -1,0 +1,14 @@
+#!/bin/bash
+# FreenetIS DEB: actions before installing of package
+
+set -e
+. /usr/share/debconf/confmodule
+
+SERVER=apache2
+
+# shutdown server
+if [ -x /usr/sbin/invoke-rc.d ]; then
+	invoke-rc.d apache2 stop 3>/dev/null || true
+else
+	/etc/init.d/apache2 stop 3>/dev/null || true
+fi

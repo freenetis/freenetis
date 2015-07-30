@@ -1,0 +1,14 @@
+#!/bin/sh
+# FreenetIS DEB: actions before uninstalling of package
+
+set -e
+
+# remove CRON entry
+rm -rf /etc/cron.d/freenetis
+
+# restart CRON
+if [ -x /usr/sbin/invoke-rc.d ]; then
+	invoke-rc.d cron restart 3>/dev/null || true
+else
+	/etc/init.d/cron restart 3>/dev/null || true
+fi

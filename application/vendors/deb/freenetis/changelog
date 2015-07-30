@@ -1,3 +1,32 @@
+freenetis (1.1.1) stable; urgency=hight
+  * Fix release (#862: Activation of user notification message)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Fri, 24 Jan 2014 18:45:31 +0100
+
+freenetis (1.1.0) stable; urgency=low
+  * First stable version of 1.1
+  * Key features: <http://www.freenetis.org/freenetis-1-1-key-features>
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Fri, 17 Jan 2014 11:10:21 +0100
+
+freenetis (1.0.12) stable; urgency=hight
+  * Fix release
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 09 Jul 2013 15:12:00 +0100
+
+freenetis (1.0.11) stable; urgency=hight
+  * Fix release (#684)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 09 Jul 2013 15:08:00 +0100
+
+freenetis (1.0.10) stable; urgency=hight
+  * Fix release (#36, #615)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 09 Jul 2013 14:37:00 +0100
+
+freenetis (1.0.9) stable; urgency=hight
+  * Fix release (#488, #508, #569)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Fri, 06 Jun 2013 14:06:00 +0100
+
+freenetis (1.0.8) stable; urgency=hight
+  * Fix release (#454, #470, #460)
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Mon, 21 Jan 2013 11:52:00 +0100
+
 freenetis (1.0.7) stable; urgency=hight
   * Fix release (#416, #436, #445, #452)
  -- Ondrej Fibich <ondrej.fibich@gmail.com>  Wed, 16 Jan 2013 19:09:56 +0100

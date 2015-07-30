@@ -1,3 +1,17 @@
+freenetis (1.1.9) stable; urgency=hight
+  * Fix release of invalid DEB package
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 03 Mar 2015 18:18:18 +0100
+
+freenetis (1.1.8) stable; urgency=hight
+  * Fix release
+  * Fixes #956: Add fee fix if it ends in '9999-12-31'
+  * Fixes #960: Cannot set default allow subnets count
+  * Fixes #962: Allow subnets count not set during self-registration of member
+  * Fixes #963: Export to PDF in PHP 5.5
+  * Fixes #964: Link to request in user profile
+  * Fixes #966: Sorting in transfers
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 03 Mar 2015 17:18:18 +0100
+
 freenetis (1.1.7) stable; urgency=low
   * Fix release
   * Fixes #895: Notification activation for members filtered by stored query

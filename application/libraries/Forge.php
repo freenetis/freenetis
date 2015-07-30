@@ -219,6 +219,19 @@ class Forge {
 	 */
 	public function validate()
 	{
+		$upload_filesize = file::shortened_size_to_bytes(ini_get('upload_max_filesize'));
+		$post_size = file::shortened_size_to_bytes(ini_get('post_max_size'));
+		if ($upload_filesize > $post_size)
+		{
+			$upload_filesize = $post_size;
+		}
+		
+		if (server::content_length() !== NULL &&
+			server::content_length() > $upload_filesize)
+		{
+			status::warning('Uploaded data exceeded PHP size limit');
+			return FALSE;
+		}
 		$status = TRUE;
 		
 		// validate inputs

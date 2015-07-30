@@ -27,7 +27,9 @@ class Registration_Controller extends Controller
 	public function index()
 	{
 		// if self-registration is not allow, redirect to login page
-		if (!$this->settings->get('self_registration') || $this->session->get('user_id', 0))
+		if ((!$this->session->get('user_id', 0) && !$this->settings->get('self_registration')) ||
+			($this->session->get('user_id', 0) && !$this->acl_check_new('Members_Controller', 'applicants'))
+			)
 		{
 			url::redirect('login');
 		}
@@ -127,8 +129,7 @@ class Registration_Controller extends Controller
 				->class('join1');
 			
 			$form->input('district')
-				->class('join2')
-				->rules('required');
+				->class('join2');
 
 			$form->input('street')
 				->label('Street')
@@ -181,8 +182,15 @@ class Registration_Controller extends Controller
 				->class('join2')
 				->style('width:180px');
 		
+		$email_required = '';
+		
+		if (!Settings::get('self_registration_applicant_email_not_required'))
+		{
+			$email_required = 'required|';
+		}
+		
 		$form->input('email')
-				->rules('required|length[3,100]|valid_email')
+				->rules($email_required.'length[3,100]|valid_email')
 				->callback(array($this, 'valid_email'))
 				->style('width:250px');
 		
@@ -395,7 +403,15 @@ class Registration_Controller extends Controller
 					// commit transaction
 					$user->transaction_commit();
 
-					url::redirect('registration/complete');
+					if ($this->user_id)
+					{
+						status::success('Registration has been sended');
+						$this->redirect('members/show_all');
+					}
+					else
+					{
+						url::redirect('registration/complete');
+					}
 				}
 				catch (Exception $ex)
 				{
@@ -406,10 +422,32 @@ class Registration_Controller extends Controller
 			}
 		}
 
-		$view = new View('registration/index');
-		$view->title = __('Registration form');
-		$view->form = $form->html();
-		$view->render(TRUE);
+		$headline = __('Registration form');
+		
+		if ($this->user_id)
+		{
+			// breadcrumbs navigation			
+			$breadcrumbs = breadcrumbs::add()
+					->link('members/show_all', 'Members',
+							$this->acl_check_view('Members_Controller','members'))
+					->disable_translation()
+					->text($headline);
+			
+			$view = new View('main');
+			$view->title = $headline;
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('form');
+			$view->content->form = $form->html();
+			$view->content->headline = $headline;
+			$view->render(TRUE);
+		}
+		else
+		{
+			$view = new View('registration/index');
+			$view->title = $headline;
+			$view->form = $form->html();
+			$view->render(TRUE);
+		}
 	}
 	
 	/**

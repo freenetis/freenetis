@@ -27,10 +27,12 @@
  * @property bool $service
  * @property integer $member_id
  * @property Member_Model $member
+ * @property ORM_Iterator $dns_zones
  */
 class Ip_address_Model extends ORM
 {
 	protected $belongs_to = array('iface', 'subnet', 'member');
+	protected $has_many = array('dns_zones');
 	
 	/**
 	 * No whitelist means, that is ip address can be redirected in any time

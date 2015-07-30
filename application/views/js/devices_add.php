@@ -530,7 +530,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			$p.find('input[name^="link_comment["]').val(null);
 			$p.find('input[name^="medium["]').val((type == <?php echo Iface_Model::TYPE_WIRELESS ?>) ? <?php echo Link_Model::MEDIUM_AIR ?> : <?php echo Link_Model::MEDIUM_CABLE ?>);
 			$p.find('input[name^="bitrate["]').val((type == <?php echo Iface_Model::TYPE_WIRELESS ?>) ? '<?php echo Link_Model::get_wireless_max_bitrate(Link_Model::NORM_802_11_G) ?>M' :  '100M');
-			$p.find('input[name^="duplex["]').val(0);
+			$p.find('input[name^="duplex["]').val((type != <?php echo Iface_Model::TYPE_WIRELESS ?> && type != <?php echo Iface_Model::TYPE_VIRTUAL_AP ?>) ? 1 : 0);
 			$p.find('input[name^="wireless_ssid["]').val(null);
 			$p.find('input[name^="wireless_norm["]').val((type == <?php echo Iface_Model::TYPE_WIRELESS ?>) ? '<?php echo Link_Model::NORM_802_11_G ?>' : null);
 			$p.find('input[name^="wireless_frequency["]').val(null);

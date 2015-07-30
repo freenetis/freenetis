@@ -69,7 +69,9 @@ class Contacts_Controller extends Controller
 		$grid_contacts->callback_field('type')
 				->callback('callback::additional_contacts_type_callback');
 
-		$grid_contacts->field('value');
+		$grid_contacts->callback_field('value')
+				->callback('callback::verified_contact')
+				->help(help::hint('verified_contact'));
 
 		$actions = $grid_contacts->grouped_action_field();
 
@@ -81,6 +83,13 @@ class Contacts_Controller extends Controller
 			$actions->add_action()
 					->icon_action('edit')
 					->url('contacts/edit/'.$user_id)
+					->class('popup_link');
+			
+			$actions->add_conditional_action()
+					->condition('is_contact_verifiable')
+					->icon_action('approve')
+					->label('Verify contact')
+					->url('contacts/verify')
 					->class('popup_link');
 		}
 
@@ -261,6 +270,7 @@ class Contacts_Controller extends Controller
 				{ // add whole contact
 					$contact_model->type = $form_values['type'];
 					$contact_model->value = $form_values['value'];
+					$contact_model->verify = 0;
 					$contact_model->save_throwable();
 
 					$contact_model->add($user);
@@ -281,6 +291,21 @@ class Contacts_Controller extends Controller
 				}
 				
 				$country_model->transaction_commit();
+
+				if (module::e('email'))
+				{
+					try
+					{
+						$this->send_verify_message($contact_model->id);
+						status::success('Verification message have been successfully sent.');
+					}
+					catch (Exception $ex)
+					{
+						status::error('Error - cant send Verification message', $ex);
+						Log::add_exception($ex);
+					}
+				}
+				
 				status::success('Additional contacts have been successfully updated');
 				$this->redirect('contacts/show_by_user/',$user_id);
 			}
@@ -423,6 +448,13 @@ class Contacts_Controller extends Controller
 				$contact_model->transaction_start();
 				$form_data = $form->as_array();
 				// contact
+				$changed = false;
+				if ($contact_model->value !== $form_data['value'])
+				{
+					$contact_model->verify = 0;
+					$changed = true;
+				}
+				
 				$contact_model->value = $form_data['value'];
 				$contact_model->save_throwable();
 				// mail redirection
@@ -434,6 +466,21 @@ class Contacts_Controller extends Controller
 				}
 				// ok
 				$contact_model->transaction_commit();
+				
+				if ($changed && module::e('email'))
+				{
+					try
+					{
+						$this->send_verify_message($contact_id);
+						status::success('Verification message have been successfully sent.');
+					}
+					catch (Exception $ex)
+					{
+						status::error('Error - cant send Verification message', $ex);
+						Log::add_exception($ex);
+					}
+				}
+				
 				status::success('Additional contacts have been successfully updated');
 				$this->redirect('contacts/show_by_user/', $user_id);
 			}
@@ -626,6 +673,209 @@ class Contacts_Controller extends Controller
 					}
 				}
 			}
+		}
+	}
+	
+	/**
+	 * Verify contact of user
+	 * @param type $user_id
+	 * @param type $contact_id 
+	 */
+	public function verify($contact_id = NULL, $verify = 0)
+	{
+		if (empty($contact_id) || !is_numeric($contact_id))
+		{
+			Controller::warning(PARAMETER);
+		}
+		
+		$contact_model = new Contact_Model($contact_id);
+
+		if (!$contact_model->id)
+		{
+			Controller::error(RECORD);
+		}
+		
+		$user_contacts_model = new Users_contacts_Model();
+		$user_id = $user_contacts_model->get_user_of_contact($contact_id);
+		
+		$user = new User_Model($user_id);
+
+
+		// rights
+		if (!$this->acl_check_edit(
+				'Users_Controller', 'additional_contacts', $user->member_id
+			) || !condition::is_contact_verifiable($contact_model))
+		{
+			Controller::error(ACCESS);
+		}
+
+		$view = new View('main');
+		$view->title = __('Verify contact');
+
+		$enum_type_model = new Enum_type_Model();
+		$country_code = NULL;
+
+		if ($contact_model->type == Contact_Model::TYPE_PHONE)
+		{
+			$country_code = $contact_model->get_phone_prefix();
+		}
+
+		$form = new Forge("contacts/verify/$contact_id?verify");
+		$form->hidden('contact_id')
+			->value($contact_id);
+		
+		$form->submit('Verify contact');
+		
+		$form2 = new Forge("contacts/verify/$contact_id?send");
+		$form2->hidden('contact_id')
+			->value($contact_id);
+
+		$form2->submit('Send verify message');
+
+		if (!module::e('email'))
+		{
+			$form2->inputs[0]->disabled('disabled');
+			$form2->inputs[0]->title(__('E-mail module is required to send verification message.'));
+		}
+
+		if ($verify == 1)
+		{
+			$contact_model->transaction_start();
+			// contact
+			$contact_model->verify = 1;
+			$contact_model->save_throwable();
+			// ok
+			$contact_model->transaction_commit();
+			status::success('Contact have been successfully verified');
+
+			$this->redirect('contacts/show_by_user/'.$user_id);
+		}
+
+		if ($form->validate())
+		{
+			if (isset($_GET) && isset($_GET['verify']))
+			{
+				$form_array = $form->as_array();
+				try
+				{
+					$contact_model->transaction_start();
+					// contact
+					$contact_model->verify = 1;
+					$contact_model->save_throwable();
+					// ok
+					$contact_model->transaction_commit();
+					status::success('Contact have been successfully verified');
+						
+				}
+				catch (Exception $ex)
+				{
+					$contact_model->transaction_rollback();
+					status::error('Error - cant verify additional contact', $ex);
+					Log::add_exception($ex);
+				}
+
+				$this->redirect(Path::instance()->previous());
+			}
+			else
+			{
+				if (module::e('email'))
+				{
+					try
+					{
+						$this->send_verify_message($contact_id);
+						status::success('Verification message have been successfully sent.');
+					}
+					catch (Exception $ex)
+					{
+						status::error('Error - cant send verification message', $ex);
+						Log::add_exception($ex);
+					}
+				}
+
+				$this->redirect(Path::instance()->previous());
+			}
+		}
+		else
+		{
+			// breadcrumbs navigation
+			$breadcrumbs = breadcrumbs::add()
+					->link('members/show_all', 'Members',
+							$this->acl_check_view('Members_Controller','members'))
+					->disable_translation()
+					->link('members/show/' . $user->member->id, 
+							"ID ".$user->member->id." - ".$user->member->name,
+							$this->acl_check_view(
+									'Members_Controller','members',
+									$user->member->id
+							)
+					)->enable_translation()
+					->link('users/show_by_member/' . $user->member_id, 'Users',
+							$this->acl_check_view(
+									'Users_Controller', 'users', $user->member_id
+							)
+					)->disable_translation()
+					->link('users/show/'.$user->id,
+							"$user->name $user->surname ($user->login)",
+							$this->acl_check_view(
+									'Users_Controller','users', $user->member_id
+							)
+					)->enable_translation()
+					->link('contacts/show_by_user/' . $user_id, 
+							'User contacts',
+							$this->acl_check_view(
+									'Users_Controller', 'additional_contacts',
+									$user->member_id
+							)
+					)->disable_translation()
+					->text($contact_model->value)
+					->enable_translation()
+					->text('Verify contact');
+
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('contacts/verify');
+			$view->content->form = $form->html();
+			$view->content->form2 = $form2->html();
+			$view->content->contact_type = $enum_type_model->get_value(
+					$contact_model->type
+			);
+			$view->content->country_code = $country_code;
+			$view->content->value = $contact_model->value;
+			$view->content->verified = $contact_model->verify;
+			$view->render(TRUE);
+		}
+	} 
+	
+	/**
+	 * Sends verification message
+	 * 
+	 * @param mixed $user_id 
+	 * @param mixed $contact_id 
+	 */
+	public function send_verify_message($contact_id)
+	{
+		$contact_model = new Contact_Model($contact_id);
+		$message_model = new Message_Model();
+
+
+		if ($contact_model->verify == 1)
+		{
+			return;
+		}
+		
+		// find message
+		$verify_message = $message_model->
+				where('type', Message_Model::VERIFY_CONTACT_MESSAGE)->find();
+
+		$data = $contact_model->get_message_info_by_contact_id($contact_id)->current();
+		$data->verify_link = url_lang::site('contacts/verify/'.$contact_id.'/1', FALSE, FALSE);
+
+		if ($contact_model->type == Contact_Model::TYPE_EMAIL)
+		{
+			Message_Model::send_email(
+				$verify_message,
+				$contact_model->value,
+				$data
+			);
 		}
 	}
 }

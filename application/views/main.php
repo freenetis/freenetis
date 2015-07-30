@@ -2,8 +2,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<meta name="format-detection" content="telephone=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<meta name="format-detection" content="telephone=no" />
 <title><?php echo strip_tags($title) ?> | <?php echo $this->settings->get('title') ?></title>
 <?php echo html::link('media/images/favicon.ico', 'shorcut icon', 'image/x-icon', FALSE); ?>
 <?php echo html::stylesheet('media/css/style.css', 'screen') ?>
@@ -168,7 +168,7 @@
 			<?php
 			if ($this->axo_doc_access)
 			{
-				echo '<a href="'.AXODOC_URL.'?controller='.urlencode(url::slice(url::current(), 1, 2)).'" class="action_field_icon" target="_blank">' . html::image(array
+				echo '<a href="'.AXODOC_URL.'?controller='.urlencode(url::slice(url::current(), 1, 2)).'" class="action_field_icon cellphone_hide" target="_blank">' . html::image(array
 				(
 					'src'	=> 'media/images/layout/axodoc.png',
 					'alt'	=> __('Show AXO documentation (required access rights) for this page'),

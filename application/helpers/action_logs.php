@@ -40,11 +40,10 @@ class action_logs {
 		if ($log_model->count_all_object_logs($table, $object_id) == 0)
 		{
 			//no modification in last 30 days
-			return	html::image(array
-					(
-						'src' => 'media/images/icons/action_logs_none.png'
-					)).
-					'&nbsp'.__('No changes in last 30 days');
+			return html::image(array
+			(
+				'src' => 'media/images/icons/grid_action/action_logs_none.png'
+			)) . '&nbsp'.__('No changes in last 30 days');
 		}
 		
 		// get last modification time of object
@@ -53,26 +52,23 @@ class action_logs {
 		if (!Controller::instance()->acl_check_view('Logs_Controller', 'logs'))
 		{
 			// only last modification date
-			$html = html::image(array
-					(
-						'src' => 'media/images/icons/action_logs.png',
-						'title' => __('Last changed date')
-					)).
-					'&nbsp<span title="'.__('Last changed date').'">'.$time.'</span>';
+			return html::image(array
+			(
+				'src' => 'media/images/icons/grid_action/action_logs.png',
+				'title' => __('Last changed date')
+			)) . '&nbsp<span title="'.__('Last changed date').'">'.$time.'</span>';
 		}
 		else
 		{
+			$img = html::image(array
+			(
+				'src' => 'media/images/icons/grid_action/action_logs.png',
+				'title' => __('Show object action logs')
+			));
 			// link to details
-			$html = html::anchor('logs/show_object/'.$table.'/'.$object_id,
-					html::image(array
-					(
-						'src' => 'media/images/icons/action_logs.png',
-						'title' => __('Show object action logs')
-					))).
-					'&nbsp<span title="'.__('Last changed date').'">'.$time.'</span>';
+			return html::anchor('logs/show_object/'.$table.'/'.$object_id, $img)
+					. '&nbsp<span title="'.__('Last changed date').'">'.$time.'</span>';
 		}
-		
-		return $html;
 	}
 
 }

@@ -220,12 +220,37 @@ echo implode(' | ', $links)
 <?php endif ?>
 
 <!-- ip addresses -->
-<?php if ($this->acl_check_view('Ip_addresses_Controller', 'ip_address', $device->user->member_id)) { ?>
-<h3><a id="device_ip_addresses_link" name="ip_addresses"><?php echo __('IP addresses') ?> 
-<img src="<?php echo url::base() ?>media/images/icons/ico_<?php echo (!$table_ip_addresses) ? 'add' : 'minus' ?>.gif" id="device_ip_addresses_button"></a></h3>
-<div id="device_ip_addresses" class="<?php echo (!$table_ip_addresses) ? 'dispNone' : '' ?>">
-<?php echo $table_ip_addresses ?><br />
-</div><br />
+<?php if ($this->acl_check_view('Ip_addresses_Controller', 'ip_address', $device->user->member_id))
+{
+	
+$sections = array
+(
+	'ip_addresses' => 'IP addresses',
+	'arp_table' => 'ARP table',
+	'dhcp_servers' => 'DHCP servers',
+	'firewall' => 'Firewall',
+	'routes' => 'Routes'
+);
+?>
+
+<div id="tabs">
+	<ul class="tabs" style="font-size: 12px;">
+	<?php foreach ($sections as $section => $name): ?>
+		<?php if(array_key_exists($section, $grids)): ?>
+			<li class="ui-corner-all"><a href="#<?php echo $section ?>"><?php echo __($name) ?></a></li>
+		<?php endif ?>
+	<?php endforeach ?>
+	</ul>
+
+<?php foreach ($sections as $section => $name): ?>
+	<?php if(array_key_exists($section, $grids)): ?>
+		<div id="<?php echo $section ?>">
+		<?php echo $grids[$section] ?>
+		</div>
+	<?php endif ?>
+<?php endforeach ?>
+</div>
+
 <?php } ?>
 
 <br class="clear" />

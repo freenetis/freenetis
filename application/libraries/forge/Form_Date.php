@@ -35,6 +35,8 @@ class Form_Date extends Form_Input {
 		'year'    => array(),
 	);
 
+	protected $parent_form = NULL;
+
 	public function __construct($name)
 	{
 		// Set name
@@ -59,6 +61,34 @@ class Form_Date extends Form_Input {
 		}
 
 		return parent::__call($method, $args);
+	}
+
+	/**
+	 * Adds infinity checkbox after input
+	 * @param Forge $form Parent Forge of Date input
+	 * @return Form_Date $this
+	 */
+	public function infinity(&$form)
+	{
+		$this->class("join1 ".$this->class);
+
+		$this->parent_form = &$form;
+
+		$this->parent_form->checkbox($this->data['name']."_infinity")
+			->class("join2 checkbox")
+			->label("Unlimited");
+
+		// add infinity rule as first
+		$rules = $this->rules;
+		$old_rules = implode('|', $rules);
+
+		if (!empty($old_rules))
+		{
+			$old_rules = '|'.$old_rules;
+		}
+		$this->rules('=infinity'.$old_rules);
+
+		return $this;
 	}
 
 	public function html_element()
@@ -114,16 +144,34 @@ class Form_Date extends Form_Input {
 				}
 			}
 		}
-		
+
 		// convert timestamp to readable format
 		$converted_data = $data;
-		$converted_data['value'] = ($data['value'] ? date('Y-m-d', $data['value']) : '');
+		$converted_data['value'] = ($data['value'] ? (is_numeric($data['value']) ? date('Y-m-d', $data['value']) : date('Y-m-d', strtotime($data['value']))) : '');
 		$converted_data['minDate'] = trim($minDate);
 		$converted_data['maxDate'] = trim($maxDate);
 		
 		$input = form::input($converted_data);
 
 		return $input;
+	}
+
+	public function rule_infinity()
+	{
+		if ($this->parent_form == NULL ||
+			!isset($this->parent_form->inputs[$this->name."_infinity"]))
+		{
+			return;
+		}
+
+		$this->parent_form->inputs[$this->name."_infinity"]->validate();
+
+		// remove rules and callbacks
+		if ($this->parent_form->inputs[$this->name."_infinity"]->checked)
+		{
+			$this->rules("-required|time_interval");
+			$this->callbacks = array();
+		}
 	}
 	
 	public function rule_time_interval()
@@ -230,6 +278,28 @@ class Form_Date extends Form_Input {
 		$time = $this->input_value($this->name);
 		
 		$this->data['value'] = strtotime($time);
+	}
+
+	public function get_string_value_with_infinite()
+	{
+		$name = $this->name . "_infinity";
+
+		$ts = new DateTime();
+
+		if ($this->parent_form == NULL)
+		{
+			$ts->setTimestamp($this->value);
+		}
+		elseif ($this->parent_form->$name->value == "1")
+		{
+			$ts->setDate(9999,12,31);
+		}
+		else
+		{
+			$ts->setTimestamp($this->value);
+		}
+
+		return $ts->format('Y-m-d');
 	}
 
 } // End Form Dateselect

@@ -57,6 +57,14 @@ class Settings
 		'applicant_connection_test_duration' => 14,
 		
 		/**
+		 * API
+		 */
+		// API disabled by default
+		'api_enabled'						=> FALSE,
+        // API auth method (basic|digest)
+        'api_auth_type'                     => 'basic',
+		
+		/**
 		 * CGI SCRIPTS SETTINGS
 		 */
 		// URL for ARP table

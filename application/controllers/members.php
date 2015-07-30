@@ -147,6 +147,14 @@ class Members_Controller extends Controller
 			));
 		}
 
+		if ($this->acl_check_new(get_class($this), 'applicants'))
+		{
+			$grid->add_new_button('registration', 'Registration form', array
+			(
+				'title' => __('Registration form'),
+			));
+		}
+		
 		if (!$hide_grid && $this->acl_check_edit('Members_Controller', 'registration'))
 		{
 			if (!$regs)
@@ -237,6 +245,8 @@ class Members_Controller extends Controller
 		$grid->order_field('street_number');
 
 		$grid->order_field('town');
+		
+		$grid->order_field('quarter');
 
 		if (Settings::get('finance_enabled'))
 		{
@@ -2522,8 +2532,13 @@ class Members_Controller extends Controller
 		
 		$form->input('email')
 				->rules('valid_email')
+				->class('join1')
                 ->callback(array($this, 'valid_unique_email'))
 				->style('width:250px');
+
+		$form->checkbox('send_verify_email')
+			->label('Send verify message')
+			->class('join2 checkbox');
 		
 		if (Settings::get('finance_enabled'))
 		{
@@ -2862,6 +2877,21 @@ class Members_Controller extends Controller
                             $contact_model->add($user);
                             $contact_model->save_throwable();
                         }
+
+						if ($form_data['send_verify_email'])
+						{
+							try
+							{
+								$cc = new Contacts_Controller();
+								$cc->send_verify_message($contact_model->id);
+								status::success('Verification message have been successfully sent.');
+							}
+							catch (Exception $ex)
+							{
+								status::error('Error - cant send Verification message', $ex);
+								Log::add_exception($ex);
+							}
+						}
 					}
 
 					// saving account
@@ -3415,7 +3445,7 @@ class Members_Controller extends Controller
 		
 		if ($this->acl_check_edit('Members_Controller', 'user_id'))
 		{
-			$form->dropdown('user_id')
+			$form->dropdown('added_by_user_id')
 					->label('Added by')
 					->options($arr_engineers)
 					->selected($member->user_id)
@@ -3712,7 +3742,7 @@ class Members_Controller extends Controller
 					}
 
 					if ($this->acl_check_edit('Members_Controller', 'user_id'))
-						$member->user_id = $form_data['user_id'];
+						$member->user_id = $form_data['added_by_user_id'];
 
 					if ($this->acl_check_edit(get_class($this),'comment',$member->id))
 						$member->comment = $form_data['comment'];
@@ -4167,8 +4197,15 @@ class Members_Controller extends Controller
 
 				case 'pdf':
 					// do pdf export
-					$this->registration_pdf_export($member_id);
-					die();
+					if ($this->registration_pdf_export($member_id))
+					{
+						die();
+					}
+					else
+					{
+						status::error('Cannot append PDF document to registration, please create PDF document in MS Word, PDF Creator or Adobe Illustrator.');
+						$this->redirect(url_lang::previous());
+					}
 					break;
 			}
 		}
@@ -4503,7 +4540,37 @@ class Members_Controller extends Controller
 		$filename = url::title(__('registration').'-'.$member->name).'.pdf';
 		$mpdf = new mPDF('utf-8', 'A4');
 		$mpdf->WriteHTML($html_logo_correct);
+		$mpdf->SetImportUse();
+		if (Settings::get('registration_document'))
+		{
+			try
+			{
+				$pages_count = $mpdf->SetSourceFile(Settings::get('registration_document'));
+			}
+			catch (Exception $e)
+			{
+				return false;
+			}
+			if ($pages_count !== false)
+			{
+				for ($i = 1; $i <= $pages_count; $i++)
+				{
+					$import_page = $mpdf->ImportPage($i);
+					$s = $mpdf->GetTemplateSize($i);
+					if ($s['w'] > $s['h'])
+					{
+						$mpdf->AddPage('L');
+					}
+					else
+					{
+						$mpdf->AddPage();
+					}
+					$mpdf->UseTemplate($import_page);
+				}
+			}
+		}
 		$mpdf->Output($filename, 'I');
+		return true;
 	}
 
 	/**
@@ -4736,6 +4803,13 @@ class Members_Controller extends Controller
 		$filter_form->add('entrance_date')
 				->type('date');
 		
+		if (module::e('self_registration'))
+		{
+			$filter_form->add('applicant_connected_from')
+					->label('Applicant connected from')
+					->type('date');
+		}
+		
 		$filter_form->add('leaving_date')
 				->type('date');
 		
@@ -4765,6 +4839,10 @@ class Members_Controller extends Controller
 						$town_model->select_list('town', 'town')
 					)
 				);
+		
+		$filter_form->add('quarter')
+			->table('t')
+			->callback('json/quarter_name');
 		
 		$filter_form->add('street')
 				->type('select')
@@ -5490,6 +5568,66 @@ class Members_Controller extends Controller
 		{
 			//login failed
 			throw new Exception(__('Connection to vtiger server has failed'));
+		}
+	}
+	
+	/**
+	 * Method used for popup filtering
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function filter()
+	{
+		// access rights
+		if (!$this->acl_check_view(get_class($this), 'members'))
+			Controller::error(ACCESS);
+		
+		// create filter form
+		$filter_form = self::create_filter_form();
+		
+		// filter form is submited => print only result in JSON format
+		if (!$filter_form->is_first_load())
+		{
+			$filter_sql = $filter_form->as_sql();
+			
+			$member_model = new Member_Model();
+		
+			// counts all members
+			$total_members = $member_model->count_all_members($filter_sql);
+			
+			// returns all members
+			$members = $member_model->get_all_members(
+					0, $total_members, 'surname', 'asc',
+					$filter_sql
+			);
+			
+			$data = array();
+			
+			// transform members from objects to array
+			$x = 0;
+			foreach ($members as $member)
+			{
+				$data[$x++] = array
+				(
+					'id' => $member->id,
+					'name' => $member->surname.' '.$member->firstname.' (ID '.$member->id.')'
+				);
+			}
+			
+			// print array with members in JSON
+			die(json_encode($data));
+		}
+		// filter form is not submited => print only form
+		else
+		{
+			$title = __('Filter members');
+			
+			$view = new View('main');
+			$view->title = $title;
+			$view->content = new View('form');
+			$view->content->headline = $title;
+			$view->content->form = $filter_form;
+			$view->render(TRUE);
 		}
 	}
 }

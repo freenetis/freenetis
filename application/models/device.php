@@ -134,7 +134,7 @@ class Device_Model extends ORM
 					d.name, d.name AS device_name, u.id AS user_id,
 					u.name AS user_name, u.surname AS user_surname, u.login AS user_login,
 					d.login, d.password, d.price, d.trade_name, d.payment_rate,
-					d.buy_date, m.name AS member_name, s.street, t.town,
+					d.buy_date, m.name AS member_name, s.street, t.town, t.quarter,
 					ap.street_number, d.comment $select_cloud_iface
 				FROM devices d
 				JOIN users u ON d.user_id = u.id
@@ -191,7 +191,7 @@ class Device_Model extends ORM
 						d.name AS device_name, u.id AS user_id, u.name AS user_name,
 						u.surname AS user_surname, u.login AS user_login,
 						d.login, d.password, d.price, d.trade_name, d.payment_rate,
-						d.buy_date, m.name AS member_name, s.street, t.town,
+						d.buy_date, m.name AS member_name, s.street, t.town, t.quarter,
 						ap.street_number, d.comment $select_cloud_iface
 					FROM devices d
 					JOIN users u ON d.user_id = u.id
@@ -1275,4 +1275,67 @@ class Device_Model extends ORM
 		}
 	}
 	
+	/**
+	 * Returns service IP address of device
+	 * 
+	 * @author Michal Kliment
+	 * @param integer $device_id ID of device
+	 * @param boolean $only_ip_address Returns only IP adress as string (not whole object)
+	 * @return object|string|boolean IP address object or IP adress as string or FALSE if eror ocurred
+	 */
+	public function get_service_ip_address($device_id = NULL, $only_ip_address = TRUE)
+	{
+		if (!$device_id && $this->id)
+			$device_id = $this->id;
+		
+		$result = $this->db->query("
+			SELECT ip.*, s.id AS subnet_id, s.name AS subnet_name
+			FROM ip_addresses ip
+			JOIN ifaces i ON ip.iface_id = i.id
+			JOIN subnets s ON ip.subnet_id = s.id
+			WHERE i.device_id = ?
+			ORDER BY service DESC
+		", array($device_id));
+		
+		if ($result && $result->current())
+		{
+			if ($only_ip_address)
+				return $result->current()->ip_address;
+			else
+				return $result->current ();
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
+	
+	/**
+	 * Tests whether given device is router (is gateway for at least 1 subnet)
+	 * 
+	 * @author Michal Kliment
+	 * @param integer $device_id ID of device
+	 * @return boolean
+	 */
+	public function is_router ($device_id = NULL)
+	{
+		if (!$device_id && $this->id)
+			$device_id = $this->id;
+		
+		$result = $this->db->query("
+			SELECT COUNT(*) AS count
+			FROM ip_addresses ip
+			JOIN ifaces i ON ip.iface_id = i.id
+			WHERE i.device_id = ? AND ip.gateway = 1
+		", array($device_id));
+		
+		if ($result && $result->current())
+		{
+			return ($result->current()->count > 0);
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
 }

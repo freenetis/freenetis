@@ -4,12 +4,16 @@
  * Shut down function of PHP for detecting FATAL ERROR.
  * Send correct headers for error and ends script.
  * Required for unit tester correct work.
- * 
+ *
  * @author Ondřej Fibich
  */
 function shutdown_function()
 {
-	if (($error_pushed = error_get_last()))
+	if (($error_pushed = error_get_last()) !== NULL &&
+		($error_pushed['type'] & (E_WARNING | E_NOTICE | E_USER_DEPRECATED | E_USER_ERROR |
+								E_USER_NOTICE | E_USER_WARNING | E_STRICT | E_DEPRECATED |
+								E_USER_DEPRECATED)) == 0
+		)
 	{
 		// get current content of page
 		$buffer = ob_get_contents();
@@ -19,25 +23,25 @@ function shutdown_function()
 		@header('HTTP/1.1 500 Internal Server Error');
 		// enable content
 		ob_start();
-		
+
 		// prepare vars for view
 		$error = __('PHP fatal error');
 		$description = '';
 		$line = $error_pushed['line'];
 		$file = $error_pushed['file'];
 		$message = $error_pushed['message'];
-		
+
 		// prepare message for log
 		$lerror = 'PHP fatal error in file ' . $file . ' on line ' . $line
 		        . ' with error: ' . trim(strip_tags(nl2br($message)));
-		
+
 		// log error
 		Log::add('error', $lerror);
 		Log::write();
-		
+
 		// load the error view
 		include Kohana::find_file('views', 'kohana_error_page');
-		
+
 		// end
 		exit();
 	}
@@ -50,14 +54,14 @@ function shutdown_function()
  * @param string $value		Text to translate
  * @param array $args		Arguments for text
  * @param integer $format	Format type:
- * 
+ *
  * <ul>
  *		<li>1: prints string with lower letters
  *		<li>2: prints string with upper first letter and others lower
  *		<li>3: prints string with upper letters
  *		<li>*: default behaviour, prints without changes
  * </ul>
- * 
+ *
  * @return string			Traslated string with parsed args and formated by given format
  */
 function __($value, $args = array(), $format = 0)
@@ -129,7 +133,7 @@ class Kohana {
 
 		// Set the user agent
 		self::$user_agent = '';
-		
+
 		if (isset($_SERVER['HTTP_USER_AGENT']))
 		{
 			self::$user_agent = trim($_SERVER['HTTP_USER_AGENT']);
@@ -157,14 +161,17 @@ class Kohana {
 		// Set autoloader
 		spl_autoload_register(array('Kohana', 'auto_load'));
 
-		// Set error handler
-		set_error_handler(array('Kohana', 'exception_handler'));
+        if (!UNITTEST)
+        {
+            // Set error handler
+            set_error_handler(array('Kohana', 'exception_handler'));
 
-		// Set exception handler
-		set_exception_handler(array('Kohana', 'exception_handler'));
+            // Set exception handler
+            set_exception_handler(array('Kohana', 'exception_handler'));
 
-		// Set shut down handler
-		register_shutdown_function('shutdown_function');
+            // Set shut down handler
+            register_shutdown_function('shutdown_function');
+        }
 
 		// Disable magic_quotes_runtime. The Input library takes care of
 		// magic_quotes_gpc later.
@@ -186,7 +193,7 @@ class Kohana {
 
 			// If the log directory does not exist, log inside of application/
 			is_dir($log_dir) or $log_dir = $app_log;
-			
+
 			// Log directory must be writable
 			if (is_dir($log_dir) AND is_writable($log_dir))
 			{
@@ -264,27 +271,27 @@ class Kohana {
 
 			// Build reflection object
 			$reflection = new ReflectionClass($controller);
-			
+
 			// Get and filter methods (#594)
 			$methods = array();
 			$p_methods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
 			$s_methods = $reflection->getMethods(ReflectionMethod::IS_STATIC);
 			$p_methods = array_diff($p_methods, $s_methods);
-			
+
 			foreach ($p_methods as $v)
 			{
 				if (!text::starts_with($v->name, 'valid_'))
 					$methods[] = $v->name;
 			}
-			
+
 			unset($p_methods);
 			unset($s_methods);
 			unset($reflection);
-			
+
 			// Find the unique controller methods
 			$methods = array_diff($methods, get_class_methods('Controller_Core'));
 			$methods = array_diff($methods, get_class_methods('Controller'));
-			
+
 			// If there are no methods in the controller, it's invalid
 			empty($methods) and Event::run('system.404');
 
@@ -405,19 +412,19 @@ class Kohana {
 			// Flush all open output buffers above the internal buffer
 			ob_end_flush();
 		}
-		
+
 		//Due to blank page issue in PHP 5.4, we have to save content of buffer before calling
 		//ob_end_clean()
 		$out =  ob_get_contents();
-		
+
 		ob_end_clean();
-		
+
 		// Run the output event
 		Event::run('system.display', $out);
 
 		// Render the final output
 		self::render($out);
-		
+
 		// save logs
 		if (Config::get('log_threshold') > 0)
 		{
@@ -504,7 +511,7 @@ class Kohana {
 				header('Content-Length: '.strlen($output));
 			}
 		}
-		
+
 		echo $output;
 	}
 
@@ -630,7 +637,7 @@ class Kohana {
 			// Load the errors_disabled view
 			include self::find_file('views', 'kohana_error_disabled');
 		}
-		
+
 		// Added by Ondřej Fibich at 8. 7. 2011
 		// This is necessary for unit test, where error in controller are
 		// checked via HTTP status code.
@@ -688,7 +695,7 @@ class Kohana {
 
 		if (class_exists($class, FALSE))
 			return TRUE;
-		
+
 		if (($type = strrpos($class, '_')) !== FALSE)
 		{
 			// Find the class suffix
@@ -705,6 +712,10 @@ class Kohana {
 				$type = 'controllers';
 				// Lowercase filename
 				$file = strtolower(substr($class, 0, -11));
+			break;
+			case 'Api':
+				$type = 'controllers/api_endpoints';
+				$file = substr($class, 0, -4);
 			break;
 			case 'Model':
 				$type = 'models';

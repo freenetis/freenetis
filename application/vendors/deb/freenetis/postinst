@@ -123,6 +123,9 @@ A2CF=/etc/$SERVER/conf.d/freenetis.conf
 # activate redirection
 a2enmod rewrite > /dev/null
 
+# activate digest
+a2enmod auth_digest > /dev/null
+
 # activate SSL if https selected
 if [ "$PROTOCOL" = "https" ]; then
 	a2enmod ssl > /dev/null

@@ -118,5 +118,30 @@ class file {
         $p = explode('.',$filename);
         return strtolower($p[count($p)-1]);
     }
+	
+	public static function shortened_size_to_bytes($size)
+	{
+		$size = strtolower($size);
+		$last = substr($size, -1);
+		if ($last == 'b')
+		{
+			$size = substr($size, 0, -1);
+		}
+		
+		$last = substr($size, -1);
+		switch ($last)
+		{
+			case 't':
+				$size *= 1024;
+			case 'g':
+				$size *= 1024;
+			case 'm':
+				$size *= 1024;
+			case 'k':
+				$size *= 1024;
+		}
+		
+		return $size;
+	}
 
 } // End file

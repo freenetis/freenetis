@@ -89,7 +89,7 @@ ol, ul  {
 	clear: both;
 	/* look */
 	border: 1px #ccc solid;
-	box-shadow: #ccc 0 0 4px; 
+	box-shadow: #ccc 0 0 4px;
 	-webkit-box-shadow: #ccc 0 0 4px;
 	-moz-box-shadow: #ccc 0 0 4px;
 	border-radius: 2px;
@@ -167,12 +167,12 @@ table.form tr  {
 	margin: 30px 0px;
 	padding: 7px 12px;
 	cursor: pointer;
-	
+
 	/* font */
 	font-weight: bold;
 	font-size: 12px;
 	color: #ffffff;
-	
+
 	/* background */
 	background: #fe6005; /* Old browsers */
 	background: -moz-linear-gradient(top,  #fe6005 0%, #ffd2ba 1%, #ff5900 100%); /* FF3.6+ */
@@ -188,7 +188,7 @@ table.form tr  {
 	-moz-border-radius: 4px;
 	-webkit-border-radius: 4px;
 	border-radius: 4px;
-	
+
 	/* shadows */
 	-moz-box-shadow:
 		0px 1px 3px rgba(43,43,43,1),
@@ -298,6 +298,53 @@ div#error strong {
 
 div#success strong {
 	color:#068c00;
+}
+
+
+.status_message_success, .status_message_warning, .status_message_error, .status_message_info {
+	border: 1px solid black;
+    font-weight:bold;
+    text-align:left;
+    margin:0px 0 10px 0;
+    padding:10px 10px 10px 40px;
+	-moz-border-radius: 2px;
+	border-radius: 2px;
+}
+.status_message_info {
+	background: url(../images/icons/status/info.png) 6px 6px no-repeat;
+	background-color: #cdd2fe;
+	border-color: #2635d2;
+	color: #2635d2;
+}
+.status_message_success {
+	background: url(../images/icons/status/success.png) 6px 6px no-repeat;
+	background-color: #a9fdc9;
+	border-color: #068c00;
+	color: #068c00;
+}
+.status_message_warning {
+	background: url(../images/icons/status/warning.png) 6px 6px no-repeat;
+	background-color: #fef4c5;
+	border-color: #ff8900;
+	color: #ff8900;
+}
+.status_message_error {
+	background: url(../images/icons/status/error.png) 6px 6px no-repeat;
+	background-color: #fec2b9;
+	border-color: #CC0000;
+	color: #CC0000;
+}
+.status-message-exception {
+	margin: 3px 0;
+    padding: 2px;
+	-moz-border-radius: 2px;
+	border-radius: 2px;
+	color: black;
+}
+.status-message-exception-body {
+	display: none;
+	max-height: 180px;
+	overflow: auto;
 }
 
 .group-button	{

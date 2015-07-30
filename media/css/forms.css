@@ -110,6 +110,17 @@ textarea {
 	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fe6005', endColorstr='#ff5900',GradientType=0 ); /* IE6-9 */
 }
 
+.submit:disabled {
+    /* background */
+    background: #606060; /* Old browsers */
+    background: -moz-linear-gradient(top, #606060 0%, #d2d2d2 1%, #595959 100%); /* FF3.6+ */
+    background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#606060), color-stop(1%,#d2d2d2), color-stop(100%,#595959)); /* Chrome,Safari4+ */
+    background: -webkit-linear-gradient(top, #606060 0%, #d2d2d2 1%, #595959 100%); /* Chrome10+,Safari5.1+ */
+    background: -o-linear-gradient(top, #606060 0%, #d2d2d2 1%, #595959 100%); /* Opera 11.10+ */
+    background: -ms-linear-gradient(top, #606060 0%, #d2d2d2 1%, #595959 100%); /* IE10+ */
+    background: linear-gradient(top, #606060 0%, #d2d2d2 1%, #595959 100%); /* W3C */
+    filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#606060', endColorstr='#595959',GradientType=0 ); /* IE6-9 */
+}
 
 .dropdown {
 	padding:2px;

@@ -15,12 +15,21 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 		{
 			var options = [];
 			$.each(data, function(key, val)
-			{ // val is ID and key is name of account
-				options.push('<option value="');
-				options.push(val);
-				options.push('">');
+			{
+				options.push('<optgroup label="');
 				options.push(key);
-				options.push('</option>');
+				options.push('">');
+				
+				$.each(val, function(key, val)
+				{
+					options.push('<option value="');
+					options.push(val);
+					options.push('">');
+					options.push(key);
+					options.push('</option>');
+				});
+				
+				options.push('</optgroup>');
 			});
 			$("#aname").html(options.join(''));
 		});

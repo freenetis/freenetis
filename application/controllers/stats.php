@@ -128,7 +128,7 @@ class Stats_Controller extends Controller
 				->type('date')
 				->default(Filter_form::OPER_GREATER_OR_EQUAL, $association->entrance_date)
 				->default(Filter_form::OPER_SMALLER_OR_EQUAL, $last_entrance_date)
-				->add_class('without_days');
+				->css_class('without_days');
 		
 		$filter_form->add('increase')
 				->type('number');
@@ -187,7 +187,7 @@ class Stats_Controller extends Controller
 
 		$year = $max_year = $month = $max_month = NULL;
 		$counts_year_keys = array_keys($counts);
-		
+
 		if (!empty($counts_year_keys))
 		{
 			$year = min($counts_year_keys);

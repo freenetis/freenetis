@@ -451,6 +451,19 @@ class valid {
     }
 	
 	/**
+	 * Checks whether string is valid for upload_max_filesize and 
+	 * post_max_size values
+	 * 
+	 * @author David Raska
+	 * @param string $str 
+	 * @return boolean
+	 */
+	public static function file_size($str)
+	{
+		return preg_match ("/^([1-9][0-9]*[k|M|G]?)$/i", $str);
+	}
+	
+	/**
 	 * Checks whether string is valid speed size (eg. in format 2M/8M)
 	 * 
 	 * @author Michal Kliment

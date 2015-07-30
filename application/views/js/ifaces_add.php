@@ -114,7 +114,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		$('#port_medium_input').val($('#medium').val());
 		
 		var bitrate = $('#bitrate').val();
-		$('#bitrate_input').val(substr(bitrate, 0, bitrate.length-1));
+		$('#bitrate_input').val(substr(bitrate, 0, bitrate.length-1) || '');
 		$('#bitrate_unit_input').val(substr(bitrate, -1));
 		
 		$('#duplex_input').val($('#duplex').val());

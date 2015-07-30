@@ -1304,7 +1304,9 @@ class Ifaces_Controller extends Controller
 		$link = new Link_Model($link_id);
 		$iface = new Iface_Model();
 		
-		if (!$link || !$link->id)
+		if (!$link || !$link->id || (
+				$link->medium != Link_Model::MEDIUM_AIR &&
+				$link->medium != Link_Model::MEDIUM_ROAMING))
 		{
 			self::error(RECORD);
 		}
@@ -1314,13 +1316,22 @@ class Ifaces_Controller extends Controller
 			self::error(ACCESS);
 		}
 		
+		$this->append_link_id = $link->id; // for callback
+		$ai_types = null;
+		
+		if ($link->medium == Link_Model::MEDIUM_AIR)
+		{
+			$ai_types = array(Iface_Model::TYPE_WIRELESS);
+		}
+		
 		$form = new Forge();
 		
 		$form->dropdown('iface_id')
 				->label('Interface')
-				->options($iface->select_list_grouped_by_device())
+				->options($iface->select_list_grouped_by_device(null, $ai_types))
 				->rules('required')
-				->style('width:400px');
+				->style('width:400px')
+				->callback(array($this, 'valid_iface_for_appending_to_link'));
 		
 		$form->submit('Add');
 		
@@ -2605,5 +2616,52 @@ class Ifaces_Controller extends Controller
 			}
 		}
 	}
+	
+	/**
+	 * Callback function to validate iface that should be appended to link
+	 * 
+	 * @param Form_Field $input
+	 */
+	public function valid_iface_for_appending_to_link($input = NULL)
+	{
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
+		
+		if ($input->value)
+		{
+			$iface = new Iface_Model($input->value);
+			$link = new Link_Model($this->append_link_id);
+			
+			// airlink constrains
+			if ($link->medium == Link_Model::MEDIUM_AIR)
+			{
+				// only wireless type enabled
+				if ($iface->type != Iface_Model::TYPE_WIRELESS)
+				{
+					// no message required this should not happend due to 
+					// select options restriction
+					$input->add_error('required');
+				}
+				
+				// check constrain for only one iface with mode AP in air link
+				if ($iface->wireless_mode == Iface_Model::WIRELESS_MODE_AP)
+				{
+					$count = ORM::factory('iface')->count_items_by_mode_and_link(
+							Iface_Model::WIRELESS_MODE_AP, $link->id, $iface->id
+					);
+					
+					if ($count > 0)
+					{
+						$input->add_error('required', __(
+								'In this link an interface in mode AP already exists.'
+						));
+					}
+				}
+			}
+		}
+	}
+	
 	
 }

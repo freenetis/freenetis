@@ -368,11 +368,11 @@ class Filter_form
 		{
 			$data = json_decode($this->queries[$query]->values, TRUE);
 				
-			$on = $data["on"];
-			$types = $data["types"];
-			$operations = $data["opers"];
-			$values = $data["values"];
-			$tables = $data["tables"];
+			$on = @$data["on"];
+			$types = @$data["types"];
+			$operations = @$data["opers"];
+			$values = @$data["values"];
+			$tables = @$data["tables"];
 			
 			$this->loaded_from_saved_query = TRUE;
 			

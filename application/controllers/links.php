@@ -229,7 +229,8 @@ class Links_Controller extends Controller
 			'use_selector'	=> false
 		));
 		
-		if ($link->medium == Link_Model::MEDIUM_ROAMING &&
+		if (($link->medium == Link_Model::MEDIUM_AIR ||
+			$link->medium == Link_Model::MEDIUM_ROAMING) &&
 			$this->acl_check_edit('Ifaces_Controller', 'iface'))
 		{
 			$grid->add_new_button(

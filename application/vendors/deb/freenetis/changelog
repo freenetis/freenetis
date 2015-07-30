@@ -1,3 +1,17 @@
+freenetis (1.1.6) stable; urgency=hight
+  * Fix release
+  * Fixes #894: Member name length limitation extended
+  * Fixes #899: Invalid prefilled value in link dialog
+  * Fixes #900: Possibility to add existing wireless interface to air link
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Wed, 19 Mar 2014 23:19:06 +0100
+
+freenetis (1.1.5) stable; urgency=hight
+  * Fix release
+  * Fixes #885: Unidentified payments filter
+  * Fixes #893: Pre-fill of form for approving of a connection request
+  * Implements #882: Determining of MAC from RB/Linux in hybrid networks
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 04 Mar 2014 23:29:40 +0100
+
 freenetis (1.1.4) stable; urgency=hight
   * Fix release
   * Fixes #880: Fixes filter initialization due to forgotten JS debug 

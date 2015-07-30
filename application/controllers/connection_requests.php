@@ -535,9 +535,25 @@ class Connection_Requests_Controller extends Controller
 			$gateway = $ip_address_model->get_gateway_of_subnet($subnet_id);
 			
 			if ($gateway && $gateway->id)
-			{
-				// first try SNMP
-				if (module::e('snmp'))
+			{	
+				$mac_address = '';
+				
+				// first try CGI scripts
+				if (module::e('cgi'))
+				{
+					$vars = arr::to_object(array
+					(
+						'GATEWAY_IP_ADDRESS'	=> $gateway->ip_address,
+						'IP_ADDRESS'			=> $ip_address
+					));
+
+					$url = text::object_format($vars, Settings::get('cgi_arp_url'));
+
+					$mac_address = @file_get_contents($url);
+				}
+				
+				// now try SNMP
+				if (!valid::mac_address($mac_address) && module::e('snmp'))
 				{
 					try
 					{
@@ -545,7 +561,6 @@ class Connection_Requests_Controller extends Controller
 
 						// try find MAC address in DHCP
 						$mac_address = $snmp->getDHCPMacAddressOf($ip_address);
-						$this->session->set('connection_request_mac', $mac_address);
 					}
 					catch (DHCPMacAddressException $e)
 					{
@@ -553,7 +568,6 @@ class Connection_Requests_Controller extends Controller
 						{
 							// try find MAC address in ARP table
 							$mac_address = $snmp->getARPMacAddressOf($ip_address);
-							$this->session->set('connection_request_mac', $mac_address);
 						}
 						catch(Exception $e)
 						{
@@ -567,24 +581,8 @@ class Connection_Requests_Controller extends Controller
 						status::mwarning($e->getMessage());
 					}
 				}
-				// now try CGI scripts
-				else if (module::e('cgi'))
-				{
-					$vars = arr::to_object(array
-					(
-						'GATEWAY_IP_ADDRESS'	=> $gateway->ip_address,
-						'IP_ADDRESS'			=> $ip_address
-					));
-
-					$url = text::object_format($vars, Settings::get('cgi_arp_url'));
-
-					$mac_address = @file_get_contents($url);
-
-					if ($mac_address !== FALSE)
-					{
-						$this->session->set('connection_request_mac', $mac_address);
-					}
-				}
+				
+				$this->session->set('connection_request_mac', $mac_address);
 			}
 		}
 		

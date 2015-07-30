@@ -2340,7 +2340,7 @@ class Members_Controller extends Controller
 		$form->input('membername')
 				->label('Name of organization')
 				->help(help::hint('member_name'))
-				->rules('length[1,60]');
+				->rules('length[1,100]');
 		
 		// access control
 		if ($this->acl_check_new('Members_Controller', 'organization_id'))
@@ -3092,7 +3092,7 @@ class Members_Controller extends Controller
 		{
 			$form->input('membername')
 					->label('Member name')
-					->rules('required|length[1,60]')
+					->rules('required|length[1,100]')
 					->value($member->name);
 		}
 		

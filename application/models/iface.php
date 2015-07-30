@@ -927,16 +927,24 @@ class Iface_Model extends ORM
 	 * Gets array of ifaces grouped by device for dropdown
 	 *
 	 * @param integer $device_id	Only iface of one device?
+	 * @param array $restrict_types Array of allowed types
 	 * @author Ondřej fibich
 	 * @return array
 	 */
-	public function select_list_grouped_by_device($device_id = NULL)
+	public function select_list_grouped_by_device($device_id = NULL, 
+			$restrict_types = array())
 	{
 		$where = '';
 		
 		if (is_numeric($device_id))
 		{
 			$where = 'WHERE d.id = ' . intval($device_id);
+		}
+		
+		if (is_array($restrict_types) && count($restrict_types))
+		{
+			$where .= empty($where) ? 'WHERE ' : ' AND ';
+			$where .= ' i.type IN (' . implode(',', $restrict_types) . ')';
 		}
 		
 		$ifaces = $this->db->query("

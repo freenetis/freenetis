@@ -884,7 +884,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				
 				<?php if (!empty($connection_request_model)): ?>
 				// add mac from request
-				if ((default_iface >= 0) && (i == default_iface))
+				if ((default_iface >= 0) && ((i - start_index) == default_iface))
 				{
 					auto_fill = true;
 					html_buffer.push('value="<?php echo $connection_request_model->mac_address ?>" ');
@@ -918,8 +918,8 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				html_buffer.push(']" ');
 				
 				<?php if (!empty($connection_request_model)): ?>
-				// add mac from request
-				if ((default_iface >= 0) && (i == default_iface))
+				// add ip from request
+				if ((default_iface >= 0) && ((i - start_index) == default_iface))
 				{
 					html_buffer.push('value="<?php echo $connection_request_model->ip_address ?>" ');
 				}
@@ -937,7 +937,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				
 				<?php if (!empty($connection_request_model)): ?>
 				// add mac from request
-				if ((default_iface >= 0) && (i == default_iface))
+				if ((default_iface >= 0) && ((i - start_index) == default_iface))
 				{
 					html_buffer.push('class="subnet_fill_in_connection_request_model_value" ');
 				}
@@ -1001,7 +1001,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				html_buffer.push('<a href="#" class="device_add_detail_button get_connected_to_device_and_iface');
 				<?php if (!empty($connection_request_model)): ?>
 				// enable getting on connection request (MAC and subnet aready filled in)
-				if (i != default_iface)
+				if ((i - start_index) != default_iface)
 				{
 					html_buffer.push(' dispNone');
 				}

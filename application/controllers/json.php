@@ -216,58 +216,10 @@ class Json_Controller extends Controller
 
 		if ($gateway && $gateway->id && valid::ip($ip_address))
 		{
-			// first try SNMP
-			if (module::e('snmp'))
-			{
-				try
-				{
-					$snmp = Snmp_Factory::factoryForDevice($gateway->ip_address);
-
-					// try find MAC address in DHCP
-					$mac_address = $snmp->getDHCPMacAddressOf($ip_address);
-
-					die(json_encode(array
-					(
-						'state' => 1,
-						'mac' => $mac_address
-					)));
-				}
-				// MAC table is not in DHCP
-				catch (DHCPMacAddressException $e)
-				{
-					try
-					{
-						// try find MAC address in ARP table
-						$mac_address = $snmp->getARPMacAddressOf($ip_address);
-
-						die(json_encode(array
-						(
-							'state' => 1,
-							'mac' => $mac_address
-						)));
-					}
-					catch(Exception $e)
-					{
-						Log::add_exception($e);
-						die(json_encode(array
-						(
-							'state' => 0,
-							'message' => $e->getMessage()
-						)));
-					}
-				}
-				catch (Exception $e)
-				{
-					Log::add_exception($e);
-					die(json_encode(array
-					(
-						'state' => 0,
-						'message' => $e->getMessage()
-					)));
-				}
-			}
-			// now try CGI scripts
-			else if (module::e('cgi'))
+			$mac_address = '';
+			
+			// first try CGI scripts
+			if (module::e('cgi'))
 			{	
 				$vars = arr::to_object(array
 				(
@@ -277,31 +229,52 @@ class Json_Controller extends Controller
 				
 				$url = text::object_format($vars, Settings::get('cgi_arp_url'));
 				
-				$mac_address = @file_get_contents($url);
-				
-				if ($mac_address !== FALSE)
+				$mac_address = trim(@file_get_contents($url));
+			}
+			
+			// now try SNMP
+			if (!valid::mac_address($mac_address) && module::e('snmp'))
+			{
+				try
 				{
-					die(json_encode(array
-					(
-						'state' => 1,
-						'mac' => $mac_address
-					)));
+					$snmp = Snmp_Factory::factoryForDevice($gateway->ip_address);
+
+					// try find MAC address in DHCP
+					$mac_address = $snmp->getDHCPMacAddressOf($ip_address);
 				}
-				else
+				// MAC table is not in DHCP
+				catch (DHCPMacAddressException $e)
 				{
-					die(json_encode(array
-					(
-						'state' => 0,
-						'message' => __('Invalid output data')
-					)));
+					try
+					{
+						// try find MAC address in ARP table
+						$mac_address = $snmp->getARPMacAddressOf($ip_address);
+					}
+					catch(Exception $e)
+					{
+						Log::add_exception($e);
+					}
 				}
+				catch (Exception $e)
+				{
+					Log::add_exception($e);
+				}
+			}
+			
+			if (valid::mac_address($mac_address))
+			{
+				die(json_encode(array
+				(
+					'state' => 1,
+					'mac' => $mac_address
+				)));
 			}
 			else
 			{
 				die(json_encode(array
 				(
 					'state' => 0,
-					'message' => __('SNMP or CGI scripts not enabled')
+					'message' => __('MAC not found')
 				)));
 			}
 		}

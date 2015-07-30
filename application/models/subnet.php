@@ -22,16 +22,128 @@
  * @property string $network_address
  * @property string $netmask
  * @property integer $redirect
+ * @property integer $dhcp
+ * @property boolean $dhcp_expired
+ * @property integer $dns
  * @property Subnets_owner_Model $subnets_owner
  * @property ORM_Iterator $clouds
  * @property ORM_Iterator $ip_addresses
  * @property ORM_Iterator $allowed_subnets
+ * @property ORM_Iterator $connection_requests
  */
 class Subnet_Model extends ORM
 {
 	protected $has_one = array('subnets_owner');
-	protected $has_many = array('ip_addresses', 'allowed_subnets');
+	protected $has_many = array('ip_addresses', 'allowed_subnets', 'connection_requests');
 	protected $has_and_belongs_to_many = array('clouds');
+	
+	/**
+	 * Sets all subnets as (not) expired.
+	 * 
+	 * @param int $flag expired (1) or not (0)  [optional]
+	 */
+	public function set_expired_all_subnets($flag = 1)
+	{
+		$this->db->query("
+			UPDATE subnets
+			SET dhcp_expired = ?
+			WHERE dhcp = 1
+		", $flag);
+	}
+	
+	/**
+	 * Sets subnets as (not) expired.
+	 * 
+	 * @param array|int $subnets Multiple subnet IDs or a single subnet ID
+	 * @param int $flag expired (1) or not (0)  [optional]
+	 */
+	public function set_expired_subnets($subnets, $flag = 1)
+	{
+		if (!is_array($subnets))
+		{
+			$subnets = array($subnets);
+		}
+		
+		if (count($subnets))
+		{
+			$this->db->query("
+				UPDATE subnets s
+				SET s.dhcp_expired = ?
+				WHERE s.dhcp > 0 AND 
+					s.id IN (" . implode(',', array_map('intval', $subnets)) . ")
+			", $flag);
+		}
+	}
+	
+	/**
+	 * Sets subnets of device as (not) expired
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $device_id ID of device
+	 * @param type $flag sexpired (1) or not (0)  [optional] 
+	 */
+	public function set_expired_subnets_of_device($device_id, $flag = 1)
+	{
+		$this->db->query("
+			UPDATE subnets s
+			JOIN ip_addresses ip ON ip.subnet_id = s.id AND ip.gateway = 1
+			JOIN ifaces i ON ip.iface_id = i.id
+			SET s.dhcp_expired = ?
+			WHERE s.dhcp > 0 AND i.device_id = ?
+		", array($flag, $device_id));
+	}
+	
+	/**
+	 * Check if any of device subnet on that the device is gateway is expired
+	 * 
+	 * @param int $device_id
+	 * @return boolean
+	 */
+	public function is_any_subnet_of_device_expired($device_id)
+	{
+		return $this->db->query("
+			SELECT COUNT(*) AS c
+			FROM ifaces i
+			JOIN ip_addresses ip ON i.id = ip.iface_id
+			JOIN subnets s ON s.id = ip.subnet_id
+			WHERE i.device_id = ? AND s.dhcp > 0 AND s.dhcp_expired > 0
+				AND ip.gateway > 0
+		", $device_id)->current()->c > 0;
+	}
+	
+	/**
+	 * Check if the MAC address is unique in the subnet.
+	 * 
+	 * @param string $mac MAC address
+	 * @param int $ip_address_id Iface ID - for edit purposes
+	 * @param int $subnet_id Subnet id [Optional - deafult self ID]
+	 * @return bool
+	 */
+	public function is_mac_unique_in_subnet($mac, $ip_address_id = NULL, $subnet_id = NULL)
+	{
+		if ($subnet_id === NULL)
+		{
+			$subnet_id = $this->id;
+		}
+		
+		$ip_address = new Ip_address_Model($ip_address_id);
+		$max_count = 0;
+		
+		if ($ip_address && $ip_address->id && ($ip_address->iface->mac == $mac))
+		{
+			$max_count = 1;
+		}
+		
+		$result = $this->db->query("
+			SELECT COUNT(*) AS count
+			FROM subnets s
+			JOIN ip_addresses ip ON ip.subnet_id = s.id
+			JOIN ifaces i ON i.id = ip.iface_id
+			WHERE s.id = ? AND i.mac = ?
+		", $subnet_id, $mac);
+		
+		return ($result->count() && $result->current()->count <= $max_count);
+	}
 	
 	/**
 	 * Gets mask and net of subnet
@@ -128,9 +240,9 @@ class Subnet_Model extends ORM
 					IFNULL(ROUND((
 						SELECT COUNT(*)
 						FROM ip_addresses
-						WHERE subnet_id = s.id AND member_id IS NULL
+						WHERE subnet_id = s.id
 					)/((~inet_aton(s.netmask) & 0xffffffff)+1)*100,1),0) AS used,
-					m.id AS member_id, m.name AS member_name
+					m.id AS member_id, m.name AS member_name, dhcp, dns, qos
 				FROM subnets s
 				LEFT JOIN subnets_owners so ON s.id = so.subnet_id
 				LEFT JOIN members m ON so.member_id = m.id
@@ -428,8 +540,17 @@ class Subnet_Model extends ORM
 		$total_available = (~ip2long($this->netmask) & 0xffffffff)-1;
 		
 		$ip_queries = array();
-		for ($i = 1; $i <= $total_available; $i++)
-			$ip_queries[] = "SELECT '".long2ip($network+$i)."' AS ip_address";
+                
+                if ($total_available > 1)
+                {
+                    for ($i = 1; $i <= $total_available; $i++)
+                      	$ip_queries[] = "SELECT '".long2ip($network+$i)."' AS ip_address";
+                }
+                // for special 1-host subnet (mask /32) add only 1 IP address with network address (#507)
+                else
+                {
+                    $ip_queries[] = "SELECT '".long2ip($network)."' AS ip_address";
+                }
 		
 		if (!count($ip_queries))
 			return array();
@@ -507,6 +628,7 @@ class Subnet_Model extends ORM
 				32-log2((~inet_aton(netmask) & 0xffffffff) + 1) AS subnet_range,
 				ip.ip_address, INET_NTOA(INET_ATON(ip.ip_address)+1) AS subnet_range_start,
 				INET_NTOA(INET_ATON(ip.ip_address)+(~inet_aton(netmask) & 0xffffffff)-2) AS subnet_range_end,
+				INET_NTOA(INET_ATON(ip.ip_address)+(~inet_aton(netmask) & 0xffffffff)-1) AS broadcast,
 				i.name AS iface
 			FROM ip_addresses ip
 			JOIN subnets s ON s.id = ip.subnet_id
@@ -583,6 +705,104 @@ class Subnet_Model extends ORM
 		}
 		
 		return $subnets;
+	}
+	
+	/**
+	 * Get gateway of subnet
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $subnet_id
+	 * @return type
+	 */
+	public function get_gateway($subnet_id = NULL)
+	{
+		if (!$subnet_id && $this->id)
+			$subnet_id = $this->id;
+		
+		return ORM::factory('ip_address')->get_gateway_of_subnet($subnet_id);
+	}
+	
+	/**
+	 * Check whether subnet has gateway
+	 * 
+	 * @author Michal Kliment
+	 * @param type $subnet_id
+	 * @return type
+	 */
+	public function has_gateway($subnet_id = NULL)
+	{
+		if (!$subnet_id && $this->id)
+			$subnet_id = $this->id;
+		
+		$gateway = $this->get_gateway($subnet_id);
+		
+		return ($gateway && $gateway->id);
+	}
+	
+	/**
+	 * This method is used for determining whether the user is connected
+	 * from registered connection. If he is the null is returned.
+	 * If not then subnet from which he is connected is searched.
+	 * If the user may obtain this IP from the searched subnet
+	 * the ID of subnet is returned. (but there must not be any connection
+	 * request on this connection already in tha database)
+	 * 
+	 * @author Ondřej Fibich
+	 * @param string $ip_address IP address from which the connection request is made
+	 * @return int|null Subnet ID or null if invalid request was made
+	 */
+	public function get_subnet_for_connection_request($ip_address)
+	{
+		$result = $this->db->query("
+			SELECT s.subnet_id FROM (
+				SELECT s.id AS subnet_id
+				FROM subnets s
+				WHERE inet_aton(s.netmask) & inet_aton(?) = inet_aton(s.network_address)
+			) s
+			LEFT JOIN ip_addresses ip ON ip.subnet_id = s.subnet_id AND inet_aton(ip.ip_address) = inet_aton(?)
+			WHERE ? NOT IN (
+				SELECT cr.ip_address FROM connection_requests cr
+				WHERE cr.state = ?
+			)
+			GROUP BY s.subnet_id
+			HAVING COUNT(ip.id) = 0
+		", $ip_address, $ip_address, $ip_address, Connection_request_Model::STATE_UNDECIDED);
+		
+		return ($result->count() > 0 ? $result->current()->subnet_id : NULL);
+	}
+	
+	/**
+	 * Returns all subnets with existing gateway
+	 * 
+	 * @author Michal Kliment
+	 * @return Mysql_Result
+	 */
+	public function get_all_subnets_with_gateway()
+	{
+		return $this->db->query("
+			SELECT s.*
+			FROM subnets s
+			JOIN ip_addresses ip ON ip.subnet_id = s.id AND ip.gateway = 1
+		");
+	}
+	
+	/**
+	 * Return all subnets on which DHCP is running and has no gateway.
+	 * 
+	 * @return Mysql_Result
+	 */
+	public function get_all_dhcp_subnets_without_gateway()
+	{
+		return $this->db->query("
+			SELECT s.*
+			FROM subnets s
+			WHERE s.dhcp > 0 AND s.id NOT IN (
+				SELECT s2.id
+				FROM subnets s2
+				JOIN ip_addresses ip ON ip.subnet_id = s2.id
+					AND ip.gateway = 1
+			)
+		");
 	}
 	
 }

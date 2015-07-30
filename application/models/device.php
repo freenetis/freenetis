@@ -27,6 +27,7 @@
  * @property integer $PPPoE_logging_in
  * @property string $login
  * @property string $password
+ * @property datetime $access_time
  * @property double $price
  * @property double $payment_rate
  * @property date $buy_date
@@ -42,7 +43,7 @@ class Device_Model extends ORM
 	
 	protected $has_many = array
 	(
-		'ifaces', 'device_admins', 'device_engineers'
+		'ifaces', 'device_admins', 'device_engineers', 'connection_requests', 'device_active_links'
 	);
 	
 	protected $belongs_to = array
@@ -57,7 +58,7 @@ class Device_Model extends ORM
 		'device_name' => 'd.name',
 		'username'	  => 'concat(u.name,\' \',u.surname)',
 		'device_type' => 'd.type',
-		'member_id'	  => 'users.member_id'
+		'member_id'	  => 'users.member_id',
 	);
 	
 	/**
@@ -92,7 +93,7 @@ class Device_Model extends ORM
 		$where = count($conds) ? 'WHERE '.implode(' AND ', $conds) : '';
 	
 		// order by check
-		if (in_array($params['order_by'], $this->arr_sql))
+		if (array_key_exists($params['order_by'], $this->arr_sql))
 			$order_by = $this->arr_sql[$params['order_by']];
 		else
 			$order_by = $this->db->escape_column($params['order_by']);
@@ -109,13 +110,15 @@ class Device_Model extends ORM
 			$limit = "";
 		
 		// HACK FOR IMPROVING PERFORMANCE (fixes #362)
-		$select_cloud = '';
-		$join_cloud = '';
+		$select_cloud_iface = '';
+		$join_cloud_iface = '';
 		
-		if (strpos($params['filter_sql'], '.`cloud` LIKE '))
+		if (isset($params['filter_sql']) && $params['filter_sql'] != '' &&
+			(strpos($params['filter_sql'], '.`cloud` LIKE ') ||
+			strpos($params['filter_sql'], '.`mac` LIKE ')))
 		{
-			$select_cloud = ', c.id AS cloud';
-			$join_cloud = "
+			$select_cloud_iface = ', c.id AS cloud, i.mac';
+			$join_cloud_iface = "
 				LEFT JOIN ifaces i ON i.device_id = d.id
 				LEFT JOIN ip_addresses ip ON ip.iface_id = i.id
 				LEFT JOIN clouds_subnets cs ON cs.subnet_id = ip.subnet_id
@@ -132,7 +135,7 @@ class Device_Model extends ORM
 					u.name AS user_name, u.surname AS user_surname, u.login AS user_login,
 					d.login, d.password, d.price, d.trade_name, d.payment_rate,
 					d.buy_date, m.name AS member_name, s.street, t.town,
-					ap.street_number, d.comment $select_cloud
+					ap.street_number, d.comment $select_cloud_iface
 				FROM devices d
 				JOIN users u ON d.user_id = u.id
 				JOIN members m ON u.member_id = m.id
@@ -141,7 +144,7 @@ class Device_Model extends ORM
 				LEFT JOIN towns t ON ap.town_id = t.id
 				LEFT JOIN enum_types e ON d.type = e.id
 				LEFT JOIN translations f ON lang = ? AND e.value = f.original_term
-				$join_cloud
+				$join_cloud_iface
 			) d
 			$where
 			GROUP BY device_id
@@ -164,13 +167,13 @@ class Device_Model extends ORM
 			$where = "WHERE $filter_sql";
 		
 		// HACK FOR IMPROVING PERFORMANCE (fixes #362)
-		$select_cloud = '';
-		$join_cloud = '';
+		$select_cloud_iface = '';
+		$join_cloud_iface = '';
 		
-		if (strpos($filter_sql, '.`cloud` LIKE '))
+		if (strpos($filter_sql, '.`cloud` LIKE ') || strpos($filter_sql, '.`mac` LIKE '))
 		{
-			$select_cloud = ', c.id AS cloud';
-			$join_cloud = "
+			$select_cloud_iface = ', c.id AS cloud, i.mac';
+			$join_cloud_iface = "
 				LEFT JOIN ifaces i ON i.device_id = d.id
 				LEFT JOIN ip_addresses ip ON ip.iface_id = i.id
 				LEFT JOIN clouds_subnets cs ON cs.subnet_id = ip.subnet_id
@@ -181,7 +184,7 @@ class Device_Model extends ORM
 		return $this->db->query("
 			SELECT COUNT(device_id) AS total FROM
 			(
-				SELECT * FROM
+				SELECT device_id FROM
 				(
 					SELECT d.id AS device_id, d.type,
 						IFNULL(f.translated_term, e.value) AS type_name, d.name,
@@ -189,7 +192,7 @@ class Device_Model extends ORM
 						u.surname AS user_surname, u.login AS user_login,
 						d.login, d.password, d.price, d.trade_name, d.payment_rate,
 						d.buy_date, m.name AS member_name, s.street, t.town,
-						ap.street_number, d.comment $select_cloud
+						ap.street_number, d.comment $select_cloud_iface
 					FROM devices d
 					JOIN users u ON d.user_id = u.id
 					JOIN members m ON u.member_id = m.id
@@ -198,14 +201,130 @@ class Device_Model extends ORM
 					LEFT JOIN towns t ON ap.town_id = t.id
 					LEFT JOIN enum_types e ON d.type = e.id
 					LEFT JOIN translations f ON lang = ? AND e.value = f.original_term
-					$join_cloud
+					$join_cloud_iface
 				) d
 				$where
 				GROUP BY device_id
 			) count
 		", Config::get('lang'))->current()->total;
 	} // end of count_all_devices
+	
+	/**
+	 * Gets filtered DHCP servers list
+	 * 
+	 * @param array $params
+	 * @return Mysql_Result
+	 */
+	public function get_all_dhcp_servers($params = array())
+	{
+		// default params
+		$default_params = array
+		(
+			'order_by'				=> 'access_time',
+			'order_by_direction'	=> 'asc'
+		);
+		
+		$params = array_merge($default_params, $params);
+		$where = '';
+		
+		// filter
+		if (isset($params['filter_sql']) && $params['filter_sql'] != '')
+			$where = 'WHERE ' . $params['filter_sql'];
+	
+		// order by check
+		if (array_key_exists($params['order_by'], $this->arr_sql))
+			$order_by = $this->arr_sql[$params['order_by']];
+		else
+			$order_by = $this->db->escape_column($params['order_by']);
+		
+		// order by direction check
+		if (strtolower($params['order_by_direction']) != 'desc')
+			$order_by_direction = 'asc';
+		else
+			$order_by_direction = 'desc';
+		
+		if (isset($params['limit']) && isset($params['offset']))
+			$limit = 'LIMIT ' . intval($params['offset']) . ', ' . intval($params['limit']);
+		else
+			$limit = '';
+		
+		return $this->db->query("
+			SELECT * FROM (
+				SELECT d.id AS device_id, d.type,
+					IFNULL(f.translated_term, e.value) AS type_name, d.name,
+					d.name AS device_name, u.id AS user_id, u.name AS user_name,
+					u.surname AS user_surname, u.login AS user_login,
+					d.login, d.password, d.price, d.trade_name, d.payment_rate,
+					d.buy_date, m.name AS member_name, st.street, t.town,
+					ap.street_number, d.comment, s.id AS subnet_id,
+					s.name AS subnet_name, d.access_time, ip.ip_address,
+					ip.id AS ip_address_id
+				FROM subnets s
+				JOIN ip_addresses ip ON s.id = ip.subnet_id
+				JOIN ifaces i ON i.id = ip.iface_id
+				JOIN devices d ON d.id = i.device_id
+				JOIN users u ON d.user_id = u.id
+				JOIN members m ON u.member_id = m.id
+				LEFT JOIN address_points ap ON d.address_point_id = ap.id
+				LEFT JOIN streets st ON ap.street_id = st.id
+				LEFT JOIN towns t ON ap.town_id = t.id
+				LEFT JOIN enum_types e ON d.type = e.id
+				LEFT JOIN translations f ON lang = ? AND e.value = f.original_term
+				WHERE s.dhcp > 0 AND ip.gateway > 0
+			) d
+			$where
+			GROUP BY device_id
+			ORDER BY $order_by $order_by_direction
+			$limit
+		", Config::get('lang'));
+	} // end of get_all_dhcp_servers
 
+	/**
+	 * Count filtered DHCP servers
+	 * 
+	 * @param array $params
+	 * @return int
+	 */
+	public function count_all_dhcp_servers($filter_sql = '')
+	{
+		$where = '';
+		
+		// filter
+		if ($filter_sql != '')
+			$where = "WHERE $filter_sql";
+		
+		// query
+		return $this->db->query("
+			SELECT COUNT(device_id) AS c FROM (
+				SELECT device_id FROM (
+					SELECT  d.id AS device_id, d.type,
+						IFNULL(f.translated_term, e.value) AS type_name, d.name,
+						d.name AS device_name, u.id AS user_id, u.name AS user_name,
+						u.surname AS user_surname, u.login AS user_login,
+						d.login, d.password, d.price, d.trade_name, d.payment_rate,
+						d.buy_date, m.name AS member_name, st.street, t.town,
+						ap.street_number, d.comment, s.id AS subnet_id,
+						s.name AS subnet_name, d.access_time, ip.ip_address,
+						ip.id AS ip_address_id
+					FROM subnets s
+					JOIN ip_addresses ip ON s.id = ip.subnet_id
+					JOIN ifaces i ON i.id = ip.iface_id
+					JOIN devices d ON d.id = i.device_id
+					JOIN users u ON d.user_id = u.id
+					JOIN members m ON u.member_id = m.id
+					LEFT JOIN address_points ap ON d.address_point_id = ap.id
+					LEFT JOIN streets st ON ap.street_id = st.id
+					LEFT JOIN towns t ON ap.town_id = t.id
+					LEFT JOIN enum_types e ON d.type = e.id
+					LEFT JOIN translations f ON lang = ? AND e.value = f.original_term
+					WHERE s.dhcp > 0 AND ip.gateway > 0
+				) d
+				$where
+				GROUP BY device_id
+			) d2
+		", Config::get('lang'))->current()->c;
+	} // end of count_all_dhcp_servers
+	
 	/**
 	 * Returns all devices of user
 	 *
@@ -585,6 +704,8 @@ class Device_Model extends ORM
 			SELECT
 				cd.id AS connected_to_device_id,
 				cd.name AS connected_to_device_name,
+				ci.id AS connected_to_iface_id,
+				ci.name AS connected_to_iface_name,
 				IFNULL(COUNT(DISTINCT cd.id), 0) AS connected_to_devices_count,
 				GROUP_CONCAT(DISTINCT cd.name SEPARATOR ', \\n') AS connected_to_devices
 			FROM devices d
@@ -734,6 +855,424 @@ class Device_Model extends ORM
 			FROM ifaces i
 			WHERE i.device_id = ? AND i.type = ?
 		", $device_id, Iface_Model::TYPE_PORT)->current()->pnumber;
+	}
+	
+	/**
+	 * Test whether device has any ports
+	 * 
+	 * @author Michal Kliment
+	 * @param type $device_id
+	 * @return type
+	 */
+	public function has_ports($device_id = null)
+	{
+		if ($device_id === NULL && isset($this) && $this->id)
+		{
+			$device_id = $this->id;
+		}
+		
+		$result = $this->db->query("
+			SELECT COUNT(*) AS count
+			FROM ifaces i
+			WHERE i.device_id = ? AND i.type = ?
+		", $device_id, Iface_Model::TYPE_PORT);
+		
+		return ($result && $result->current() && $result->current()->count);
+	}
+	
+	/**
+	 * Returns full export of device as object
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $device_id
+	 * @return type
+	 */
+	public function get_export($device_id = NULL)
+	{
+		if (!$device_id && $this->id)
+			$device = $this;
+		else
+			$device = new Device_Model($device_id);
+		
+		// interfaces of device
+		$interfaces = array();
+		
+		// IP addresses of device
+		$addresses = array();
+
+		// gateways of device, probably only one
+		$gateways = array();
+		
+		// DHCP servers of device
+		$dhcp_servers = array();
+		
+		// DHCP servers addresses (for sorting)
+		$dhcp_servers_addresses = array();
+		
+		// dns servers
+		$system_dns_servers = arr::trim(explode("\n", Settings::get('dns_servers')));
+		
+		if (!count($system_dns_servers))
+		{
+			throw new Exception(
+				__('Error').': '.
+				__('Device has not been exported: DNS servers are not set')
+			);
+		}
+		
+		// all device's interfaces
+		foreach ($device->ifaces as $iface)
+		{
+			// for all type of interface
+			$interface = arr::to_object(array
+			(
+				'name'			=> $iface->name,
+				'type'			=> $iface->type,
+				'mac'			=> $iface->mac,
+				'number'		=> $iface->number,
+				'link_name'		=> $iface->link->name,
+				'comment'		=> '{link_name}'
+			), 'stdClass', FALSE);
+			
+			// only for wireless type of interface
+			if ($iface->type == Iface_Model::TYPE_WIRELESS)
+			{
+				$interface->wireless = arr::to_object(array
+				(
+					'mode'			=> $iface->wireless_mode,
+					'ssid'			=> $iface->link->wireless_ssid,
+					'norm'			=> $iface->link->wireless_norm,
+					'frequency'		=> $iface->link->wireless_norm,
+					'channel'		=> $iface->link->wireless_norm,
+					'channel_width'	=> $iface->link->wireless_norm,
+					'polarization'	=> $iface->link->wireless_norm,
+					'bitrate'		=> $iface->link->bitrate
+				), 'stdClass', FALSE);
+				
+				// only for mode AP of wireless type of interface
+				if ($iface->wireless_mode == Iface_Model::WIRELESS_MODE_AP)
+				{
+					$interface->wireless->clients = array();
+					
+					// find all connected client
+					foreach ($iface->link->ifaces as $link_iface)
+					{
+						// not device itself
+						if ($link_iface->id == $iface->id)
+							continue;
+						
+						$interface->wireless->clients[] = arr::to_object(array
+						(
+							'name'			=> $link_iface->name,
+							'mac'			=> $link_iface->mac,
+							'device_name'	=> $link_iface->device->name,
+							'device_type'	=> $link_iface->device->type,
+							'member_id'		=> $link_iface->device->user->member->id,
+							'member_name'	=> $link_iface->device->user->member->name,
+							'member_type'	=> $link_iface->device->user->member->type,
+							'comment'		=> 'ID {member_id} - {member_name} - {device_name}'
+						), 'stdClass', FALSE);
+					}
+				}
+			}
+			
+			// only for VLAN type of interface 
+			else if ($iface->type == Iface_Model::TYPE_VLAN)
+			{	
+				if (!$iface->ifaces_vlans->count())
+				{
+					throw new Exception(
+						__('Error').': '.__('Cannot find VLAN of VLAN interface '.$iface->name)
+					);
+				}
+				
+				if (!$iface->ifaces_relationships->count())
+				{
+					throw new Exception(
+						__('Error').': '.__('Cannot find parent interface of VLAN interface '.$iface->name)
+					);
+				}
+
+					$interface->vlan = arr::to_object(array
+				(
+					'name'				=> $iface->ifaces_vlans->current()->vlan->name,
+					'parent_interface'	=> $iface->ifaces_relationships->current()->parent_iface->name,
+					'tag_802_1q'		=> $iface->ifaces_vlans->current()->vlan->tag_802_1q
+				), 'stdClass', FALSE);
+			}
+				
+			// only for port type of interface
+			else if ($iface->type == Iface_Model::TYPE_PORT)
+			{
+				// default port vlan of port is default VLAN
+				$port_vlan = 1;
+				
+				$vlans = array();
+				
+				// for all port's vlans
+				foreach ($iface->ifaces_vlans as $iface_vlan)
+				{	
+					// tagged or untagged
+					$vlans[$iface_vlan->vlan->tag_802_1q] = $iface_vlan->tagged;
+					
+					// vlan is port vlan
+					if ($iface_vlan->port_vlan)
+						$port_vlan = $iface_vlan->vlan->tag_802_1q;
+				}
+				
+				$interface->port = arr::to_object(array
+				(
+					'mode'		=> $iface->port_mode,
+					'port_vlan' => $port_vlan,
+					'vlans'		=> $vlans
+				), 'stdClass', FALSE);
+			}
+			
+			$interface->ip_addresses = array();
+
+			// interface's IP addresses
+			foreach ($iface->ip_addresses as $ip_address)
+			{				
+				// create CIDR format
+				$cidr = $ip_address->subnet->network_address.'/'.network::netmask2cidr($ip_address->subnet->netmask);
+				
+				// find broadcast address
+				$broadcast = long2ip(ip2long($ip_address->subnet->network_address) | ~ip2long($ip_address->subnet->netmask));
+				
+				$address = arr::to_object(array
+				(
+					'address'		=> $ip_address->ip_address,
+					'netmask'		=> $ip_address->subnet->netmask,
+					'network'		=> $ip_address->subnet->network_address,
+					'broadcast'		=> $broadcast,
+					'cidr'			=> $cidr,
+					'interface'		=> $iface->name,
+					'subnet_name'	=> $ip_address->subnet->name,
+					'comment'		=> '{subnet_name}'
+				), 'stdClass', FALSE);
+
+				// device is gateway
+				if ($ip_address->gateway)
+				{
+					// DHCP server on subnet is running
+					if ($ip_address->subnet->dhcp)
+					{
+						$range_start	= long2ip(ip2long($ip_address->ip_address)+1);
+						$range_end		= long2ip(ip2long($broadcast)-1);
+						
+						$dns_servers = $system_dns_servers;
+						
+						// DNS server is on
+						if ($ip_address->subnet->dns)
+						{
+							array_unshift($dns_servers, $ip_address->ip_address);
+						}
+						
+						$dhcp_server = arr::to_object(array
+						(
+							'name'			=> text::cs_utf2ascii($ip_address->subnet->name),
+							'network'		=> $ip_address->subnet->network_address,
+							'netmask'		=> $ip_address->subnet->netmask,
+							'gateway'		=> $ip_address->ip_address,
+							'broadcast'		=> $broadcast,
+							'cidr'			=> $cidr,
+							'interface'		=> $iface->name,
+							'range_start'	=> $range_start,
+							'range_end'		=> $range_end,
+							'ranges'		=> array
+							(
+								arr::to_object(array
+								(	
+									'start'		=> $range_start,
+									'end'		=> $range_end
+								), 'stdClass', FALSE),
+							),
+							'dns_servers'	=> $dns_servers,
+							'hosts'			=> array(),
+							'comment'		=> '{name}'
+						), 'stdClass', FALSE);
+						
+						$mac_addresses = array();
+						
+						$ip_addresses = array();
+						
+						// hosts addresses (for sorting)
+						$hosts_addresses = array();
+						
+						// find all hosts in subnets
+						foreach ($ip_address->subnet->ip_addresses as $dhcp_ip_address)
+						{
+							// not device itself
+							if ($dhcp_ip_address->ip_address == $ip_address->ip_address ||
+								!$dhcp_ip_address->iface_id)
+							{
+								continue;
+							}
+							
+							// for VLAN interface get MAC from parent interface
+							if ($dhcp_ip_address->iface->type == Iface_Model::TYPE_VLAN)
+							{
+								if (!$dhcp_ip_address->iface->ifaces_relationships->count())
+								{
+									throw new Exception(
+										__('Error').': '.__('Cannot find parent interface of VLAN interface '.$dhcp_ip_address->iface)
+									);
+								}
+								
+								$mac = $dhcp_ip_address->iface->ifaces_relationships->current()->parent_iface->mac;
+							}
+							else
+								$mac = $dhcp_ip_address->iface->mac;
+							
+							$host = arr::to_object(array
+							(
+								'id'			=> $dhcp_ip_address->id,
+								'server'		=> $dhcp_server->name,
+								'ip_address'	=> $dhcp_ip_address->ip_address,
+								'mac'			=> $mac,
+								'device_name'	=> $dhcp_ip_address->iface->device->name,
+								'device_type'	=> $dhcp_ip_address->iface->device->type,
+								'member_id'		=> $dhcp_ip_address->iface->device->user->member->id,
+								'member_name'	=> $dhcp_ip_address->iface->device->user->member->name,
+								'member_type'	=> $dhcp_ip_address->iface->device->user->member->type,
+								'comment'		=> 'ID {member_id} - {member_name} - {device_name}'
+							), 'stdClass', FALSE);
+							
+							// mac is not valid
+							if (!valid::mac_address($host->mac))
+							{
+								// log to database
+								Log_queue_Model::error(
+									'Device has not been exported: Invalid MAC address format',
+									print_r($host, true)
+								);
+							}
+							// mac is not unique
+							else if (in_array($host->mac, $mac_addresses))
+							{
+								// log to database
+								Log_queue_Model::error(
+									'Device has not been exported: Duplicate MAC address '.$host->mac.' in subnet',
+									print_r($host, true)
+								);
+							}
+							// mac is valid => host is valid
+							else
+							{
+								$mac_addresses[] = $host->mac;
+								
+								$ranges = array();
+								
+								
+								foreach ($dhcp_server->ranges as $i => $range)
+								{
+									// ip address is in range, split range
+									if (ip2long($host->ip_address) >= ip2long($range->start)
+										&& ip2long($host->ip_address) <= ip2long($range->end))
+									{	
+										if ($range->start != $host->ip_address)
+										{
+											$ranges[] = arr::to_object(array
+											(
+												'start' => $range->start,
+												'end'	=> long2ip(ip2long($host->ip_address)-1)
+											));
+										}
+										
+										if ($range->end != $host->ip_address)
+										{
+											$ranges[] = arr::to_object(array
+											(
+												'start' => long2ip(ip2long($host->ip_address)+1),
+												'end'	=> $range->end
+											));
+										}
+									}
+									else
+									{
+										$ranges[] = $range;
+									}
+								}
+								
+								$dhcp_server->ranges = $ranges;
+								
+								$dhcp_server->hosts[] = $host;
+								
+								$hosts_addresses[] = ip2long($host->ip_address);
+							}
+						}
+						
+						array_multisort($hosts_addresses, $dhcp_server->hosts);
+						
+						$dhcp_servers[] = $dhcp_server;
+						
+						$dhcp_servers_addresses[] = ip2long($dhcp_server->network);
+					}
+				}
+				else
+				{
+					// find gateway of subnet
+					$gateway = $ip_address->subnet->get_gateway();
+					
+					if ($gateway && $gateway->ip_address)
+					{
+						$gateways[] = $gateway->ip_address;
+						
+						$address->gateway = $gateway->ip_address;
+					}
+				}
+
+				$addresses[] = $address;
+				
+				$interface->ip_addresses[] = $address;
+			}
+			
+			$interfaces[$iface->type][] = $interface;
+		}
+		
+		array_multisort($dhcp_servers_addresses, $dhcp_servers);
+		
+		// finally return result
+		return arr::to_object(array
+		(
+			'name'			=> $device->name,
+			'type'			=> $device->type,
+			'interfaces'	=> $interfaces,
+			'ip_addresses'	=> $addresses,
+			'dhcp_servers'	=> $dhcp_servers,
+			'dns_servers'	=> $system_dns_servers,
+			'gateways'		=> array_unique($gateways)
+		), 'stdClass', FALSE);
+	}
+	
+	/**
+	 * Test if given IP address belongs to device
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $ip_address
+	 * @param type $device_id
+	 * @return boolean
+	 */
+	public function is_ip_address_of_device($ip_address, $device_id = NULL)
+	{
+		if (!$device_id && $this->id)
+			$device_id = $this->id;
+		
+		$result = $this->db->query("
+			SELECT COUNT(*) AS count
+			FROM ip_addresses ip
+			JOIN ifaces i ON ip.iface_id = i.id
+			WHERE ip.ip_address = ? AND i.device_id = ?
+		", array($ip_address, $device_id));
+		
+		if ($result && $result->current() && $result->current()->count > 0)
+		{
+			return TRUE;
+		}
+		else
+		{
+			return FALSE;
+		}
 	}
 	
 }

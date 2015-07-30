@@ -409,6 +409,19 @@ class text {
 	}
 	
 	/**
+	 * Check if first string ends with second
+	 *
+	 * @author Ondřej Fibich
+	 * @param string $str	String
+	 * @param string $end	End
+	 * @return bool			true if first string ends with second	
+	 */
+	public static function ends_with($str, $end)
+	{
+		return strcmp(mb_substr($str, mb_strlen($str) - mb_strlen($end)), $end) == 0;
+	}
+	
+	/**
 	 * Pushes object properties into given format string
 	 *
 	 * @author Ondřej Fibich
@@ -503,6 +516,45 @@ class text {
 		{
 			return $replace.' '.$extra_text;
 		}
+	}
+	
+	/**
+	 * Highlight occurences of what in where by span with class highlighted
+	 * 
+	 * @param string $what What should be highlighted
+	 * @param string $where Where it should be highlighted
+	 * @return string String with hightligthed occurences of what
+	 */
+	public static function highligth($what, $where)
+	{
+		// make every letter valid in regex
+		$what_letters = str_split($what);
+		
+		foreach ($what_letters as $i => $valid_what_letter)
+		{
+			// delimiter of regex
+			if ($valid_what_letter == '/')
+			{
+				$valid_what_letter = '\/';
+			}
+			// change
+			$what_letters[$i] = '[' . $valid_what_letter . ']';
+		}
+		
+		// highlingth occurrences with ignore case
+		$r = preg_replace(
+				'/(' . implode('', $what_letters) . ')/i', 
+				'<span class="highlighted">$1</span>',
+				$where
+		);
+		
+		// an error occured, we will rather return old string
+		if (!$r)
+		{
+			return $where;
+		}
+		
+		return $r;
 	}
 
 

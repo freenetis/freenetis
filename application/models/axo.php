@@ -33,6 +33,64 @@ class Axo_Model extends ORM
 	protected $table_names_plural = FALSE;
 	
 	/**
+	 * Returns all section values
+	 * 
+	 * @author Michal Kliment
+	 * @return type
+	 */
+	public static function get_section_values()
+	{
+		$axo_model = new Axo_Model();
+		
+		$axos = arr::sort(
+			array_unique(
+				arr::from_objects(
+					$axo_model->get_all_values(),
+					'section_value'
+				)
+			)
+		);
+		
+		return $axos;
+	}
+	
+	/**
+	 * Returns all values
+	 * 
+	 * @author Michal Kliment
+	 * @return type
+	 */
+	public static function get_values()
+	{
+		$axo_model = new Axo_Model();
+		
+		$axos = arr::sort(
+			array_unique(
+				arr::from_objects(
+					$axo_model->get_all_values(),
+					'value'
+				)
+			)
+		);
+		
+		return $axos;
+	}
+	
+	/**
+	 * Returns all AXO values
+	 * 
+	 * @author Michal Kliment
+	 * @return type
+	 */
+	public function get_all_values()
+	{
+		return $this->db->query("
+			SELECT * FROM axo
+			ORDER BY section_value
+		");
+	}
+	
+	/**
 	 * Gets AXo by ACl
 	 *
 	 * @param integer $acl_id

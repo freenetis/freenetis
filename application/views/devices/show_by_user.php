@@ -29,8 +29,12 @@ if ($this->acl_check_new('Devices_Controller', 'devices', $member_id))
 			<h3>
 				<a name="device_<?php echo $id ?>_link" href="<?php echo url_lang::base() ?>devices/show/<?php echo $id ?>" title="<?php echo __('Show device') ?>"><?php echo __('device') ?> <?php echo $device['name'] ?> (<?php echo $device['type'] ?>)</a>
 				<img src="<?php echo url::base() ?>media/images/icons/ico_minus.gif" id="device_<?php echo $id ?>_button" class="device_button">
-				<?php echo html::anchor('devices/edit/' . $id, html::image(array('src' => 'media/images/icons/gtk_edit.png')), array('title' => __('Edit device'))) ?>
-				<?php echo html::anchor('devices/delete/' . $id, html::image(array('src' => 'media/images/icons/delete.png')), array('title' => __('Delete device'), 'class' => 'delete_link')) ?>
+				<?php if ($this->acl_check_edit('Devices_Controller', 'devices', $member_id)): ?>
+					<?php echo html::anchor('devices/edit/' . $id, html::image(array('src' => 'media/images/icons/gtk_edit.png')), array('title' => __('Edit device'))) ?>
+				<?php endif ?>
+				<?php if ($this->acl_check_delete('Devices_Controller', 'devices', $member_id)): ?>
+					<?php echo html::anchor('devices/delete/' . $id, html::image(array('src' => 'media/images/icons/delete.png')), array('title' => __('Delete device'), 'class' => 'delete_link')) ?>
+				<?php endif ?> 
 			</h3>
 
 			<div id="device_<?php echo $id ?>" class="device">
@@ -43,17 +47,17 @@ if ($this->acl_check_new('Devices_Controller', 'devices', $member_id))
 							<li class="ui-corner-all"><a href="#interfaces"><?php echo __('Interfaces') ?></a></li>
 						</ul>
 						
-					<?php if ($this->acl_check_view(get_class($this), 'ip_address', $member_id)) { ?>
+					<?php if ($this->acl_check_view('Ip_addresses_Controller', 'ip_address', $member_id)): ?>
 						<div id="ip_addresses">
 						<?php echo $grid['ip_addresses'] ?>
 						</div>
-					<?php } ?>
+					<?php endif ?>
 
-					<?php if ($this->acl_check_view(get_class($this), 'iface', $member_id)) { ?>
+					<?php if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id)): ?>
 						<div id="interfaces">
 						<?php echo $grid['ifaces'] ?>
 						</div>
-					<?php } ?>
+					<?php endif ?>
 
 					</div>
 				<?php endforeach ?>

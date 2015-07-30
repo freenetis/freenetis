@@ -3,6 +3,7 @@
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 		<title><?php echo $title ?> | <?php echo $this->settings->get('title') ?></title>
+		<?php echo html::link('media/images/favicon.ico', 'shorcut icon', 'image/x-icon', FALSE); ?>
 		<?php echo html::stylesheet('media/css/installation.css') ?>
 		<?php echo html::stylesheet('media/css/jquery-ui.css') ?>
 		<?php echo html::stylesheet('media/css/jquery.validate.password.css') ?>
@@ -10,6 +11,11 @@
 		<?php echo html::script('media/js/jquery-ui.min', FALSE) ?>
 		<?php echo html::script('media/js/jquery.ui.datepicker-cs', FALSE) ?>
 		<?php echo html::script('media/js/jquery.validate.min', FALSE) ?>
+		<script type="text/javascript"><!--
+			// settings for jquery.validate.password
+			var security_password_level = <?php echo Settings::get('security_password_level') ?>;
+			var security_password_length = <?php echo Settings::get('security_password_length') ?>;
+		--></script>
 		<?php echo html::script('media/js/jquery.validate.password', FALSE) ?>
 		<?php echo html::script('media/js/jquery.metadata', FALSE) ?>
 		<?php echo html::script('media/js/jquery.tablesorter', FALSE) ?>
@@ -26,13 +32,13 @@
 				$('form').validate();
 			});
 			
-		--></script>
+		//--></script>
 	</head>
 
 	<body>
 
 		<div id="main">
-			<h1><a href="<?php echo url_lang::base() ?>"><span>FreenetIS</span></a></h1>
+			<h1><a href="<?php echo url_lang::base() ?>" title="<?php echo __('Back to login') ?>"><span>FreenetIS</span><i><?php echo Version::get_version() ?></i></a></h1>
 			<div class="flags">
 				<?php echo special::create_language_flags(array('cs' => 'Česky', 'en' => 'English')) ?>
 			</div>

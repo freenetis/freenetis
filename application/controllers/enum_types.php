@@ -43,13 +43,13 @@ class Enum_types_Controller extends Controller
 			$limit_results = 200, $order_by = 'id', $order_by_direction = 'ASC')
 	{
 		// check if logged user have access right to view all translations
-		if (!$this->acl_check_view('Settings_Controller', 'enum_types'))
+		if (!$this->acl_check_view('Enum_types_Controller', 'enum_types'))
 			Controller::Error(ACCESS);
 
 		// to-do - pagination
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$allowed_order_type = array('id', 'type', 'value');
 		
@@ -87,7 +87,7 @@ class Enum_types_Controller extends Controller
 
 		// add button for new translation
 		// check if logged user have access right to add new translation
-		if ($this->acl_check_new('Settings_Controller', 'enum_types'))
+		if ($this->acl_check_new('Enum_types_Controller', 'enum_types'))
 		{
 			$grid->add_new_button('enum_types/add', __('Add new enum type'));
 		}
@@ -102,17 +102,19 @@ class Enum_types_Controller extends Controller
 		$actions = $grid->grouped_action_field();
 
 		// check if logged user have access right to edit this enum types
-		if ($this->acl_check_edit('Settings_Controller', 'enum_types'))
+		if ($this->acl_check_edit('Enum_types_Controller', 'enum_types'))
 		{
-			$actions->add_action()
+			$actions->add_conditional_action()
+					->condition('is_not_readonly')
 					->icon_action('edit')
 					->url('enum_types/edit');
 		}
 
 		// check if logged user have access right to delete this enum_types
-		if ($this->acl_check_delete('Settings_Controller', 'enum_types'))
+		if ($this->acl_check_delete('Enum_types_Controller', 'enum_types'))
 		{
-			$actions->add_action()
+			$actions->add_conditional_action()
+					->condition('is_not_readonly')
 					->icon_action('delete')
 					->url('enum_types/delete')
 					->class('delete_link');
@@ -138,7 +140,7 @@ class Enum_types_Controller extends Controller
 	public function add()
 	{
 		// access control
-		if (!$this->acl_check_new('Settings_Controller', 'enum_types'))
+		if (!$this->acl_check_new('Enum_types_Controller', 'enum_types'))
 			Controller::error(ACCESS);
 
 		$arr_type_names = array
@@ -190,7 +192,7 @@ class Enum_types_Controller extends Controller
 			// breadcrumbs
 			$breadcrumbs = breadcrumbs::add()
 					->link('enum_types/show_all', 'Enumerations',
-							$this->acl_check_view('Settings_Controller', 'enum_types'))
+							$this->acl_check_view('Enum_types_Controller', 'enum_types'))
 					->text('Add new enum type');
 
 			// view for adding translation
@@ -216,12 +218,12 @@ class Enum_types_Controller extends Controller
 		if ($enum_type_id)
 		{
 			// access control
-			if (!$this->acl_check_edit('Settings_Controller', 'enum_types'))
+			if (!$this->acl_check_edit('Enum_types_Controller', 'enum_types'))
 				Controller::error(ACCESS);
 
 			$enum_type = new Enum_type_Model($enum_type_id);
 
-			if (!$enum_type->id)
+			if (!$enum_type->id || $enum_type->read_only)
 				url::redirect('enum_types/show_all');
 
 			$arr_type_names = ORM::factory('enum_type_name')->select_list('id', 'type_name');
@@ -271,7 +273,7 @@ class Enum_types_Controller extends Controller
 				// breadcrumbs
 				$breadcrumbs = breadcrumbs::add()
 						->link('enum_types/show_all', 'Enumerations',
-								$this->acl_check_view('Settings_Controller', 'enum_types'))
+								$this->acl_check_view('Enum_types_Controller', 'enum_types'))
 						->text($enum_type->value . ' (' . $enum_type_id . ')')
 						->text('Edit translation');
 
@@ -302,12 +304,12 @@ class Enum_types_Controller extends Controller
 		if ($enum_type_id)
 		{
 			// access control
-			if (!$this->acl_check_delete('Settings_Controller', 'enum_types'))
+			if (!$this->acl_check_delete('Enum_types_Controller', 'enum_types'))
 				Controller::error(ACCESS);
 
 			$enum_type = new Enum_type_Model($enum_type_id);
 
-			if (!$enum_type->id)
+			if (!$enum_type->id || $enum_type->read_only)
 				url::redirect('enum_types/show_all');
 
 			// success

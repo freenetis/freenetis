@@ -6,6 +6,6 @@
 
 <br />
 
-<?php if ($this->acl_check_edit('Settings_Controller', 'system')): ?>
+<?php if ($this->acl_check_edit('Settings_Controller', 'voip_settings')): ?>
 <p><?php echo html::anchor(url_lang::base() . 'settings/voip', __('Enable VoIP')) ?></p>
 <?php endif ?>

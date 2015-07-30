@@ -73,7 +73,7 @@ class special
 	 *
 	 * @return boolean
 	 */
-	public static function create_language_flags($flags_array, $extension = 'jpg')
+	public static function create_language_flags($flags_array, $extension = 'png')
 	{
 		$index_page = (Settings::get('index_page')) ? 'index.php/' : '';
 		if (is_array($flags_array))

@@ -37,14 +37,28 @@ class Traffic_Controller extends Controller
 	public function __construct()
 	{
 		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
 
 		// contains items of menu
-		$this->sections = array
-		(
-			url_lang::base().'traffic/show_all'		=> __('Total traffic'),
-			url_lang::base().'traffic/ip_addresses'	=> __('Traffic of IP addresses'),
-			url_lang::base().'traffic/members'		=> __('Traffic of members')
-		);
+		$this->sections = array();
+		
+		if ($this->acl_check_view('Ulogd_Controller', 'total'))
+		{
+			$this->sections[url_lang::base().'traffic/show_all'] = __('Total traffic');
+		}
+		
+		if ($this->acl_check_view('Ulogd_Controller', 'ip_address'))
+		{
+			$this->sections[url_lang::base().'traffic/ip_addresses'] = __('Traffic of IP addresses');
+		}
+		
+		if ($this->acl_check_view('Ulogd_Controller', 'member'))
+		{
+			$this->sections[url_lang::base().'traffic/members'] = __('Traffic of members');
+		}
 
 		// time of next update of ulogd
 		$this->ulogd_update_next = Settings::get('ulogd_update_last')
@@ -62,7 +76,22 @@ class Traffic_Controller extends Controller
 	 */
 	public function index()
 	{
-		url::redirect('traffic/show_all');
+		if ($this->acl_check_view('Ulogd_Controller', 'total'))
+		{
+			url::redirect('traffic/show_all');
+		}
+		
+		if ($this->acl_check_view('Ulogd_Controller', 'ip_address'))
+		{
+			url::redirect('traffic/ip_addresses');
+		}
+		
+		if ($this->acl_check_view('Ulogd_Controller', 'member'))
+		{
+			url::redirect('traffic/members');
+		}
+		
+		Controller::error(ACCESS);
 	}
 	
 	public function show_all ($type = 'daily', $limit_results = 50,
@@ -73,12 +102,12 @@ class Traffic_Controller extends Controller
 		$default_order_by = array('day', 'month', 'year');
 		
 		// access control
-		if (!$this->acl_check_view('Ulogd_Controller','member'))
+		if (!$this->acl_check_view('Ulogd_Controller','total'))
 			Controller::error(ACCESS);
 		
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		$type_number = array_search($type, $allowed_types);
 		
@@ -104,21 +133,7 @@ class Traffic_Controller extends Controller
 			
 			$filter_form->add('month')
 					->type('select_number')
-					->values(array
-					(
-						1 => __('January'),
-						2 => __('February'),
-						3 => __('March'),
-						4 => __('April'),
-						5 => __('May'),
-						6 => __('June'),
-						7 => __('July'),
-						8 => __('August'),
-						9 => __('September'),
-						10 => __('October'),
-						11 => __('November'),
-						12 => __('December')
-					));
+					->values(date::months_array());
 		}
 		
 		if ($type_number == 2)
@@ -345,8 +360,8 @@ class Traffic_Controller extends Controller
 			Controller::error(ACCESS);
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		// by default orders by ulogd's type of traffic of active members
 		if ($order_by == '')
@@ -526,8 +541,8 @@ class Traffic_Controller extends Controller
 			Controller::error(ACCESS);
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		$type_number = array_search($type, $allowed_types);
 		
@@ -552,21 +567,7 @@ class Traffic_Controller extends Controller
 		{
 			$filter_form->add('month')
 					->type('select_number')
-					->values(array
-					(
-						1 => __('January'),
-						2 => __('February'),
-						3 => __('March'),
-						4 => __('April'),
-						5 => __('May'),
-						6 => __('June'),
-						7 => __('July'),
-						8 => __('August'),
-						9 => __('September'),
-						10 => __('October'),
-						11 => __('November'),
-						12 => __('December')
-					));
+					->values(date::months_array());
 		}
 		
 		if ($type_number != 0)
@@ -779,8 +780,8 @@ class Traffic_Controller extends Controller
 			Controller::error(ACCESS);
 		
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		$type_number = array_search($type, $allowed_types);
 		
@@ -798,21 +799,7 @@ class Traffic_Controller extends Controller
 		{
 			$filter_form->add('month')
 					->type('select_number')
-					->values(array
-					(
-						1 => __('January'),
-						2 => __('February'),
-						3 => __('March'),
-						4 => __('April'),
-						5 => __('May'),
-						6 => __('June'),
-						7 => __('July'),
-						8 => __('August'),
-						9 => __('September'),
-						10 => __('October'),
-						11 => __('November'),
-						12 => __('December')
-					));
+					->values(date::months_array());
 		}
 		
 		if ($type_number > 0)
@@ -856,12 +843,12 @@ class Traffic_Controller extends Controller
 		{
 			case 'daily':
 				
-				$before_2_months = time() - 86400 * 31 * 2;
-				
-				if ($before_2_months > $time)
-				{
-					$time = $before_2_months;
-				}
+			$before_2_months = time() - 86400 * 31 * 2;
+
+			if ($before_2_months > $time)
+			{
+				$time = $before_2_months;
+			}
 				
 				break;
 
@@ -872,8 +859,8 @@ class Traffic_Controller extends Controller
 				if ($before_2_years > $time)
 				{
 					$time = $before_2_years;
-				}
-				
+		}
+		
 				break;
 		}
 		
@@ -961,7 +948,8 @@ class Traffic_Controller extends Controller
 			}
 		}
 		
-		$arr_traffics = array_merge($arr_traffics, $traffics);
+		$arr_traffics = $traffics + $arr_traffics;
+		ksort($arr_traffics);
 		
 		$total_traffics = count($arr_traffics);
 		

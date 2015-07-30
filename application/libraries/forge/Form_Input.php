@@ -276,6 +276,12 @@ class Form_Input
 	 */
 	public function html()
 	{
+		// sets input value to a value of GET parameter with same name (request #614)
+		$value = Input::instance()->get($this->name());
+		
+		if(!empty($value))
+			$this->value ($value);
+		
 		// Make sure validation runs
 		$this->validate();
 
@@ -520,7 +526,7 @@ class Form_Input
 
 		// Fetch the method for this object
 		$method = $this->method;
-
+		
 		if (func_num_args() > 0)
 		{
 			$name = func_get_arg(0);
@@ -535,7 +541,7 @@ class Form_Input
 				$value = $input->$method($name);
 				return (isset($value[$matches[3]])) ? $value[$matches[3]] : '';
 			}
-
+			
 			return $input->$method($name);
 		}
 		else
@@ -548,8 +554,8 @@ class Form_Input
 	 * @return  void
 	 */
 	protected function load_value()
-	{
-		if (is_bool($this->is_valid))
+	{	
+		if (is_bool($this->is_valid))		
 			return;
 
 		if ($name = $this->name)
@@ -575,11 +581,11 @@ class Form_Input
 		// Validation has already run
 		if (is_bool($this->is_valid))
 			return $this->is_valid;
-
+		
 		// No data to validate
 		if ($this->input_value() == FALSE)
 			return $this->is_valid = FALSE;
-		
+
 		// Load the submitted value
 		$this->load_value();
 	
@@ -680,7 +686,7 @@ class Form_Input
 	}
 
 	/**
-	 * Chceck if value is GPS coordinate if it is not empty
+	 * Check if value is GPS coordinate if it is not empty
 	 * 
 	 * @author Ondřej Fibich
 	 */
@@ -694,6 +700,22 @@ class Form_Input
 				{
 					$this->errors['gps'] = TRUE;
 				}
+			}
+		}
+	}
+
+	/**
+	 * Check if value is pregex if it is not empty
+	 * 
+	 * @author Ondřej Fibich
+	 */
+	protected function rule_preg_regex()
+	{
+		if ($this->value)
+		{
+			if (@preg_match($this->value, '') === FALSE)
+			{
+				$this->errors['preg_regex'] = TRUE;
 			}
 		}
 	}

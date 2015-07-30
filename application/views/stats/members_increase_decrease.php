@@ -22,7 +22,7 @@
 		});
 	}
 	
---></script>
+//--></script>
 
 <h2><?php echo __('Increase and decrease of members') ?></h2>
 <?php echo $link_back ?><br /><br />

@@ -80,6 +80,16 @@ class TextEditor
 	{
 		return $this->driver->getHeight();
 	}
+	
+	public function getClass()
+	{
+		return $this->driver->getClass();
+	}
+	
+	public function setClass($c)
+	{
+		return $this->driver->setClass($c);
+	}
 
 	public function checkCompatiblily()
 	{
@@ -124,9 +134,20 @@ class TextEditor_Driver_TinyMCE implements TextEditor_Driver
 	// TinyMCE path
 	protected $path = 'media/js/tinymce/';
 	protected $content;
+	protected $class = 'wysiwyg';
 
 	public function __construct()
 	{
+	}
+	
+	public function getClass()
+	{
+		return $this->class;
+	}
+	
+	public function setClass($c)
+	{
+		return $this->class = $c;
 	}
 
 	public function setWidth($width)
@@ -168,7 +189,7 @@ class TextEditor_Driver_TinyMCE implements TextEditor_Driver
 	{
 		return  '<textarea id="' . $this->fieldName . '" name="' .
 				$this->fieldName . '" width="' . $this->width .
-				'" class="wysiwyg">' . $this->content . '</textarea>';
+				'" class="' . $this->class . '">' . $this->content . '</textarea>';
 	}
 
 	public function checkCompatiblily()

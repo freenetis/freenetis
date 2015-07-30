@@ -69,8 +69,8 @@ class valid {
 		// Use parse_url to validate the URL
 		$url = parse_url($url);
 
-		echo "<pre>";
-		print_r ($url);
+		//echo "<pre>";
+		//print_r ($url);
 
 		// Restore error reporting
 		error_reporting($ER);
@@ -125,13 +125,13 @@ class valid {
 	 */
 	public static function ip_check_subnet($ip, $net, $mask)
 	{
-		$mask = 0xffffffff << (32 - $mask) & 0xffffffff;
+		$size	= (~$mask & 0xffffffff)+1;
 		
-		if (($ip & $mask) != (int) $net)
+		if (($ip & $mask) != $net)
 		{
 			return false; // IP address does not match the subnet/mask
 		}
-		else if ($ip == $net || ($ip == ($net | ~$mask)) && ~$mask != 0)
+		else if ($size > 1 && ($ip == $net || $ip == ($net + $size - 1)))
 		{
 			return false; // Invalid IP address
 		}
@@ -462,5 +462,28 @@ class valid {
 		return preg_match ("/^([0-9]+[k|M|G|T]?)(\/[0-9]+[k|M|G|T]?)?$/i", $str);
 	}
 
+	/**
+	 * Checks whether number is included in range
+	 * 
+	 * @author Jan Dubina
+	 * @param type $number
+	 * @return boolean 
+	 */
+	public static function range ($number, $min = 0, $max = 100)
+	{
+		return ($number >= $min) && ($number <= $max);
+	}
 
+	/**
+	 * Checks whether string is valid bank account number
+	 * 
+	 * @author Jan Dubina
+	 * @param string $str
+	 * @return boolean 
+	 */
+	public static function bank_account ($str)
+	{
+		return preg_match ("/^([0-9]{1,6}-)?([0-9]{2,10})\/[0-9]{4}$/", $str);
+	}
+	
 } // End valid

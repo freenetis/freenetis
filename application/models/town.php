@@ -68,6 +68,12 @@ class Town_Model extends ORM
 			$zip_code_where = ' AND LOWER(zip_code) = ' . $this->db->escape(strtolower($zip_code));
 		}
 		
+		// prevent saving address point in City-City format
+		if ($quarter == $town)
+		{
+			$quarter = NULL;
+		}
+		
 		if (empty($quarter))
 		{
 			$quarter_where = ' AND (quarter IS NULL OR LENGTH(quarter) = 0)';

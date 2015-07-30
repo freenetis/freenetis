@@ -262,9 +262,29 @@ class Kohana {
 			// Make sure the controller class exists
 			class_exists($controller, FALSE) or Event::run('system.404');
 
+			// Build reflection object
+			$reflection = new ReflectionClass($controller);
+			
+			// Get and filter methods (#594)
+			$methods = array();
+			$p_methods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
+			$s_methods = $reflection->getMethods(ReflectionMethod::IS_STATIC);
+			$p_methods = array_diff($p_methods, $s_methods);
+			
+			foreach ($p_methods as $v)
+			{
+				if (!text::starts_with($v->name, 'valid_'))
+					$methods[] = $v->name;
+			}
+			
+			unset($p_methods);
+			unset($s_methods);
+			unset($reflection);
+			
 			// Find the unique controller methods
-			$methods = array_diff(get_class_methods($controller), get_class_methods('Controller_Core'));
-
+			$methods = array_diff($methods, get_class_methods('Controller_Core'));
+			$methods = array_diff($methods, get_class_methods('Controller'));
+			
 			// If there are no methods in the controller, it's invalid
 			empty($methods) and Event::run('system.404');
 

@@ -41,7 +41,7 @@ class Approval_template_item_Model extends ORM
 		return $this->db->query("
 				SELECT i.id as item_id, i.priority, i.approval_template_id, t.id,
 					t.name, ag.id AS group_id, ag.name AS group_name, t.type, 
-					t.interval, t.min_suggest_amount
+					t.interval, t.min_suggest_amount, t.one_vote
 				FROM approval_template_items i
 				LEFT JOIN approval_types t ON t.id = i.approval_type_id
 				LEFT JOIN aro_groups ag ON t.aro_group_id = ag.id
@@ -102,17 +102,16 @@ class Approval_template_item_Model extends ORM
 	 * Function to check if user have rights to vote
 	 *
 	 * @author Ondřej Fibich
-	 * @param integer $work_id
+	 * @param object $object Job or Request
+	 * @param integer $object_type Vote_Model::WORK or Vote_Model::REQUEST
 	 * @param integer $user_id
 	 * @param double $suggest_amount
 	 * @return boolean
 	 */
 	public function check_user_vote_rights(
-			$work_id, $user_id, $suggest_amount = NULL)
-	{
-		$work = new Job_Model($work_id);
-		
-		if (!$work || !$work->id || $work->state > 1)
+			$object, $object_type, $user_id, $suggest_amount)
+	{	
+		if (!is_object($object) || !$object || !$object->id || $object->state > 1)
 		{
 			return FALSE;
 		}
@@ -121,16 +120,9 @@ class Approval_template_item_Model extends ORM
 		
 		$cond = '';
 		
-		// if suggested amount is empty get it from work/report
-		if (empty($suggest_amount))
+		if ($suggest_amount)
 		{
-			$suggest_amount = $work->suggest_amount;
-
-			// gets suggested amount of whole report
-			if ($work->job_report_id)
-			{
-				$suggest_amount = $work->job_report->get_suggest_amount();
-			}
+			$cond = ' AND t.min_suggest_amount <= '.intval($suggest_amount);
 		}
 
 		$groups = $this->db->query("
@@ -138,9 +130,9 @@ class Approval_template_item_Model extends ORM
 				FROM approval_template_items i
 				LEFT JOIN approval_types t ON i.approval_type_id = t.id
 				LEFT JOIN aro_groups a ON t.aro_group_id = a.id
-				WHERE i.approval_template_id = ? AND t.min_suggest_amount <= ?
+				WHERE i.approval_template_id = ? $cond
 				ORDER BY i.priority DESC
-		", $work->approval_template_id, $suggest_amount);
+		", $object->approval_template_id);
 		
 		// group by priority
 		
@@ -155,7 +147,6 @@ class Approval_template_item_Model extends ORM
 		
 		// check each group from most priority
 		
-		$job = new Job_Model();
 		$vote = new Vote_Model();
 		$counter = 0;
 		
@@ -169,8 +160,8 @@ class Approval_template_item_Model extends ORM
 			{
 				$ids[] = $item->id;
 				
-				$item_state = $work->get_state(
-						Vote_Model::WORK,
+				$item_state = Vote_Model::get_state(
+						$object,
 						$item->approval_type_id
 				);
 				
@@ -207,7 +198,7 @@ class Approval_template_item_Model extends ORM
 			// if this is last group of voters, enable edit vote
 			else if ($in_group && (
 						(count($group_by_priority) == $counter) ||
-						!$vote->has_user_voted_about($user_id, $work->id)
+						!$vote->has_user_voted_about($user_id, $object->id, $object_type)
 					))
 			{
 				return TRUE;
@@ -308,6 +299,7 @@ class Approval_template_item_Model extends ORM
 				LEFT JOIN groups_aro_map g ON t.aro_group_id = g.group_id
 				WHERE i.approval_template_id = ? $cond
 				GROUP BY g.aro_id
+				HAVING g.aro_id IS NOT NULL
 		", array($template_id));
 	}
 

@@ -4,6 +4,7 @@
 	echo html::anchor('contacts/add/' . $user_id, __('Add contact'), array('title' => __('Add contact'), 'class' => 'popup_link')) . "<br /><br />" ?>
 <?php echo $grid_contacts; ?>
 
+<?php if (Settings::get('phone_invoices_enabled')): ?>
 <br /><br />
 <h2><?php echo __('Private user contacts'); ?></h2><br />
 <p><?php echo __('Private phone contacts of user, which are used in telephone invoices'); ?>.</p>
@@ -15,3 +16,4 @@
 	<br /><br />
 	<?php echo $grid_private_contacts; ?>
 <?php endif; ?>
+<?php endif ?>

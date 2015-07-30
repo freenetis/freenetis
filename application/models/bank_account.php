@@ -24,12 +24,51 @@
  * @property integer $bank_nr
  * @property string $IBAN
  * @property string $SWIFT
+ * @property integer $type
+ * @property string $settings
  * @property ORM_Iterator $accounts
  */
 class Bank_account_Model extends ORM
 {
+	// type of bank account (bank)
+	/** Other (unknown) bank account */
+	const TYPE_OTHER			= 0;
+	/* FIO bank account */
+	const TYPE_FIO				= 1;
+	/** Unicredit bank account */
+	const TYPE_UNICREDIT		= 2;
+	/** Raiffeisenbank */
+	const TYPE_RAIFFEISENBANK	= 3;
+	
+	/** 
+	 * Type message names
+	 *
+	 * @var array
+	 */
+	private static $type_name = array
+	(
+		self::TYPE_OTHER			=> '',
+		self::TYPE_FIO				=> 'FIO',
+		self::TYPE_UNICREDIT		=> 'UniCredit',
+		self::TYPE_RAIFFEISENBANK	=> 'Raiffeisebank'
+	);
+	
+	// db relations
 	protected $belongs_to = array('member');
 	protected $has_and_belongs_to_many = array('accounts');
+	
+	/**
+	 * Get settings driver for managing of bank account settings.
+	 * 
+	 * @return BankAccountSettings
+	 * @throws InvalidArgumentException On unsuported type of bank account
+	 */
+	public function get_settings_driver()
+	{
+		$driver = Bank_Account_Settings::factory($this->type);
+		$driver->load_column_data($this->settings);
+		return $driver;
+	}
 
 	/**
 	 * Contruct of app, shutdown action logs by default
@@ -41,6 +80,31 @@ class Bank_account_Model extends ORM
 
 		// disable action log
 		$this->set_logger(FALSE);
+	}
+	
+	/**
+	 * Types of bank account (key is type, value is name).
+	 * 
+	 * @return array
+	 */
+	public static function get_type_names()
+	{
+		return self::$type_name;
+	}
+	
+	/**
+	 * Type of bank account type name.
+	 * 
+	 * @return string|null
+	 */
+	public static function get_type_name($type)
+	{
+		if (isset(self::$type_name[$type]))
+		{
+			return self::$type_name[$type];
+		}
+		
+		return NULL;
 	}
 
 	/**
@@ -74,7 +138,8 @@ class Bank_account_Model extends ORM
 	{	
 		return $this->db->query("
 				SELECT ba.id, ba.name AS baname, m.name AS mname,
-					CONCAT(ba.account_nr, '/', ba.bank_nr) AS account_number
+					CONCAT(ba.account_nr, '/', ba.bank_nr) AS account_number,
+					ba.type, ba.settings
 				FROM bank_accounts ba
 				LEFT JOIN members m ON m.id = ba.member_id
 				WHERE ba.member_id = 1
@@ -88,7 +153,7 @@ class Bank_account_Model extends ORM
 	public function get_bank_accounts(
 			$limit_from = 0, $limit_results = 20,
 			$order_by = 'id', $order_by_direction = 'asc',
-			$filter_values = array())
+			$filter_sql = '')
 	{
 		$where = '';
 		// order by direction check
@@ -97,26 +162,14 @@ class Bank_account_Model extends ORM
 			$order_by_direction = 'asc';
 		}
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach($filter_values as $key => $value)
-			{
-				if($key != 'submit')
-				{
-					if ($key == 'name')
-					{
-						$key = 'ba.name';
-					}
-					$where .= ' AND '.$this->db->escape_column($key).' LIKE '
-							. $this->db->escape("%$value%")
-							. ' COLLATE utf8_general_ci';
-				}
-			}
+			$where = "AND $filter_sql";
 		}
 		// query
 		return $this->db->query("
 				SELECT ba.id, ba.name AS baname, ba.account_nr, ba.bank_nr,
-					m.name AS member_name, ba.member_id
+					m.name AS member_name, ba.member_id, ba.type, ba.settings
 				FROM bank_accounts ba
 				LEFT JOIN members m ON m.id = ba.member_id
 				WHERE ba.member_id <> 1 $where
@@ -129,23 +182,13 @@ class Bank_account_Model extends ORM
 	 * It counts bank accounts except bank accounts of association.
 	 * @return integer
 	 */
-	public function count_bank_accounts($filter_values = array())
+	public function count_bank_accounts($filter_sql = '')
 	{
 		$where = '';
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach($filter_values as $key => $value)
-			{
-				if($key != 'submit')
-				{
-					if ($key == 'name')
-						$key = 'ba.name';
-					$where .= ' AND '.$this->db->escape_column($key)
-							. ' LIKE ' . $this->db->escape("%$value%")
-							. ' COLLATE utf8_general_ci';
-				}
-			}
+			$where = "AND $filter_sql";
 		}
 		// query
 		return $this->db->query("

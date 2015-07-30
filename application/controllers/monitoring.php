@@ -18,6 +18,16 @@
  */
 class Monitoring_Controller extends Controller
 {
+	/**
+	 * Only enable if notification enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+	    if (!module::e('monitoring'))
+			self::error(ACCESS);
+	}
 	
 	/**
 	 * Index method - only redirect to list of all monitored hosts
@@ -36,8 +46,14 @@ class Monitoring_Controller extends Controller
 	 * @param type $priority
 	 * @param string $group_by 
 	 */
-	public function show_all($priority = 1, $group_by = 'all')
+	public function show_all($priority = 1, $group_by = '')
 	{	
+		// access control
+		if (!$this->acl_check_view('Monitoring_Controller', 'monitoring'))
+		{
+			Controller::error (ACCESS);
+		}
+		
 		// definition options for group by
 		$group_by_options = array
 		(
@@ -73,6 +89,30 @@ class Monitoring_Controller extends Controller
 			'town_id'			=> __('Town'),
 			'address_point_id'	=> __('Address point')
 		);
+		
+		$user_model = new User_Model($this->user_id);
+		$group_by_setting = $user_model->get_user_setting(User_Model::SETTINGS_MONITORING_GROUP_BY);
+		
+		// empty value in users settings
+		if (!empty($group_by_setting))
+		{
+			// use database settings if not set explicitly
+			if (empty($group_by))
+			{
+				$group_by = $group_by_setting;
+			}
+		}
+		// empty value in users settings
+		else
+		{
+			$group_by = 'all';
+		}
+		
+		// update database settings
+		if ($group_by != $group_by_setting)
+		{
+			$user_model->set_user_setting(User_Model::SETTINGS_MONITORING_GROUP_BY, $group_by);
+		}
 		
 		$form->dropdown('group_by')
 			->options($group_by_options_values)
@@ -253,6 +293,13 @@ class Monitoring_Controller extends Controller
 		
 		$title = __('Monitoring');
 		
+		$count_down_devices = ORM::factory('preprocessor')->count_off_down_devices();
+		
+		if ($count_down_devices > 0)
+		{
+			$title .= " ($count_down_devices)";
+		}
+		
 		$view = new View('main');
 		$view->title = $title;
 		$view->content = new View('monitoring/show_all');
@@ -260,6 +307,7 @@ class Monitoring_Controller extends Controller
 		$view->content->filter_form = $filter_form;
 		$view->content->grids = $grids;
 		$view->content->labels = $labels;
+		$view->content->title = $title;
 		$view->render(TRUE);
 	}
 	
@@ -280,6 +328,13 @@ class Monitoring_Controller extends Controller
 		// record doesn't exist
 		if (!$monitor_host->id)
 			Controller::error (RECORD);
+		
+		// access control
+		if (!$this->acl_check_view('Monitoring_Controller', 'monitoring',
+			$monitor_host->device->user->member_id))
+		{
+			Controller::error(ACCESS);
+		}
 		
 		$title = __('Monitoring detail of device').' '.$monitor_host->device->name;
 		
@@ -307,6 +362,13 @@ class Monitoring_Controller extends Controller
 		// record doesn't exist
 		if (!$monitor_host->id)
 			Controller::error(RECORD);
+		
+		// access control
+		if (!$this->acl_check_edit('Monitoring_Controller', 'monitoring',
+			$monitor_host->device->user->member_id))
+		{
+			Controller::error(ACCESS);
+		}
 
 		$form = new Forge();
 
@@ -337,7 +399,8 @@ class Monitoring_Controller extends Controller
 			catch(Exception $e)
 			{
 				$monitor_host->transaction_rollback();
-				status::error('Error - Cannot update monitoring.');
+				Log::add_exception($e);
+				status::error('Error - Cannot update monitoring.', $e);
 			}
 
 			$this->redirect(Path::instance()->previous());
@@ -373,6 +436,13 @@ class Monitoring_Controller extends Controller
 		if (!$monitor_host->id)
 			Controller::error(RECORD);
 		
+		// access control
+		if (!$this->acl_check_delete('Monitoring_Controller', 'monitoring',
+			$monitor_host->device->user->member_id))
+		{
+			Controller::error(ACCESS);
+		}
+		
 		// do everything in transaction
 		try
 		{
@@ -386,7 +456,8 @@ class Monitoring_Controller extends Controller
 		catch(Exception $e)
 		{
 			$monitor_host->transaction_rollback();
-			status::error('Error - Cannot update monitoring.');
+			Log::add_exception($e);
+			status::error('Error - Cannot update monitoring.', $e);
 		}
 
 		$this->redirect(Path::instance()->previous());
@@ -445,13 +516,29 @@ class Monitoring_Controller extends Controller
 
 		if (!$action)
 		{
+			$action_options = array();
+			
+			// access control
+			if ($this->acl_check_new('Monitoring_Controller', 'monitoring',
+				$device->user->member_id))
+			{
+				$action_options['add'] = __('Add');
+			}
+			
+			if ($this->acl_check_edit('Monitoring_Controller', 'monitoring',
+				$device->user->member_id))
+			{
+				$action_options['edit'] = __('Edit');
+			}
+			
+			if ($this->acl_check_delete('Monitoring_Controller', 'monitoring',
+				$device->user->member_id))
+			{
+				$action_options['delete'] = __('Delete');
+			}
+			
 			$form->dropdown('action')
-				->options(array
-				(
-					'add' => __('Add'),
-					'edit' => __('Edit'),
-					'delete' => __('Delete')
-				));
+				->options($action_options);
 		}
 		
 		if (!$action || ($action && $action != 'delete'))
@@ -481,7 +568,6 @@ class Monitoring_Controller extends Controller
 				{
 					// adds device(s) to monitoring
 					case 'add':
-						
 						// removes already monitored devices
 						$device_ids = array_diff(
 							$device_ids,
@@ -513,7 +599,8 @@ class Monitoring_Controller extends Controller
 			catch(Exception $e)
 			{
 				$monitor_host_model->transaction_rollback();
-				status::error('Error - Cannot update monitoring.');
+				Log::add_exception($e);
+				status::error('Error - Cannot update monitoring.', $e);
 			}
 
 			$this->redirect(Path::instance()->previous());
@@ -531,5 +618,3 @@ class Monitoring_Controller extends Controller
 		}
 	}
 }
-
-?>

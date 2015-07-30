@@ -67,7 +67,7 @@ class Bank_transfer_Model extends ORM
 	 */
 	public function get_bank_transfers(
 			$ba_id = null, $limit_from = 0, $limit_results = 20, $order_by = 'id',
-			$order_by_direction = 'DESC', $filter_values = array())
+			$order_by_direction = 'DESC', $filter_sql = '')
 	{
 		$where = '';
 		// order by check
@@ -85,15 +85,9 @@ class Bank_transfer_Model extends ORM
 			$order_by_direction = 'asc';
 		}
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach($filter_values as $key => $value)
-			{
-				if ($key != 'submit' && $this->has_column($key))
-				{
-					$where .= ' AND '.$key.' LIKE \'%'.$value.'%\' COLLATE utf8_general_ci';
-				}
-			}
+			$where = "AND $filter_sql";
 		}
 		// query
 		return $this->db->query("
@@ -105,7 +99,7 @@ class Bank_transfer_Model extends ORM
 				LEFT JOIN transfers t ON t.id = bt.transfer_id
 				WHERE (bt.origin_id = ? OR bt.destination_id = ?)
 				$where
-				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
+				ORDER BY $order_by $order_by_direction
 				LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
 		", array($ba_id, $ba_id, $ba_id, $ba_id));
 	}
@@ -117,19 +111,12 @@ class Bank_transfer_Model extends ORM
 	 * @param $account_id
 	 * @return integer
 	 */
-	public function count_bank_transfers($ba_id, $filter_values = array())
+	public function count_bank_transfers($ba_id, $filter_sql = '')
 	{
 		$where = '';
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach($filter_values as $key => $value)
-			{
-				if ($key != 'submit' && $this->has_column($key))
-				{
-					$where .= ' AND '.$key.' LIKE ' . $this->db->escape("%$value%")
-							. ' COLLATE utf8_general_ci';
-				}
-			}
+			$where = "AND $filter_sql";
 		}
 		// query
 		return $this->db->query("
@@ -137,7 +124,7 @@ class Bank_transfer_Model extends ORM
 				FROM bank_transfers bt
 				LEFT JOIN bank_accounts ba ON ba.id = IF (bt.origin_id = ?, bt.destination_id, bt.origin_id)
 				LEFT JOIN transfers t ON t.id = bt.transfer_id
-				WHERE bt.origin_id = ? OR bt.destination_id = ?
+				WHERE (bt.origin_id = ? OR bt.destination_id = ?)
 				$where						
 		", array($ba_id, $ba_id, $ba_id))->current()->total;		
 	}
@@ -316,7 +303,7 @@ class Bank_transfer_Model extends ORM
 	 */
 	public function get_unidentified_transfers(
 			$limit_from = 0, $limit_results = 500, $order_by = 'id',
-			$order_by_direction = 'asc', $filter_values = array())
+			$order_by_direction = 'asc', $filter_sql = "")
 	{
 		$where = '';
 		// order by direction check
@@ -325,32 +312,11 @@ class Bank_transfer_Model extends ORM
 			$order_by_direction = 'asc';
 		}
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach($filter_values as $key => $value)
-			{
-				if ($key != 'submit')
-				{
-					if ($key == 'name')
-					{
-						$key = 'ba.name';
-					}
-					
-					if ($where == '')
-					{
-						$where .= 'WHERE ' . $this->db->escape_column($key)
-								. ' LIKE ' . $this->db->escape("%$value%")
-								. ' COLLATE utf8_general_ci';
-					}
-					else
-					{
-						$where .= ' AND ' . $this->db->escape_column($key)
-								. ' LIKE ' . $this->db->escape("%$value%")
-								. ' COLLATE utf8_general_ci';
-					}
-				}
-			}
+			$where = "WHERE $filter_sql";
 		}
+		
 		// srct contains all source transactions, asst contains all transfers assigned to credit accounts
 		return $this->db->query("
 				SELECT srct.id, srct.datetime, srct.amount, srct.text,
@@ -373,36 +339,16 @@ class Bank_transfer_Model extends ORM
 	 * 
 	 * @return integer
 	 */
-	public function count_unidentified_transfers($filter_values = array())
+	public function count_unidentified_transfers($filter_sql = "")
 	{
 		$where = '';
+		
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach($filter_values as $key => $value)
-			{
-				if ($key != 'submit')
-				{
-					if ($key == 'name')
-					{
-						$key = 'ba.name';
-					}
-					
-					if ($where == '')
-					{
-						$where .= 'WHERE ' . $this->db->escape_column($key)
-								. ' LIKE ' . $this->db->escape("%$value%")
-								. ' COLLATE utf8_general_ci';
-					}
-					else
-					{
-						$where .= ' AND ' . $this->db->escape_column($key)
-								. ' LIKE ' . $this->db->escape("%$value%")
-								. ' COLLATE utf8_general_ci';
-					}
-				}
-			}
+			$where = "WHERE $filter_sql";
 		}
+		
 		// filter
 	    return $this->db->query("
 				SELECT COUNT(srct.id) as total
@@ -414,7 +360,6 @@ class Bank_transfer_Model extends ORM
 				LEFT JOIN bank_accounts ba ON ba.id = bt.origin_id
 				$where
 		", array(Account_attribute_Model::MEMBER_FEES))->current()->total;
-
 	}
 	
 	/**
@@ -475,17 +420,17 @@ class Bank_transfer_Model extends ORM
 			return false;
 		}
 		
-		$cond_number="";
-		$cond_vs="IS NULL";
+		$cond_number = '';
+		$cond_vs = 'IS NULL';
 		
 		if (!empty($data->variable_symbol))
 		{
-			$cond_vs="=$data->variable_symbol";
+			$cond_vs = '=' . $this->db->escape_str($data->variable_symbol);
 		}
 		
 		if (!empty($data->number))
 		{
-			$cond_number="AND bt.number=$data->number";
+			$cond_number = 'AND bt.number=' . $this->db->escape($data->number);
 		}
 		
 		return $this->db->query("
@@ -519,12 +464,14 @@ class Bank_transfer_Model extends ORM
 			return array();
 		}
 		
+		$codes = implode(',', array_map('intval', $transaction_codes));
+		
 		$duplicities = $this->db->query("
 				SELECT bt.transaction_code
 				FROM bank_transfers bt
 				LEFT JOIN bank_statements bs ON bs.id = bt.bank_statement_id
 				LEFT JOIN bank_accounts ba ON ba.id = bs.bank_account_id
-				WHERE bt.transaction_code IN (" . implode(",", $transaction_codes) . ")
+				WHERE bt.transaction_code IN (" . $codes . ")
 					AND ba.id = ?
 		", $bank_account_id);
 		
@@ -536,6 +483,30 @@ class Bank_transfer_Model extends ORM
 		}
 		
 		return $duplicate_transaction_codes;
+	}
+	
+	/**
+	 * Gets last transaction code of the given bank account.
+	 * 
+	 * @see Fio_Bank_Statement_Importer
+	 * @param integer $bank_account_id
+	 * @return integer|null
+	 */
+	public function get_last_transaction_code_of($bank_account_id)
+	{
+		$result = $this->db->query("
+				SELECT MAX(bt.transaction_code) AS last_tc
+				FROM bank_transfers bt
+				JOIN bank_statements bs ON bt.bank_statement_id = bs.id
+				WHERE bs.bank_account_id = ?
+		", $bank_account_id);
+		
+		if ($result->count())
+		{
+			return $result->current()->last_tc;
+		}
+		
+		return NULL;
 	}
 
 }

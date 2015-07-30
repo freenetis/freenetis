@@ -20,6 +20,18 @@
 class Device_templates_Controller extends Controller
 {
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Index redirects to show all
 	 */
 	public function index()
@@ -33,7 +45,7 @@ class Device_templates_Controller extends Controller
 	public function show_all()
 	{
 		// access check
-		if (!$this->acl_check_view('Devices_Controller', 'devices'))
+		if (!$this->acl_check_view('Device_templates_Controller', 'device_template'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -51,12 +63,13 @@ class Device_templates_Controller extends Controller
 				'use_selector'	=> false
 		));
 
-		if ($this->acl_check_new('Devices_Controller', 'devices'))
+		if ($this->acl_check_new('Device_templates_Controller', 'device_template'))
 		{
 			$grid->add_new_button('device_templates/add', 'Add new template');
 			$grid->add_new_button('device_templates/import_from_file', 'Import device templates');
-			$grid->add_new_button('device_templates/export_to_json', 'Export device templates');
 		}
+		
+		$grid->add_new_button('device_templates/export_to_json', 'Export device templates');
 
 		$grid->field('id')
 				->label('ID');
@@ -75,14 +88,14 @@ class Device_templates_Controller extends Controller
 				->icon_action('show')
 				->url('device_templates/show');
 		
-		if ($this->acl_check_edit('Devices_Controller', 'devices'))
+		if ($this->acl_check_edit('Device_templates_Controller', 'device_template'))
 		{
 			$actions->add_action()
 					->icon_action('edit')
 					->url('device_templates/edit');
 		}
 		
-		if ($this->acl_check_delete('Devices_Controller', 'devices'))
+		if ($this->acl_check_delete('Device_templates_Controller', 'device_template'))
 		{			
 			$actions->add_action()
 					->icon_action('delete')
@@ -122,7 +135,7 @@ class Device_templates_Controller extends Controller
 		}
 		
 		// check acess
-		if (!$this->acl_check_view('Devices_Controller', 'devices'))
+		if (!$this->acl_check_view('Device_templates_Controller', 'device_template'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -135,12 +148,46 @@ class Device_templates_Controller extends Controller
 			Controller::error(RECORD);
 		}		
 		
+		$device_active_link = new Device_active_link_Model();
+		$active_links = $device_active_link->get_device_active_links(
+				$device_template_id,
+				Device_active_link_Model::TYPE_TEMPLATE
+		);
+		
+		$active_links_grid = new Grid('devices', null, array
+		(
+			'use_paginator'	   			=> false,
+			'use_selector'	   			=> false,
+			'total_items'				=> $active_links->count()
+		));
+		
+		$active_links_grid->Field('id')
+				->label('ID');
+		
+		$active_links_grid->Field('url_pattern')
+				->label('URL pattern');
+		
+		$active_links_grid->Field('name');
+		
+		$active_links_grid->Field('title');
+		
+		if ($this->acl_check_view('Device_active_links_Controller', 'active_links'))
+		{
+			$actions = $active_links_grid->grouped_action_field();
+			
+			$actions->add_action('id')
+					->icon_action('show')
+					->url('device_active_links/show');
+		}
+		
+		$active_links_grid->datasource($active_links);
+		
 		$headline = $device_templates_model->name . ' (' . $device_template_id . ')';
 		
 		// bread crumbs
 		$breadcrumbs = breadcrumbs::add()
 				->link('device_templates/show_all', 'Devices templates',
-						$this->acl_check_view('Devices_Controller', 'devices'))
+						$this->acl_check_view('Device_templates_Controller', 'device_template'))
 				->disable_translation()
 				->text($headline)
 				->html();
@@ -153,6 +200,7 @@ class Device_templates_Controller extends Controller
 		$view->content->device_template = $device_templates_model;
 		$view->content->iface_model = new Iface_Model();
 		$view->content->ivals = $device_templates_model->get_value();
+		$view->content->active_links_grid = $active_links_grid;
 		$view->render(TRUE);
 	}
 
@@ -164,7 +212,7 @@ class Device_templates_Controller extends Controller
 	public function add($enum_type_id = NULL)
 	{
 		// check access
-		if (!$this->acl_check_new('Devices_Controller', 'devices'))
+		if (!$this->acl_check_new('Device_templates_Controller', 'device_template'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -176,6 +224,21 @@ class Device_templates_Controller extends Controller
 			NULL => '---- ' . __('Select type') . ' ----'
 		) + $et_model->get_values(Enum_type_Model::DEVICE_TYPE_ID);
 
+		// Device active links
+		$device_active_links_model = new Device_active_link_Model();
+		
+		$all_active_links = $device_active_links_model->get_all_active_links();
+		
+		$active_links = array();
+		
+		foreach($all_active_links AS $active_link)
+		{
+			if (!$active_link->name)
+				$active_links[$active_link->id] = $active_link->title;
+			else
+				$active_links[$active_link->id] = $active_link->name.' ('.$active_link->title.')';
+		}
+		
 		// form
 		$form = new Forge();
 
@@ -195,6 +258,12 @@ class Device_templates_Controller extends Controller
 		
 		$form->checkbox('default')
 				->label('Default for this device type?');
+		
+		$form->dropdown('active_links_select[]')
+				->label('Device active links')
+				->options($active_links)
+				->multiple('multiple')
+				->size(10);
 		
 		// eth
 		
@@ -240,6 +309,7 @@ class Device_templates_Controller extends Controller
 			// data
 			$form_data = $form->as_array(FALSE);
 			$vals = $_POST['values'];
+			$vals['default_iface'] = @$_POST['default_iface'];
 			
 			// parse values
 			$this->validate_form_value($vals);
@@ -269,7 +339,14 @@ class Device_templates_Controller extends Controller
 					$tdefault->save();
 				}
 			}
-
+			
+			// map to device active links
+			$device_active_links_model->map_device_to_active_links(
+					$device_template_model,
+					$form_data['active_links_select'],
+					Device_active_link_Model::TYPE_TEMPLATE
+			);
+			
 			// clean
 			unset($vals);
 			unset($form_data);
@@ -286,7 +363,7 @@ class Device_templates_Controller extends Controller
 			// bread crumbs
 			$breadcrumbs = breadcrumbs::add()
 					->link('device_templates/show_all', 'Device templates',
-							$this->acl_check_view('Devices_Controller', 'devices'))
+							$this->acl_check_view('Device_templates_Controller', 'device_template'))
 					->disable_translation()
 					->text($headline)
 					->html();								
@@ -316,7 +393,7 @@ class Device_templates_Controller extends Controller
 		}
 		
 		// check access
-		if (!$this->acl_check_delete('Devices_Controller', 'devices'))
+		if (!$this->acl_check_edit('Device_templates_Controller', 'device_template'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -340,6 +417,32 @@ class Device_templates_Controller extends Controller
 		// values
 		$ivals = $device_template_model->get_value();
 		
+		// Device active links
+		$device_active_links_model = new Device_active_link_Model();
+		
+		$all_active_links = $device_active_links_model->get_all_active_links();
+		$all_selected_active_link = $device_active_links_model->get_device_active_links(
+						$device_templates_id,
+						Device_active_link_Model::TYPE_TEMPLATE
+		);
+		
+		$active_links = array();
+		
+		foreach($all_active_links AS $active_link)
+		{
+			if (!$active_link->name)
+				$active_links[$active_link->id] = $active_link->title;
+			else
+				$active_links[$active_link->id] = $active_link->name.' ('.$active_link->title.')';
+		}
+		
+		$selected_active_links = array();
+		
+		foreach ($all_selected_active_link AS $active_link)
+		{
+			$selected_active_links[] = $active_link->id;
+		}
+		
 		// form
 		$form = new Forge('device_templates/edit/' . $device_templates_id);
 
@@ -361,6 +464,14 @@ class Device_templates_Controller extends Controller
 		$form->checkbox('default')
 				->label('Default for this device type?')
 				->checked($device_template_model->default);
+		
+		$form->dropdown('active_links[]')
+				->label('Device active links')
+				->options($active_links)
+				->selected($selected_active_links)
+				->multiple('multiple')
+				->size(10);
+		
 		
 		// eth
 		
@@ -416,6 +527,7 @@ class Device_templates_Controller extends Controller
 			// data
 			$form_data = $form->as_array(FALSE);
 			$vals = $_POST['values'];
+			$vals['default_iface'] = @$_POST['default_iface'];
 			
 			// parse values
 			$this->validate_form_value($vals);
@@ -444,6 +556,17 @@ class Device_templates_Controller extends Controller
 					$tdefault->save();
 				}
 			}
+			
+			$device_active_links_model->unmap_device_from_active_links(
+					$device_templates_id,
+					Device_active_link_Model::TYPE_TEMPLATE
+			);
+			
+			$device_active_links_model->map_device_to_active_links(
+					$device_templates_id,
+					$form_data['active_links'],
+					Device_active_link_Model::TYPE_TEMPLATE
+			);
 
 			// clean
 			unset($vals);
@@ -460,11 +583,11 @@ class Device_templates_Controller extends Controller
 		// bread crumbs
 		$breadcrumbs = breadcrumbs::add()
 				->link('device_templates/show_all', 'Device templates',
-						$this->acl_check_view('Devices_Controller', 'devices'))
+						$this->acl_check_view('Device_templates_Controller', 'device_template'))
 				->disable_translation()
 				->link('device_templates/show/' . $device_templates_id,
 						$device_template_model->name . ' (' . $device_templates_id . ')',
-						$this->acl_check_view('Devices_Controller', 'devices'))
+						$this->acl_check_view('Device_templates_Controller', 'device_template'))
 				->text($headline)
 				->html();
 
@@ -492,7 +615,7 @@ class Device_templates_Controller extends Controller
 		}
 		
 		// check access
-		if (!$this->acl_check_delete('Devices_Controller', 'devices'))
+		if (!$this->acl_check_delete('Device_templates_Controller', 'device_template'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -528,7 +651,7 @@ class Device_templates_Controller extends Controller
 	public function import_from_file()
 	{
 		// check acess
-		if (!$this->acl_check_view('Devices_Controller', 'devices'))
+		if (!$this->acl_check_new('Device_templates_Controller', 'device_template'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -546,7 +669,7 @@ class Device_templates_Controller extends Controller
 		// bread crumbs
 		$breadcrumbs = breadcrumbs::add()
 				->link('device_templates/show_all', 'Device templates',
-						$this->acl_check_view('Devices_Controller', 'devices'))
+						$this->acl_check_view('Device_templates_Controller', 'device_template'))
 				->disable_translation()
 				->text($headline)
 				->html();
@@ -612,7 +735,7 @@ class Device_templates_Controller extends Controller
 							$device_template_model->values = json_encode($template->values);
 							$device_template_model->default = $template->default;
 							
-							$device_template_model->save();
+							$device_template_model->save_throwable();
 							
 							// remove old defauts
 							if ($template->default)
@@ -627,7 +750,7 @@ class Device_templates_Controller extends Controller
 								foreach ($tdefaults as $tdefault)
 								{
 									$tdefault->default = 0;
-									$tdefault->save();
+									$tdefault->save_throwable();
 								}
 							}
 
@@ -667,9 +790,9 @@ class Device_templates_Controller extends Controller
 				// bread crumbs
 				$breadcrumbs = breadcrumbs::add()
 						->link('device_templates/show_all', 'Device templates',
-								$this->acl_check_view('Devices_Controller', 'devices'))
+								$this->acl_check_view('Device_templates_Controller', 'device_template'))
 						->link('device_templates/import_from_file', 'Upload device templates',
-								$this->acl_check_view('Devices_Controller', 'devices'))
+								$this->acl_check_view('Device_templates_Controller', 'device_template'))
 						->text('Import results')
 						->html();
 			}
@@ -704,7 +827,7 @@ class Device_templates_Controller extends Controller
 	public function export_to_json()
 	{
 		// check acess
-		if (!$this->acl_check_view('Devices_Controller', 'devices'))
+		if (!$this->acl_check_view('Device_templates_Controller', 'device_template'))
 		{
 			Controller::error(ACCESS);
 		}

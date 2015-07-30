@@ -19,6 +19,18 @@
  */
 class Device_engineers_Controller extends Controller
 {
+	
+	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
 
 	/**
 	 * Adds engineer to device (creates relation between engineer and device).
@@ -67,45 +79,59 @@ class Device_engineers_Controller extends Controller
 			$form_data = $form->as_array();
 
 			$device_engineer = new Device_engineer_Model();
-			$device_engineer->user_id = $form_data['user_id'];
-			$device_engineer->device_id = $device_id;
-			unset($form_data);
 			
-			if ($device_engineer->save())
+			try
 			{
+				$device_engineer->transaction_start();
+				
+				$device_engineer->user_id = $form_data['user_id'];
+				$device_engineer->device_id = $device_id;
+
+				$device_engineer->save_throwable();
+				
+				$device_engineer->transaction_commit();
 				status::success('New device engineer has been successfully saved.');
-				url::redirect(url_lang::base() . 'devices/show/' . $device_id);
 			}
+			catch (Exception $e)
+			{
+				$device_engineer->transaction_rollback();
+				status::error('Error - Cannot add new device engineer.', $e);
+				Log::add_exception($e);
+			}
+			
+			$this->redirect('devices/show/', $device_id);
 		}
-		
-		$header = __('Add new device engineer');
-		
-		// breadcrumbs navigation
-		$breadcrumbs = breadcrumbs::add()
-				->link('members/show_all', 'Members',
-						$this->acl_check_view('Members_Controller', 'members'))
-				->link('members/show/' . $device->user->member->id,
-						'ID ' . $device->user->member->id . ' - ' . $device->user->member->name,
-						$this->acl_check_view('Members_Controller', 'members', $device->user->member->id))
-				->link('users/show_by_member/' . $device->user->member_id, 'Users',
-						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
-				->link('users/show/' . $device->user->id,
-						$device->user->name . ' ' . $device->user->surname . ' (' . $device->user->login . ')',
-						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
-				->link('devices/show_by_user/' . $device->user_id,'Devices',
-						$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
-				->link('devices/show/' . $device->id,
-						($device->name != '' ? $device->name : $device->id),
-						$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
-				->text('Add new device engineer');
-		
-		$view = new View('main');
-		$view->title = $header;
-		$view->breadcrumbs = $breadcrumbs->html();
-		$view->content = new View('form');
-		$view->content->form = $form->html();
-		$view->content->headline = $header;
-		$view->render(TRUE);
+		else
+		{
+			$header = __('Add new device engineer');
+
+			// breadcrumbs navigation
+			$breadcrumbs = breadcrumbs::add()
+					->link('members/show_all', 'Members',
+							$this->acl_check_view('Members_Controller', 'members'))
+					->link('members/show/' . $device->user->member->id,
+							'ID ' . $device->user->member->id . ' - ' . $device->user->member->name,
+							$this->acl_check_view('Members_Controller', 'members', $device->user->member->id))
+					->link('users/show_by_member/' . $device->user->member_id, 'Users',
+							$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+					->link('users/show/' . $device->user->id,
+							$device->user->name . ' ' . $device->user->surname . ' (' . $device->user->login . ')',
+							$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+					->link('devices/show_by_user/' . $device->user_id,'Devices',
+							$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+					->link('devices/show/' . $device->id,
+							($device->name != '' ? $device->name : $device->id),
+							$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+					->text('Add new device engineer');
+
+			$view = new View('main');
+			$view->title = $header;
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('form');
+			$view->content->form = $form->html();
+			$view->content->headline = $header;
+			$view->render(TRUE);
+		}
 	}
 
 	/**

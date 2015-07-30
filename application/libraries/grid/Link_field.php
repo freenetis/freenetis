@@ -37,6 +37,13 @@ class Link_Field extends Field
 	public $data_name = 'id';
 	
 	/**
+	 * Title of data column
+	 * 
+	 * @var string
+	 */
+	public $data_title = '';
+	
+	/**
 	 * URL to action
 	 *
 	 * @var string
@@ -68,7 +75,7 @@ class Link_Field extends Field
 	 * @param string $url
 	 * @param string $data_name	Name of data field, if empty name is set as data name
 	 */
-	public function link($url, $data_name = NULL)
+	public function link($url, $data_name = NULL, $data_title = NULL)
 	{
 		if (!text::starts_with($url, url::base()))
 		{
@@ -85,6 +92,13 @@ class Link_Field extends Field
 		}
 		
 		$this->data_name = $data_name;
+		
+		if (empty($data_title))
+		{
+			$data_title = $data_name;
+		}
+		
+		$this->data_title = $data_title;
 		
 		if (!empty($data_name))
 		{

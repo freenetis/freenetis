@@ -37,6 +37,7 @@ abstract class Sms
 	 *  name				Name
 	 *  description			Another info about driver for user
 	 *  hostname			Hostname of gateway [optional]
+	 *	help				Translatable help hint string [optional]
 	 *  test_mode_enabled	Indicator of test mode (driver does not send anything)
 	 *
 	 * @var array
@@ -49,6 +50,7 @@ abstract class Sms
 			'name'				=> 'Soundwin V100',
 			'class'				=> 'Soudvinv100',
 			'description'		=> 'GMS',
+			'help'				=> 'sms_driver_soudvinv100',
 			'test_mode_enabled'	=> FALSE,
 		),
 		'KLIKNIAVOLEJ' => array
@@ -58,6 +60,7 @@ abstract class Sms
 			'class'				=> 'Klikniavolej',
 			'description'		=> 'SMS',
 			'hostname'			=> 'kavremote.mobil.cz:80',
+			'help'				=> 'sms_driver_klikniavolej',
 			'test_mode_enabled'	=> TRUE,
 		),
 	);
@@ -149,9 +152,10 @@ abstract class Sms
 	 * Gets name of driver
 	 *
 	 * @param integer $driver	String index of driver or integer ID of driver.
+	 * @param boolean $with_help Should contain name help as well [optional]
 	 * @return string
 	 */
-	public static function get_driver_name($driver)
+	public static function get_driver_name($driver, $with_help = FALSE)
 	{
 		$selected_driver = self::_get_driver_index($driver);
 		
@@ -159,7 +163,15 @@ abstract class Sms
 		{
 			$d = self::$DRIVERS[$selected_driver];
 			
-			return $d['description'] . ' ' . __('Gateway') . ' ' . $d['name'];
+			$name = $d['description'] . ' ' . __('Gateway') . ' ' . $d['name'];
+			
+			// help available?
+			if ($with_help && isset($d['help']))
+			{
+				$name .= ' ' . help::hint($d['help']);
+			}
+			
+			return $name;
 		}
 		
 		return __('Inactive');

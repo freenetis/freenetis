@@ -281,7 +281,7 @@
 		}
     }
 
---></script>
+//--></script>
 
 
 <h2><?php echo __('Import private contact') ?></h2><br />

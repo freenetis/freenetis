@@ -33,6 +33,12 @@ if (isset($_GET['redirect_to']))
 {
     $redirect_to = $_GET['redirect_to'];
 	
+	// if empty then google
+	if (trim($redirect_to) == '')
+	{
+		$redirect_to = 'http://www.google.com';
+	}
+	
 	// split url to segments
 	$url_segments = explode("://", $redirect_to);
 	
@@ -48,7 +54,7 @@ if (isset($_GET['redirect_to']))
 
 // content of redirection message
 $message_query = "
-	SELECT message_id, m.text, m.self_cancel, m.ip_address, m.whitelisted, subnet_name,
+	SELECT message_id, m.text, m.self_cancel, m.ip_address, subnet_name,
 		members.name AS member_name, members.id AS member_id,
 		(
 			SELECT GROUP_CONCAT(vs.variable_symbol) AS variable_symbol
@@ -59,13 +65,13 @@ $message_query = "
 		a.balance, m.comment, ip_address_id
 	FROM
 	(
-		SELECT m.id,message_id,text,self_cancel,ip_address,whitelisted,
+		SELECT m.id,message_id,text,self_cancel,ip_address,
 		subnet_name, m.comment, IFNULL(m.member_id,u.member_id) AS member_id,
 		datetime, ip_address_id
 		FROM
 		(
 			SELECT m.id, m.id AS message_id, m.text, m.self_cancel, ip.ip_address,
-				ip.whitelisted, s.name AS subnet_name, mip.comment, ip.member_id,
+				s.name AS subnet_name, mip.comment, ip.member_id,
 				ip.iface_id AS iface_id, mip.datetime, ip.id AS ip_address_id
 			FROM messages m
 			JOIN messages_ip_addresses mip ON m.id = mip.message_id
@@ -98,7 +104,7 @@ if ($message && count($message) > 0)
 	if ($message['self_cancel'] == 1)
 	{
 		// gets ip addresses and redirection of member
-		$ip_query = "SELECT ip.id AS ip_address_id, ip.ip_address, ip.whitelisted,
+		$ip_query = "SELECT ip.id AS ip_address_id, ip.ip_address,
 					m.id AS message_id, m.name AS message, m.type,
 					".$message['member_id']." AS member_id
 				FROM ip_addresses ip
@@ -156,8 +162,8 @@ if ($suffix_array &&
 <?php if (!empty($redirect_to)): ?>
 <meta http-equiv="Refresh" content="5; url=<?php echo $redirect_to ?>" />
 <?php endif; ?>
-<title>Freenetis</title>
-<?php // echo str_replace('https', 'http', html::stylesheet('media/css/style.css', 'screen')) ?>
+<title>FreenetIS</title>
+<link href="../media/images/favicon.ico" rel="shorcut icon" type="image/x-icon" />
 <link href="../media/css/style.css" rel="stylesheet" type="text/css" />
 <style type="text/css">
 #content-padd h2 {margin: 10px 0px;}

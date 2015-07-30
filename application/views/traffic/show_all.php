@@ -28,9 +28,9 @@
 
 	<?php endif ?>
 	
---></script>
+//--></script>
 
-<h2><?php echo $title ?><div style="float: right; font-weight: normal; font-size: 65%"><?php echo module_state::get_state('logging', TRUE) ?></div></h2><br />
+<h2><?php echo $title ?><div style="float: right; font-weight: normal; font-size: 65%"><?php echo module::get_state('logging', TRUE) ?></div></h2><br />
 
 <ul class="tabs">
     <?php foreach ($this->sections as $url => $name): ?>	

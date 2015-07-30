@@ -185,6 +185,9 @@ class Version
 	 * @throws Old_Mechanism_Exception
 	 *						On old upgrade mechanism
 	 * 
+	 * @throws Not_Enabled_Upgrade_Exception
+	 *						On not enabled upgrade between DB versions
+	 * 
 	 * @throws Exception	On any other error
 	 */
 	public static function make_db_up_to_date()
@@ -245,6 +248,29 @@ class Version
 			// include include file
 			require 'db_upgrades/upgrade_' . $version . '.php';
 			
+			// check if the upgrade is allowed from the current DB version
+			if (isset($upgrade_enabled_only_from[$version]))
+			{
+				if (!is_array($upgrade_enabled_only_from[$version]))
+				{
+					$upgrade_enabled_only_from[$version] = 
+						array($upgrade_enabled_only_from[$version]);
+				}
+				
+				// not listed => not enabled
+				if (!in_array(self::get_db_version(), $upgrade_enabled_only_from[$version]))
+				{
+					$m = __('Database upgrade %s not allowed from version %s.',
+							array($version, self::get_db_version()));
+					// throw error with comment
+					throw new Not_Enabled_Upgrade_Exception($m);
+				}
+				else
+				{
+					Log::add('debug', 'Upgrade ' . $version . ' enabled from (' . self::get_db_version() . ')');
+				}
+			}
+			
 			// check if the upgrade is equvivalent to the current DB version
 			if (isset($upgrade_equal_to[$version]))
 			{
@@ -275,6 +301,8 @@ class Version
 			// function names
 			$f_before = 'upgrade_' . $f_version . '_before';
 			$f_after = 'upgrade_' . $f_version . '_after';
+			// last sql query for error message
+			$last_sql_query = NULL;
 
 			// make update
 			try
@@ -318,6 +346,7 @@ class Version
 						}
 						catch (Exception $ex)
 						{
+							$last_sql_query = $upgrade_sql[$version][$qindex];
 							Settings::set('upgrade_midpoint_error', $qindex);
 							throw $ex;
 						}
@@ -370,8 +399,12 @@ class Version
 			catch (Exception $e)
 			{
 				$message = 'Upgrade DB: ' . $version . '<br /><br />'
-						 . 'Function: ' . $e->getMessage() . '<br />'
-						 . 'Last SQL command: ' . $db->last_query();
+						 . 'Function: ' . $e->getMessage();
+				
+				if (!empty($last_sql_query))
+				{
+					$message .= '<br />Last SQL command: ' . $last_sql_query;
+				}
 
 				throw new Exception($message);
 			}
@@ -394,5 +427,16 @@ class Database_Downgrate_Exception extends Exception
  * structure that cannot be automatically turned to new mechanism. 
  */
 class Old_Mechanism_Exception extends Exception
+{
+}
+
+/**
+ * Exception that reflects state of not enabled upgrade by using field 
+ * upgrade_enabled_only_from in the current database upgrade.
+ * 
+ * It occures when a new upgrade should be performed, but current version
+ * is not listed in upgrade_enabled_only_from.
+ */
+class Not_Enabled_Upgrade_Exception extends Exception
 {
 }

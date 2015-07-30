@@ -220,48 +220,28 @@ class Monitor_host_Model extends ORM
 	}
 	
 	/**
-	 * Return all hosts by given state, optional by interval in which have to
-	 * be state changed date
+	 * Returns all hosts by given state to notification
 	 * 
 	 * @author Michal Kliment
 	 * @param type $state
-	 * @param type $from_state_changed_diff
-	 * @param type $to_state_changed_diff
 	 * @return type 
 	 */
-	public function get_all_hosts_by_state(
-		$state, $from_state_changed_diff = NULL, $to_state_changed_diff = NULL)
-	{
-		$where = '';
-		
-		// limit results by interval of state changed date
-		if ($from_state_changed_diff !== NULL && $to_state_changed_diff !== NULL)
-		{
-			$where = 'WHERE state_changed_diff >= '.intval($from_state_changed_diff)
-				.' AND state_changed_diff <= '.intval($to_state_changed_diff)
-				.' AND (last_notification_diff IS NULL OR last_notification_diff > '
-					.(intval($to_state_changed_diff) - intval($from_state_changed_diff)).')';
-		}
-		
+	public function get_all_hosts_by_state($state)
+	{	
 		return $this->db->query("
 			SELECT * FROM
 			(
 				SELECT
 					mh.*,
 					d.name,
+					d.name AS device_name,
 					ip_address,
 					CEIL(
 						(
 							UNIX_TIMESTAMP(last_attempt_date)
 							- UNIX_TIMESTAMP(state_changed_date)
 						)/60
-					) AS state_changed_diff,
-					CEIL(
-						(
-							UNIX_TIMESTAMP(last_attempt_date)
-							- UNIX_TIMESTAMP(last_notification_date)
-						)/60
-					) AS last_notification_diff
+					) AS state_changed_diff
 				FROM monitor_hosts mh
 				JOIN devices d ON mh.device_id = d.id
 				JOIN ifaces i ON i.device_id = d.id
@@ -272,10 +252,10 @@ class Monitor_host_Model extends ORM
 					FROM ip_addresses ip
 					ORDER BY ip.service = 1 DESC
 				) ip ON ip.iface_id = i.id
-				WHERE state = ?
+				WHERE state = ? 
 				GROUP BY d.id
 			) h
-			$where
+			WHERE last_notification_date > NOW()
 			ORDER BY state_changed_diff
 		", array($state));
 	}
@@ -317,21 +297,6 @@ class Monitor_host_Model extends ORM
 	}
 	
 	/**
-	 * Gets count of down devices
-	 * 
-	 * @see My_Controller
-	 * @return integer
-	 */
-	public function count_off_down_devices()
-	{
-		return $this->db->query("
-			SELECT COUNT(*) AS total
-			FROM monitor_hosts mh
-			WHERE state = ?
-		", self::STATE_DOWN)->current()->total;
-	}
-	
-	/**
 	 * Update host with data from fping
 	 * 
 	 * @author Michal Kliment
@@ -341,24 +306,27 @@ class Monitor_host_Model extends ORM
 	 * @return type 
 	 */
 	public function update_host($ip_address, $state, $latency)
-	{
-		$failed = ($state == self::STATE_UP) ? 0 : 1;
-		
+	{		
+		// host is down
 		if ($state != self::STATE_UP)
+		{
+			$failed = 1;
 			$latency = NULL;
+			$interval = Settings::get('monitoring_notification_down_host_interval');
+		}
+		else
+		{
+			$failed = 0;
+			$interval = Settings::get('monitoring_notification_up_host_interval');
+		}
 		
 		return $this->db->query("
-			UPDATE monitor_hosts mh,
-			(
-				SELECT i.device_id
-				FROM ip_addresses ip
-				JOIN ifaces i ON ip.iface_id = i.id
-				WHERE ip_address = ?
-			) ip
+			UPDATE monitor_hosts mh
 			SET
-				state = ?,
 				state_changed = IF(state <> ?, 1, 0),
 				state_changed_date = IF(state <> ?, NOW(), state_changed_date),
+				last_notification_date = IF(state <> ?, NOW() + INTERVAL ".intval($interval)." MINUTE, last_notification_date),
+				state = ?,
 				last_attempt_date = NOW(),
 				latency_current = ?,
 				latency_min = IF(? IS NOT NULL AND (latency_min IS NULL OR latency_min > ?), ?, latency_min),
@@ -367,10 +335,16 @@ class Monitor_host_Model extends ORM
 				polls_total = polls_total + 1,
 				polls_failed = polls_failed + ?,
 				availability = ROUND((polls_total + 1 - polls_failed - ?)/(polls_total + 1)*100, 2)
-			WHERE ip.device_id = mh.device_id
+			WHERE mh.device_id IN
+			(
+				SELECT i.device_id
+				FROM ip_addresses ip
+				JOIN ifaces i ON ip.iface_id = i.id
+				WHERE ip_address = ?
+			)
 		", array
 		(
-			$ip_address,
+			$state,
 			$state,
 			$state,
 			$state,
@@ -378,7 +352,8 @@ class Monitor_host_Model extends ORM
 			$latency, $latency, $latency, 
 			$latency, $latency, $latency,
 			$latency, $failed,
-			$failed, $failed
+			$failed, $failed,
+			$ip_address
 		));
 	}
 	
@@ -407,6 +382,14 @@ class Monitor_host_Model extends ORM
 		);
 	}
 	
+	/**
+	 * Updates given hosts by IDs
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param array $ids
+	 * @param integer $priority
+	 * @return MySQL_Result
+	 */
 	public function update_hosts($ids = array(), $priority = 0)
 	{
 		if (!count($ids))
@@ -422,6 +405,14 @@ class Monitor_host_Model extends ORM
 		", $priority);
 	}
 	
+	/**
+	 * Deletes given hosts by IDS from monitoring
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param array $ids
+	 * @param string $column
+	 * @return MySQL_Result
+	 */
 	public function delete_hosts($ids = array(), $column = 'device_id')
 	{
 		if (!count($ids))
@@ -437,14 +428,5 @@ class Monitor_host_Model extends ORM
 				".implode(', ', $ids)."
 			)
 		");
-	}
-	
-	public function update_host_notification_date ($monitor_host_id)
-	{
-		return $this->db->query("
-			UPDATE monitor_hosts
-			SET last_notification_date = NOW()
-			WHERE id = ?;
-		", $monitor_host_id);
 	}
 }

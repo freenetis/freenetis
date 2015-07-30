@@ -48,8 +48,8 @@ class Address_points_Controller extends Controller
 			Controller::error(ACCESS);
 		
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		// parameters control
 		$allowed_order_type = array
@@ -216,7 +216,7 @@ class Address_points_Controller extends Controller
 		$members = array
 		(
 			NULL => '----- '.__('Select member').' -----'
-		) + arr::from_objects(ORM::factory('member')->get_all_members_to_dropdown());
+		) + Member_Model::select_list_grouped();
 		
 		// form to group by type
 		$form = new Forge(url::base(TRUE).url::current(TRUE));
@@ -227,7 +227,7 @@ class Address_points_Controller extends Controller
 		
 		$form->submit('submit');
 		
-		if ($form->validate())
+		if ($form->validate() && !isset($_POST['record_per_page']))
 		{
 			url::redirect('address_points/show_all/'.$form->member_id->value);
 		}
@@ -363,7 +363,7 @@ class Address_points_Controller extends Controller
 			Controller::error(ACCESS);
 		
 		// country
-		$arr_countries = ORM::factory('country')->select_list('id', 'country_name');
+		$arr_countries = ORM::factory('country')->where('enabled', 1)->select_list('id', 'country_name');
 			   		
 		// streets
 		$arr_streets = array
@@ -512,8 +512,9 @@ class Address_points_Controller extends Controller
 			Controller::error(ACCESS);
 
 		// country
-		$arr_countries = ORM::factory('country')->select_list('id', 'country_name');
-			   		
+		$arr_countries = ORM::factory('country')->where('enabled', 1)->select_list('id', 'country_name');
+		$arr_countries = $arr_countries + ORM::factory('country')->where('id', $ap->country_id)->select_list('id', 'country_name');
+		
 		// streets
 		$arr_streets = array
 		(
@@ -759,6 +760,78 @@ class Address_points_Controller extends Controller
 	}
 	
 	/**
+	 * Help AJAX function to fill GPS by street, town, district, zip and country
+	 *
+	 * @author David Raška
+	 */
+	public function get_gps_by_address_string()
+	{
+		$country_id = (int) $this->input->get('country_id');
+		$town = $this->input->get('town');
+		$district = $this->input->get('district');
+		$street = $this->input->get('street');
+		$zip = $this->input->get('zip');
+		
+		$match = array();
+		
+		if (preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $street, $match))
+		{
+			// street
+			$street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $street));
+
+			$number = $match[0];
+
+
+			// first try find in already exist address points
+			$address_point = ORM::factory('address_point')
+					->get_address_point_with_gps_by_country_id_town_district_street_zip
+			(
+					$country_id, $town, $district, $street, $number, $zip
+			);
+
+			// success, we end
+			if ($address_point && strlen($address_point->gps))
+			{
+				$gps = explode(' ', $address_point->gps);
+				echo gps::real2degrees($gps[0], FALSE) . ' ';
+				echo gps::real2degrees($gps[1], FALSE);
+
+				return;
+			}
+
+			// try find by google API
+			$country_model = new Country_Model($country_id);
+			$country = ($country_model) ? $country_model->country_name : '';
+
+			if ($district)
+			{
+				$town .= ", $district";
+			}
+			
+			$town .= ", $zip";
+
+			if (!$number || $town == '' || $country == '')
+				return;
+
+			$data = self::get_geocode_from_google ($street, $number, $town, $country);
+
+			if (!$data)
+				return;
+			
+			/* return only precise GPS coordinates
+			 * 
+			 * Valid location types: ROOFTOP
+			 */
+			$type = $data->results[0]->geometry->location_type;
+			if ($type != "ROOFTOP")
+				return;
+
+			echo gps::real2degrees(num::decimal_point($data->results[0]->geometry->location->lat), FALSE)." ".
+				gps::real2degrees(num::decimal_point($data->results[0]->geometry->location->lng), FALSE);
+		}
+	}
+	
+	/**
 	 * Helper function to get geocode data from Google Map API
 	 * 
 	 * @author Michal Kliment
@@ -873,5 +946,78 @@ class Address_points_Controller extends Controller
 		$view->content->form = $form;
 		$view->content->aditional_info = $ai;
 		$view->render(TRUE);
+	}
+	
+	/**
+	 * Test if address point server is active
+	 * 
+	 * @return boolean
+	 */
+	public static function is_address_point_server_active()
+	{
+		static $address_point_server_active = NULL;
+		
+		if ($address_point_server_active === NULL)
+		{
+			if (Settings::get('address_point_url'))
+			{
+				$curl = new Curl_HTTP_Client();
+				$result = $curl->fetch_url(Settings::get('address_point_url').'?mode=test');
+
+				if ($curl->get_http_response_code() == 200 && $result !== FALSE)
+				{
+					// Address point server responses
+					$result = json_decode($result);
+
+					$address_point_server_active = ($result && $result->state);
+				}
+				else	// Address point server is not active
+				{
+					Log_queue_Model::error(
+							'Error in address point validation: Server is not active'
+					);
+
+					$address_point_server_active = FALSE;
+				}
+			}
+			else	// Address point server not set
+			{
+				$address_point_server_active = FALSE;
+			}
+		}
+		
+		return $address_point_server_active;
+	}
+	
+	/**
+	 * Test if given address point is valid
+	 * 
+	 * @return boolean
+	 */
+	public static function is_address_point_valid($country = NULL, $town = '', $district = '', $street = '', $zip = '')
+	{
+		$country = urlencode($country);
+		$town = urlencode($town);
+		$district = urlencode($district);
+		$street = urlencode($street);
+		$zip = urlencode($zip);
+		
+		$curl = new Curl_HTTP_Client();
+		$result = $curl->fetch_url(Settings::get('address_point_url')."?country=$country&town=$town&street=$street&zip=$zip&district=$district&mode=validate");
+		
+		if ($curl->get_http_response_code() == 200 && $result !== FALSE)
+		{
+			$result = json_decode($result);
+			
+			return ($result && $result->state);
+		}
+		else
+		{
+			Log_queue_Model::error(
+					'Error in address point validation: Cannot validate'
+			);
+			
+			return FALSE;
+		}
 	}
 }

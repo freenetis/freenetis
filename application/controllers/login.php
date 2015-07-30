@@ -23,9 +23,16 @@ class Login_Controller extends Controller
 	 *
 	 * @param mixed $error 
 	 */
-	public function index($error = false)
+	public function index($error = FALSE, $success = FALSE)
 	{
-		cookie::set('testcookie', 'enabled', time()+3600);
+		cookie::set('testcookie', 'enabled', 3600);
+		
+		// redirect if cookies not enabled to ensure that this is not the first
+		// time when user access FreenetIS
+		if (!isset($_COOKIE['testcookie']) && !isset($_GET['cookies_failed']))
+		{
+			url::redirect('login?cookies_failed=true');
+		}
 		
 		if ($this->input->post('submit') != '')
 		{
@@ -60,11 +67,6 @@ class Login_Controller extends Controller
 					if ($member->locked)
 					{
 						$error = __('Your accout has been locked.').' '
-								.__('Please contact administrator.');
-					}
-					else if ($member->type == Member_Model::TYPE_APPLICANT)
-					{
-						$error = __('Your request for membership has not been approved yet').'.<br>'
 								.__('Please contact administrator.');
 					}
 					else
@@ -106,13 +108,22 @@ class Login_Controller extends Controller
 						}
 						else
 						{
-							if ($user_type != User_Model::USER)
+							$favourite = ORM::factory('user_favourite_pages')->get_user_default_page($user_id);
+							
+							if ($favourite)
 							{
-								url::redirect('members/show/'.$member_id);
+								url::redirect($favourite->page);
 							}
 							else
 							{
-								url::redirect('users/show/'.$user_id);
+								if ($user_type != User_Model::USER)
+								{
+									url::redirect('members/show/'.$member_id);
+								}
+								else
+								{
+									url::redirect('users/show/'.$user_id);
+								}
 							}
 						}
 					}
@@ -127,20 +138,39 @@ class Login_Controller extends Controller
 		// check if is logged in 
 		if (isset($_SESSION['username']))
 		{
-			if ($_SESSION['username'] == $_SESSION['member_login'])
+			$favourite = ORM::factory('user_favourite_pages')->get_user_default_page($_SESSION['user_id']);
+							
+			if ($favourite)
 			{
-				url::redirect('members/show/'.$_SESSION['member_id']);
+				url::redirect($favourite->page);
 			}
 			else
 			{
-				url::redirect('users/show/'.$_SESSION['user_id']);
+				if ($_SESSION['username'] == $_SESSION['member_login'])
+				{
+					url::redirect('members/show/'.$_SESSION['member_id']);
+				}
+				else
+				{
+					url::redirect('users/show/'.$_SESSION['user_id']);
+				}
 			}
 		}
-
+		
+		// view
 		$login = new View('login/index');
 		$login->title = __('Login to');		
 		$login->error = (!$error) ? $this->session->get_once('err_message') : $error;
-		$login->render(TRUE);		
+		$login->success = $success;
+		
+		// connnection request
+		if (mb_strpos($this->session->get('referer'), 'connection_requests/add') !== FALSE &&
+			!$error)
+		{
+			$login->error = __('For the connection request creation you must login to your account.');
+		}
+
+		$login->render(TRUE);
 	}
 
 	/**
@@ -149,7 +179,7 @@ class Login_Controller extends Controller
 	public function logout()
 	{
 		$this->session->destroy();	
-		$this->index(__('You have been successfully logged out.'));
+		$this->index(FALSE, __('You have been successfully logged out.'));
 	}
 
 }

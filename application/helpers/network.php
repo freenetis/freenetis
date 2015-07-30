@@ -100,6 +100,51 @@ class network
 	}
 
 	/**
+	 * Formats speed
+	 *
+	 * @author Michal Kliment
+	 * @param integer $speed In B/s
+	 * @return string
+	 */
+	public static function speed($speed)
+	{
+		// default unit is nothing
+		$unit = '';
+		
+		if ($speed >= 1024)
+		{
+			$unit = 'k';
+			$speed = round($speed / 1024, 2);
+
+			// size is too big
+			if ($speed >= 1024)
+			{
+				// transforms to Mega
+				$unit = 'M';
+				$speed = round($speed / 1024, 2);
+
+				// size is still too big
+				if ($speed >= 1024)
+				{
+					// transforms to Giga
+					$unit = 'G';
+					$speed = round($speed / 1024, 2);
+
+					// size is still too big
+					if ($speed >= 1024)
+					{
+						// transforms to Giga
+						$unit = 'T';
+						$speed = round($speed / 1024, 2);
+					}
+				}
+			}
+		}
+
+		return ($speed) ? $speed . $unit : '0' . $unit;
+	}
+
+	/**
 	 * Checks whether ip address belongs to default address ranges
 	 *
 	 * @author Michal Kliment
@@ -136,11 +181,10 @@ class network
 				return true;
 		}
 		return false;
-		;
 	}
 	
 	/**
-	 * Converts speed string to integer
+	 * Converts speed string to integer (bytes)
 	 * 
 	 * @author Michal Kliment
 	 * @param string $str
@@ -176,7 +220,7 @@ class network
 	}
 	
 	/**
-	 * Converts integer to speed string
+	 * Converts integer (bytes) to speed string
 	 * 
 	 * @author Michal Kliment
 	 * @param type $bytes

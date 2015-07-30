@@ -21,17 +21,31 @@
  * @package Controller
  */
 class Works_Controller extends Controller
-{	
+{
+	/**
+	 * Only checks whether works are enabled
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function __construct()
+	{
+	    parent::__construct();
+	    
+	    // approval are not enabled
+	    if (!Settings::get('works_enabled'))
+			Controller::error (ACCESS);
+	}
+	
 	/**
 	 * Index redirects to work pending
 	 */
 	public function index()
 	{
-		url::redirect('works/pending');
+		url::redirect('works/show_all');
 	}
 
 	/**
-	 * Function to show all pending works
+	 * Function to show all works
 	 * 
 	 * @author Michal Kliment
 	 * @param number $limit_results
@@ -40,67 +54,120 @@ class Works_Controller extends Controller
 	 * @param string $page_word
 	 * @param number $page
 	 */
-	public function pending(
-			$limit_results = 100, $order_by = 'date',
-			$order_by_direction = 'ASC',
+	public function show_all(
+			$limit_results = 20, $order_by = 'date',
+			$order_by_direction = 'DESC',
 			$page_word = null, $page = 1)
 	{
+		/**
+		 * @todo Add own AXO
+		 */
+		
 		// acccess control
-		if (!$this->acl_check_view('Users_Controller','work'))
+		if (!$this->acl_check_view('Works_Controller','work'))
 			Controller::error(ACCESS);
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
+		
+		$filter_form = new Filter_form('j');
+		
+		$filter_form->add('state')
+			->type('select')
+			->values(Vote_Model::get_states());
+		
+		$filter_form->add('uname')
+			->callback('json/user_fullname')
+			->label('Worker');
+		
+		$filter_form->add('description');
+		
+		$filter_form->add('suggest_amount')
+			->type('number');
+		
+		$filter_form->add('date')
+			->type('date');
+		
+		$filter_form->add('hours')
+			->type('number');
+		
+		$filter_form->add('km')
+			->type('number');
 
 		$work_model = new Job_Model();
-		$total_works = $work_model->count_all_pending_works();
-
-		if (($sql_offset = ($page - 1) * $limit_results) > $total_works)
-			$sql_offset = 0;
-
-		$works = $work_model->get_all_pending_works(
-				$sql_offset, (int)$limit_results, $order_by, $order_by_direction
-		);
-
-		$approval_template_item_model = new Approval_template_item_Model();
-
-		// test if user can vote
-		$can_vote = FALSE;
 		
-		foreach ($works as $work)
+		// hide grid on its first load (#442)
+		$hide_grid = Settings::get('grid_hide_on_first_load') && $filter_form->is_first_load();
+		
+		if (!$hide_grid)
 		{
-			if ($approval_template_item_model->check_user_vote_rights(
-					$work->id, $this->session->get('user_id'),
-					$work->suggest_amount
-				))
+			try
 			{
-				$can_vote = TRUE;
-				break;
+				$total_works = $work_model->count_all_works($filter_form->as_sql());
+
+				if (($sql_offset = ($page - 1) * $limit_results) > $total_works)
+					$sql_offset = 0;
+
+				$works = $work_model->get_all_works(
+					$sql_offset, (int)$limit_results, $order_by,
+					$order_by_direction, $filter_form->as_sql()
+				);
+			}
+			catch (Exception $e)
+			{
+				if ($filter_form->is_loaded_from_saved_query())
+				{
+					status::error('Invalid saved query', $e);
+					// disable default query (loop protection)
+					if ($filter_form->is_loaded_from_default_saved_query())
+					{
+						ORM::factory('filter_query')->remove_default($filter_form->get_base_url());
+					}
+					$this->redirect(url_lang::current());
+				}
+				throw $e;
+			}
+
+			$vote_model = new Vote_Model();
+
+			$items_to_vote = $vote_model->get_all_items_user_can_vote(
+				$this->user_id
+			);
+
+			$works_to_vote = array();
+
+			if (array_key_exists(Vote_Model::WORK, $items_to_vote))
+			{
+				$works_to_vote = $items_to_vote[Vote_Model::WORK];
 			}
 		}
 
 		// create grid
-		$grid = new Grid('works/pending', __('List of all pending works'), array
+		$grid = new Grid('works/show_all', NULL, array
 		(
 			'use_paginator'				=> true,
 			'use_selector'				=> true,
 			'current'					=> $limit_results,
-			'selector_increace'			=> 100,
-			'selector_min'				=> 100,
+			'selector_increace'			=> 20,
+			'selector_min'				=> 20,
 			'selector_max_multiplier'	=> 20,
-			'base_url'					=> Config::get('lang').'/works/pending/'
+			'base_url'					=> Config::get('lang').'/works/show_all/'
 										. $limit_results.'/'.$order_by.'/'.$order_by_direction ,
 			'uri_segment'				=> 'page',
-			'total_items'				=> $total_works,
+			'total_items'				=> isset($total_works) ? $total_works : 0,
 			'items_per_page'			=> $limit_results,
 			'style'						=> 'classic',
 			'order_by'					=> $order_by,
 			'order_by_direction'		=> $order_by_direction,
 			'limit_results'				=> $limit_results,
+			'filter'				=> $filter_form
 		));
 
-		if ($this->acl_check_new('Users_Controller','work'))
+		/**
+		 * @todo Add own AXO
+		 */
+		if ($this->acl_check_new('Works_Controller','work'))
 		{
 			$grid->add_new_button('works/add', __('Add new work'));
 		}
@@ -135,356 +202,281 @@ class Works_Controller extends Controller
 				->callback('callback::vote_state_field');
 		
 		$grid->order_callback_field('comments_count')
-				->label(__('comments'))
-				->callback('callback::comments_field');
+				->label(__('Comments'))
+				->callback('callback::comments_field')
+				->class('center');
 
 		// user can vote -> show columns for form items
-		if ($can_vote)
+		if (!$hide_grid && count($works_to_vote))
 		{
 			$grid->order_form_field('vote')
-					->label(__('Vote'))
-					->type('dropdown')
-					->options(array
-					(
-						NULL	=> '--------',
-						1		=> __('Agree'),
-						-1		=> __('Disagree'),
-						0		=> __('Abstain')
-					))->callback('Works_Controller::vote_form_field');
+				->label(__('Vote'))
+				->type('dropdown')
+				->options(array
+				(
+				    NULL => '----- '.__('Select vote').' -----'
+				))
+				->callback(
+					'Votes_Controller::vote_form_field',
+					$works_to_vote,
+					Vote_Model::WORK
+				);
 			
 			$grid->order_form_field('comment')
-					->label(__('Comment'))
-					->type('textarea')
-					->callback('Works_Controller::comment_form_field');
+				->label(__('Comment'))
+				->type('textarea')
+				->callback(
+					'Votes_Controller::comment_form_field',
+					$works_to_vote
+				);
 		}
+		
+		$actions = $grid->grouped_action_field();
 
 		// access control
-		if ($this->acl_check_view('Users_Controller','work'))
+		if ($this->acl_check_view('Works_Controller','work'))
 		{
-			$grid->grouped_action_field()
-					->add_action('id')
+			$actions->add_action('id')
 					->icon_action('show')
 					->url('works/show');
 		}
-
-		$grid->datasource($works);
+		
+		// access control
+		if ($this->acl_check_edit('Works_Controller','work'))
+		{
+			$actions->add_conditional_action('id')
+					->icon_action('edit')
+					->condition('is_item_new')
+					->url('works/edit')
+					->class('popup_link');
+		}
+		
+		// access control
+		if ($this->acl_check_delete('Works_Controller','work'))
+		{
+			$actions->add_conditional_action('id')
+					->icon_action('delete')
+					->condition('is_item_new')
+					->url('works/delete')
+					->class('delete_link');
+		}
+		
+		if (!$hide_grid)
+			$grid->datasource($works);
 
 		// form is submited
-		if (isset ($_POST) && count ($_POST))
+		if (isset ($_POST) && count ($_POST) > 1)
 		{
-			$vote_model = new Vote_Model();
-			$post_votes = $_POST['vote'];
-			$comments = $_POST['comment'];
-			$approval_template_model = new Approval_template_Model();
-			$approval_template_item_model = new Approval_template_item_Model();
-
-			foreach ($post_votes as $id => $post_vote)
+			try
 			{
-				$work = $work_model->where('id', $id)->find();
+				$vote_model = new Vote_Model();
+				
+				$vote_model->transaction_start();
+				
+				$work_ids	= $_POST['ids'];
+				$votes		= $_POST['vote'];
+				$comments	= $_POST['comment'];
 
-				// finding aro group of logged user
-				$aro_group = $approval_template_item_model->get_aro_group_by_approval_template_id_and_user_id(
-						$work->approval_template_id,
-						$this->session->get('user_id'),
-						$work->suggest_amount
-				);
+				$approval_template_item_model = new Approval_template_item_Model();
+				
+				// voting user
+				$user = new User_Model($this->user_id);
 
-				// user can vote
-				if ($aro_group && $aro_group->id)
+				foreach ($work_ids as $work_id)
 				{
-					// finding vote of user
-					$vote = $vote_model->where('user_id', $this->session->get('user_id'))
-							->where('fk_id', $id)
-							->where('type',Vote_Model::WORK)
-							->find();
+					// user cannot vote about work
+					if (!in_array($work_id, $works_to_vote))
+						continue;
 
-					// delete vote
-					if ($vote->id && $post_vote=="")
-					{
-						$vote->delete();
-					}
-					// edit vote
-					else if ($vote->id && $post_vote!="")
-					{
-						$vote->vote = $post_vote;
-						$vote->comment = $comments[$id];
-						$vote->time = date('Y-m-d H:i:s');
-						$vote->save();
-					}
-					// create vote
-					else if (!$vote->id && $post_vote!="")
-					{
-						$vote->clear();
-						$vote->user_id = $this->session->get('user_id');
-						$vote->fk_id = $id;
-						$vote->aro_group_id = $aro_group->id;
-						$vote->type = Vote_Model::WORK;
-						$vote->vote = $post_vote;
-						$vote->comment = $comments[$id];
-						$vote->time = date('Y-m-d H:i:s');
-						$vote->save();
-					}
+					$work = $work_model->where('id', $work_id)->find();
 
-					// set up state of work
-					$work->state = $work->get_state(Vote_Model::WORK);
-
-					// work is approved
-					if ($work->state == 3)
-					{
-						// creates new transfer
-						$account_model = new Account_Model();
-						
-						$operating_id = $account_model->where(
-								'account_attribute_id', Account_attribute_Model::OPERATING
-						)->find()->id;
-						
-						$credit_id = $account_model->where('member_id', $work->user->member_id)
-								->where('account_attribute_id', Account_attribute_Model::CREDIT)
-								->find()->id;
-						
-						$transfer_id = Transfer_Model::insert_transfer(
-							$operating_id,
-							$credit_id,
-							null,
-							null,
-							$this->session->get('user_id'),
-							null,
-							date('Y-m-d'),
-							date('Y-m-d H:i:s'),
-							__('Work approval'),
+					if (!$work || !$work->id)
+						continue;
+					
+					// finding aro group of logged user
+					$aro_group = $approval_template_item_model
+						->get_aro_group_by_approval_template_id_and_user_id(
+							$work->approval_template_id,
+							$this->user_id,
 							$work->suggest_amount
-						);
-
-						$work->transfer_id = $transfer_id;
+					);
+					
+					$new_vote		= $votes[$work->id];
+					$new_comment	= $comments[$work->id];
+					
+					// cannot agree/disagree own work
+					if ($new_vote != Vote_Model::ABSTAIN &&
+						$work->user_id == $this->user_id)
+					{
+						continue;	
 					}
-
-					$work->save();
-
-					// set up state of approval template
-					$approval_template = $approval_template_model->where('id',$work->approval_template_id)->find();
-					$approval_template->state = $approval_template_model->get_state($approval_template->id);
-					$approval_template->save();
+					
+					$vote = $vote_model->where(array
+					(
+						'user_id'	=> $this->user_id,
+						'type'		=> Vote_Model::WORK,
+						'fk_id'		=> $work->id
+					))->find();
+					
+					// vote already exists
+					if ($vote && $vote->id)
+					{
+						if ($new_vote != '' && $new_vote == $vote->vote)
+							continue;
+						
+						// new vote is not empty and different to old, change old
+						if ($new_vote != '')
+						{
+							$vote->vote = $new_vote;
+							$vote->comment = $new_comment;
+							$vote->time = date('Y-m-d H:i:s');
+							$vote->save_throwable();
+							
+							$subject = mail_message::format('work_vote_update_subject');
+							$body = mail_message::format('work_vote_update', array
+							(
+								$user->name.' '.$user->surname,
+								$work->user->name.' '.$work->user->surname,
+								url_lang::base().'works/show/'.$work->id
+							));
+						}
+						// new vote is empty, delete old
+						else
+						{
+							$vote->delete_throwable();
+							
+							$subject = mail_message::format('work_vote_delete_subject');
+							$body = mail_message::format('work_vote_delete', array
+							(
+								$user->name.' '.$user->surname,
+								$work->user->name.' '.$work->user->surname,
+								url_lang::base().'works/show/'.$work->id
+							));
+						}
+						
+						// send message about adding vote to all watchers
+						Mail_message_Model::send_system_message_to_item_watchers(
+							$subject,
+							$body,
+							Vote_Model::WORK,
+							$work->id
+						);
+					}
+					// new vote is not empty
+					elseif ($new_vote != '')
+					{
+						// add new vote
+						Vote_Model::insert(
+							$this->user_id,
+							Vote_Model::WORK,
+							$work->id,
+							$new_vote,
+							$new_comment,
+							$aro_group->id
+						);
+						
+						$subject = mail_message::format('work_vote_add_subject');
+						$body = mail_message::format('work_vote_add', array
+						(
+							$user->name.' '.$user->surname,
+							$work->user->name.' '.$work->user->surname,
+							url_lang::base().'works/show/'.$work->id
+						));
+						
+						// send message about adding vote to all watchers
+						Mail_message_Model::send_system_message_to_item_watchers(
+							$subject,
+							$body,
+							Vote_Model::WORK,
+							$work->id
+						);
+					}
+					
+					// set up state of work
+					$work->state = Vote_Model::get_state($work);
+					
+					switch ($work->state)
+					{
+						// work was approved
+						case Vote_Model::STATE_APPROVED:
+							
+							if (Settings::get('finance_enabled'))
+							{
+								// create transfer
+								$work->transfer_id = Transfer_Model::insert_transfer_for_work_approve(
+									$work->user->member_id,
+									$work->suggest_amount
+								);
+							}
+							
+							$subject = mail_message::format('work_approve_subject');
+							$body = mail_message::format('work_approve', array
+							(
+								$work->user->name.' '.$work->user->surname,
+								url_lang::base().'works/show/'.$work->id
+							));
+							
+							// send messages about work approve to all watchers
+							Mail_message_Model::send_system_message_to_item_watchers(
+								$subject,
+								$body,
+								Vote_Model::WORK,
+								$work->id
+							);
+							
+							break;
+						
+						// work was rejected
+						case Vote_Model::STATE_REJECTED:
+							
+							$subject = mail_message::format('work_reject_subject');
+							$body = mail_message::format('work_reject', array
+							(
+								$work->user->name.' '.$work->user->surname,
+								url_lang::base().'works/show/'.$work->id
+							));
+							
+							// send messages about work reject to all watchers
+							Mail_message_Model::send_system_message_to_item_watchers(
+								$subject,
+								$body,
+								Vote_Model::WORK,
+								$work->id
+							);
+							
+							break;
+					}
+					
+					$work->save_throwable();
+					
+					// update state of approval template
+					Approval_template_Model::update_state(
+						$work->approval_template_id
+					);
 					
 					ORM::factory ('member')
 						->reactivate_messages($work->user->member_id);
 				}
+			
+				$vote_model->transaction_commit();
+				status::success('Votes has been successfully updated.');
 			}
-			status::success('Votes has been successfully updated.');
+			catch (Exception $e)
+			{
+				$vote_model->transaction_rollback();
+			}
+			
 			url::redirect(url::base(TRUE).url::current(TRUE));
 		}
+		
+		$title = __('Works');
 
 		$view = new View('main');
-		$view->title = __('Pending works');
-		$view->breadcrumbs = __('Pending works');
-		$view->content = new View('works/show_all');
-		$view->content->grid = $grid;
-		$view->render(TRUE);
-	}
-
-	/**
-	 * Function to show all approved works
-	 * 
-	 * @author Michal Kliment
-	 * @param number Number of records to show
-	 * @param string Column in database to ordering records
-	 * @param string Direction of ordering
-	 * @param string Unused variable
-	 * @param number Number of page
-	 */
-	public function approved(
-			$limit_results = 50, $order_by = 'date', $order_by_direction = 'DESC',
-			$page_word = null, $page = 1)
-	{
-		// acccess control
-		if (!$this->acl_check_view('Users_Controller','work'))
-			Controller::error(ACCESS);
-
-		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
-
-		$work_model = new Job_Model();
-		$total_works = $work_model->count_all_approved_works();
-
-		if (($sql_offset = ($page - 1) * $limit_results) > $total_works)
-			$sql_offset = 0;
-
-		$works = $work_model->get_all_approved_works($sql_offset, (int)$limit_results, $order_by, $order_by_direction);
-
-		// create grid
-		$grid = new Grid('works/approved', __('List of all approved works'), array
-		(
-			'use_paginator'				=> true,
-			'use_selector'				=> true,
-			'current'					=> $limit_results,
-			'selector_increace'			=> 50,
-			'selector_min'				=> 50,
-			'selector_max_multiplier'	=> 20,
-			'base_url'					=> Config::get('lang').'/works/approved/'
-										. $limit_results.'/'.$order_by.'/'.$order_by_direction ,
-			'uri_segment'				=> 'page',
-			'total_items'				=> $total_works,
-			'items_per_page'			=> $limit_results,
-			'style'						=> 'classic',
-			'order_by'					=> $order_by,
-			'order_by_direction'		=> $order_by_direction,
-			'limit_results'				=> $limit_results,
-		));
-
-		$grid->order_field('id')
-				->label(__('Id'));
-		
-		$grid->order_link_field('user_id')
-				->link('users/show', 'uname')
-				->label('Worker');
-		
-		$grid->order_callback_field('description')
-				->label(__('Description'))
-				->callback('callback::limited_text');
-		
-		$grid->order_field('date')
-				->label(__('Date'));
-		
-		$grid->order_field('hours')
-				->label(__('Hours'));
-		
-		$grid->order_field('km')
-				->label(__('Km'));
-		
-		$grid->order_callback_field('rating')
-				->label(__('Rating'))
-				->callback('callback::money');
-		
-		$grid->order_callback_field('approval_state')
-				->label(__('State'))
-				->help(help::hint('approval_state'))
-						->callback('callback::vote_state_field');
-		
-		$grid->order_callback_field('comments_count')
-				->label(__('comments'))
-				->callback('callback::comments_field');
-
-		// access control
-		if ($this->acl_check_view('Users_Controller','work'))
-		{
-			
-			$grid->grouped_action_field()
-					->add_action('id')
-					->icon_action('show')
-					->url('works/show');
-		}
-
-		$grid->datasource($works);
-
-		$view = new View('main');
-		$view->title = __('Approved works');
-		$view->breadcrumbs = __('Approved works');
-		$view->content = new View('works/show_all');
-		$view->content->grid = $grid;
-		$view->render(TRUE);
-	}
-
-	/**
-	 * Function to show all rejected works
-	 * 
-	 * @author Michal Kliment
-	 * @param number $limit_results
-	 * @param string $order_by
-	 * @param string $order_by_direction
-	 * @param string $page_word
-	 * @param number $page
-	 */
-	public function rejected(
-			$limit_results = 100, $order_by = 'date', $order_by_direction = 'DESC',
-			$page_word = null, $page = 1)
-	{
-		// acccess control
-		if (!$this->acl_check_view('Users_Controller','work'))
-			Controller::error(ACCESS);
-
-		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
-
-		$work_model = new Job_Model();
-		$total_works = $work_model->count_all_rejected_works();
-
-		if (($sql_offset = ($page - 1) * $limit_results) > $total_works)
-			$sql_offset = 0;
-
-		$works = $work_model->get_all_rejected_works(
-				$sql_offset, (int)$limit_results, $order_by, $order_by_direction
-		);
-
-		// create grid
-		$grid = new Grid(url_lang::base().'works/rejected', __('List of all rejected works'), array
-		(
-			'use_paginator'				=> true,
-			'use_selector'				=> true,
-			'current'					=> $limit_results,
-			'selector_increace'			=> 100,
-			'selector_min'				=> 100,
-			'selector_max_multiplier'	=> 20,
-			'base_url'					=> Config::get('lang').'/works/rejected/'
-										. $limit_results.'/'.$order_by.'/'.$order_by_direction ,
-			'uri_segment'				=> 'page',
-			'total_items'				=> $total_works,
-			'items_per_page'			=> $limit_results,
-			'style'						=> 'classic',
-			'order_by'					=> $order_by,
-			'order_by_direction'		=> $order_by_direction,
-			'limit_results'				=> $limit_results,
-		));
-
-		$grid->order_field('id')
-				->label(__('Id'));
-		
-		$grid->order_link_field('user_id')
-				->link('users/show', 'uname')
-				->label('Worker');
-		
-		$grid->order_callback_field('description')
-				->label(__('Description'))
-				->callback('callback::limited_text');
-		
-		$grid->order_field('date')
-				->label(__('Date'));
-		
-		$grid->order_field('hours')
-				->label(__('Hours'));
-		
-		$grid->order_field('km')
-				->label(__('Km'));
-		
-		$grid->order_callback_field('suggest_amount')
-				->label(__('Suggest amount'))
-				->callback('callback::money');
-		
-		$grid->order_callback_field('approval_state')
-				->label(__('State'))
-				->help(help::hint('approval_state'))
-						->callback('callback::vote_state_field');
-		
-		$grid->order_callback_field('comments_count')
-				->label(__('comments'))
-				->callback('callback::comments_field');
-
-		// access control
-		if ($this->acl_check_view('Users_Controller','work'))
-		{
-			$grid->grouped_action_field()
-					->add_action('id')
-					->icon_action('show')
-					->url('works/show');
-		}
-
-		$grid->datasource($works);
-
-		$view = new View('main');
-		$view->title = __('Rejected works');
-		$view->breadcrumbs = __('Rejected works');
-		$view->content = new View('works/show_all');
-		$view->content->grid = $grid;
+		$view->title = $title;
+		$view->breadcrumbs = $title;
+		$view->content = new View('show_all');
+		$view->content->headline = __('List of all works');
+		$view->content->table = $grid;
 		$view->render(TRUE);
 	}
 
@@ -504,7 +496,7 @@ class Works_Controller extends Controller
 		if (!$user->id)
 			Controller::error(RECORD);
 
-		if (!$this->acl_check_view('Users_Controller', 'work', $user->member_id))
+		if (!$this->acl_check_view('Works_Controller', 'work', $user->member_id))
 			Controller::error(ACCESS);
 
 		$work_model = new Job_Model();
@@ -512,22 +504,6 @@ class Works_Controller extends Controller
 		$pending_works = $work_model->get_all_pending_works_by_user($user->id);
 
 		$approval_template_item_model = new Approval_template_item_Model();
-
-		// test if user can vote
-		$can_vote = FALSE;
-		
-		foreach ($pending_works as $pending_work)
-		{
-			if ($approval_template_item_model->check_user_vote_rights(
-					$pending_work->id,
-					Session::instance()->get('user_id'),
-					$pending_work->suggest_amount
-				))
-			{
-				$can_vote = TRUE;
-				break;
-			}
-		}
 
 		$total_pending = array();
 		$total_pending['hours'] = 0;
@@ -549,7 +525,7 @@ class Works_Controller extends Controller
 			'total_items' =>  count ($pending_works)
 		));
 
-		if ($this->acl_check_new('Users_Controller','work', $user->member_id))
+		if ($this->acl_check_new('Works_Controller','work', $user->member_id))
 		{
 			$pending_works_grid->add_new_button(
 					url_lang::base().'works/add/'.$user->id,
@@ -585,35 +561,35 @@ class Works_Controller extends Controller
 		$pending_works_grid->callback_field('comments_count')
 				->label(__('comments'))
 				->callback('callback::comments_field');
-
-		// user can vote -> show columns for form items
-		if ($can_vote)
-		{
-			$pending_works_grid->form_field('vote')
-					->label(__('Vote'))
-					->type('dropdown')
-					->options(array
-					(
-						NULL	=> '--------',
-						1		=> __('Agree'),
-						-1		=> __('Disagree'),
-						0		=> __('Abstain')
-					))->callback('Works_Controller::vote_form_field');
-		
-			$pending_works_grid->form_field('comment')
-					->label(__('Comment'))
-					->type('textarea')
-					->callback('Works_Controller::comment_form_field');
-		}
 		
 		$actions = $pending_works_grid->grouped_action_field();
 
 		// access control
-		if ($this->acl_check_view('Users_Controller','work',$user->member_id))
+		if ($this->acl_check_view('Works_Controller','work',$user->member_id))
 		{
 			$actions->add_action('id')
 					->icon_action('show')
 					->url('users/show_work');
+		}
+		
+		// access control
+		if ($this->acl_check_view('Works_Controller','work',$user->member_id))
+		{
+			$actions->add_conditional_action('id')
+					->icon_action('edit')
+					->condition('is_item_new')
+					->url('works/edit')
+					->class('popup_link');
+		}
+		
+		// access control
+		if ($this->acl_check_delete('Works_Controller','work',$user->member_id))
+		{
+			$actions->add_conditional_action('id')
+					->icon_action('delete')
+					->condition('is_item_new')
+					->url('works/delete')
+					->class('delete_link');
 		}
 
 		$pending_works_grid->datasource($pending_works);
@@ -672,7 +648,7 @@ class Works_Controller extends Controller
 		$actions = $approved_works_grid->grouped_action_field();
 
 		// access control
-		if ($this->acl_check_view('Users_Controller', 'work', $user->member_id))
+		if ($this->acl_check_view('Works_Controller', 'work', $user->member_id))
 		{
 			$actions->add_action('id')
 					->icon_action('show')
@@ -734,7 +710,7 @@ class Works_Controller extends Controller
 		$actions = $rejected_works_grid->grouped_action_field();
 
 		// access control
-		if ($this->acl_check_view('Users_Controller','work', $user->member_id))
+		if ($this->acl_check_view('Works_Controller','work', $user->member_id))
 		{
 			$actions->add_action('id')
 					->icon_action('show')
@@ -742,118 +718,6 @@ class Works_Controller extends Controller
 		}
 
 		$rejected_works_grid->datasource($rejected_works);
-
-		// form is submited
-		if (isset ($_POST) && count ($_POST))
-		{
-			$vote_model = new Vote_Model();
-			$post_votes = $_POST['vote'];
-			$comments = $_POST['comment'];
-			$approval_template_model = new Approval_template_Model();
-			$approval_template_item_model = new Approval_template_item_Model();
-
-			foreach ($post_votes as $id => $post_vote)
-			{
-				$work = $work_model->where('id', $id)->find();
-				
-				// finding aro group of logged user
-				$aro_group = $approval_template_item_model->get_aro_group_by_approval_template_id_and_user_id(
-						$work->approval_template_id,
-						$this->session->get('user_id'),
-						$work->suggest_amount
-				);
-
-				// user can vote
-				if ($aro_group && $aro_group->id)
-				{
-					// finding vote of user
-					$vote = $vote_model->where('user_id', $this->session->get('user_id'))
-							->where('fk_id', $id)
-							->where('type', Vote_Model::WORK)
-							->find();
-
-					// delete vote
-					if ($vote->id && $post_vote=="")
-					{
-						$vote->delete();
-					}
-					// edit vote
-					else if ($vote->id && $post_vote!="")
-					{
-						$vote->vote = $post_vote;
-						$vote->comment = $comments[$id];
-						$vote->time = date('Y-m-d H:i:s');
-						$vote->save();
-					}
-					// create vote
-					else if (!$vote->id && $post_vote!="")
-					{
-						$vote->clear();
-						$vote->user_id = $this->session->get('user_id');
-						$vote->fk_id = $id;
-						$vote->aro_group_id = $aro_group->id;
-						$vote->type = Vote_Model::WORK;
-						$vote->vote = $post_vote;
-						$vote->comment = $comments[$id];
-						$vote->time = date('Y-m-d H:i:s');
-						$vote->save();
-					}
-
-					// set up state of work
-					$work->state = $work->get_state(Vote_Model::WORK);
-
-					// work is approved
-					if ($work->state == 3)
-					{
-						// creates new transfer
-						$account_model = new Account_Model();
-
-						$operating_id = $account_model->where(
-								'account_attribute_id', Account_attribute_Model::OPERATING
-						)->find()->id;
-						
-						$credit_id = $account_model->where('member_id', $work->user->member_id)
-								->where('account_attribute_id', Account_attribute_Model::CREDIT)
-								->find()->id;
-
-						$transfer_id = Transfer_Model::insert_transfer(
-							$operating_id,
-							$credit_id,
-							null,
-							null,
-							$this->session->get('user_id'),
-							null,
-							date('Y-m-d'),
-							date('Y-m-d H:i:s'),
-							__('Work approval'),
-							$work->suggest_amount
-						);
-
-						$work->transfer_id = $transfer_id;
-					}
-
-					$work->save();
-
-					// set up state of approval template
-					$approval_template = $approval_template_model->where(
-							'id',$work->approval_template_id
-					)->find();
-					
-					$approval_template->state = $approval_template_model->get_state(
-							$approval_template->id
-					);
-					
-					$approval_template->save();
-					
-					ORM::factory ('member')
-						->reactivate_messages($work->user->member_id);
-
-				}
-
-			}
-			status::success('Votes has been successfully updated.');
-			url::redirect(url::base(TRUE).url::current(TRUE));
-		}
 
 		
 		// breadcrumbs navigation
@@ -889,7 +753,9 @@ class Works_Controller extends Controller
 		$view->title = __('List of works of user').' '.$user->name.' '.$user->surname;
 		$view->breadcrumbs = $breadcrumbs->html();
 		$view->content = new View('works/show_by_user');
-		$view->content->headline = __('List of works of user').' '.$user->name.' '.$user->surname;
+		$view->content->headline = __('List of works of user') . ' '
+				. $user->name . ' ' . $user->surname . ' '
+				. help::hint('work_description');
 		$view->content->user = $user;
 		$view->content->pending_works_grid = $pending_works_grid;
 		$view->content->approved_works_grid = $approved_works_grid;
@@ -919,7 +785,7 @@ class Works_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_view('Users_Controller', 'work', $work->user->member_id))
+		if (!$this->acl_check_view('Works_Controller', 'work', $work->user->member_id))
 			Controller::error(ACCESS);
 
 		// breadcrumbs navigation
@@ -927,37 +793,19 @@ class Works_Controller extends Controller
 
 		if ($work->job_report_id)
 		{
-			switch ($work->state)
-			{
-				case 0:
-				case 1:
-					$this->breadcrumbs->link(
-							'work_reports/pending', 'Pending work reports',
-							$this->acl_check_view('Users_Controller', 'work')
-					);
-					break;
-				case 2:
-					$this->breadcrumbs->link(
-							'work_reports/rejected', 'Rejected work reports',
-							$this->acl_check_view('Users_Controller', 'work')
-					);
-					break;
-				case 3:
-					$this->breadcrumbs->link(
-							'work_reports/approved', 'Approved work reports',
-							$this->acl_check_view('Users_Controller', 'work')
-					);
-					break;
-			}
+			$this->breadcrumbs->link(
+				'work_reports/show_all', 'Work reports',
+				$this->acl_check_view('Works_Controller', 'work')
+			);
 			
 			$this->breadcrumbs->link(
-					'work_reports/show/' . $work->job_report_id,
-					text::limit_chars($work->job_report->description, 40)
+				'work_reports/show/' . $work->job_report_id,
+				text::limit_chars($work->job_report->description, 40)
 			);
 		}
 		else
 		{
-			if (url::slice(url_lang::uri(Path::instance()->previous()),1,1) == 'show_by_user')
+			if (url_lang::current(1) == 'users')
 			{
 				$this->breadcrumbs->link('members/show_all', 'Members',
 								$this->acl_check_view('Members_Controller', 'members'))
@@ -987,29 +835,16 @@ class Works_Controller extends Controller
 						)->enable_translation()
 						->link('works/show_by_user/'.$work->user->id, 'Works',
 								$this->acl_check_view(
-										'Users_Controller', 'work',
+										'Works_Controller', 'work',
 										$work->user->member_id
 								)
 						);
 			}
 			else
 			{
-				switch ($work->state)
-				{
-					case 0:
-					case 1:
-						$this->breadcrumbs->link('works/pending', 'Pending works',
-								$this->acl_check_view('Users_Controller', 'work'));
-						break;
-					case 2:
-						$this->breadcrumbs->link('works/rejected', 'Rejected works',
-								$this->acl_check_view('Users_Controller', 'work'));
-						break;
-					case 3:
-						$this->breadcrumbs->link('works/approved', 'Approved works',
-								$this->acl_check_view('Users_Controller', 'work'));
-						break;
-				}
+				$this->breadcrumbs->link('works/show_all', 'Works',
+					$this->acl_check_view('Works_Controller', 'work'));
+				
 			}
 		}
 
@@ -1083,7 +918,7 @@ class Works_Controller extends Controller
 			$agrees[$i] = 0;
 			$user_vote = NULL;
 
-	    	foreach ($votes as $vote)
+			foreach ($votes as $vote)
 			{
 				if ($this->session->get('user_id')==$vote->user_id)
 					$user_vote = $vote->vote;
@@ -1116,7 +951,7 @@ class Works_Controller extends Controller
 			));
 			
 			$vote_rights = $approval_template_item_model->check_user_vote_rights(
-					$work->id, $this->user_id
+					$work, Vote_Model::WORK, $this->user_id, $suggest_amount
 			);
 
 			if ($user_aro_group &&
@@ -1126,8 +961,8 @@ class Works_Controller extends Controller
 				$vote_rights)
 			{
 				$vote_grids[$i]->add_new_button(
-						url_lang::base().'votes/add_to_work/'.$work->id,
-						__('Add vote')
+					url_lang::base().'votes/add/'.Vote_Model::WORK.'/'.$work->id,
+					__('Add vote'), array('class' => 'popup_link')
 				);
 			}
 			
@@ -1150,7 +985,8 @@ class Works_Controller extends Controller
 			$actions->add_conditional_action()
 					->icon_action('edit')
 					->url('votes/edit')
-					->condition('is_own');
+					->condition('is_own')
+					->class('popup_link');
 			
 			$actions->add_conditional_action()
 					->icon_action('delete')
@@ -1170,13 +1006,13 @@ class Works_Controller extends Controller
 
 		if (!$work->job_report_id)
 		{
-			if ($this->acl_check_edit('Users_Controller','work',$work->user->member_id) &&
+			if ($this->acl_check_edit('Works_Controller','work',$work->user->member_id) &&
 				$work->state == 0)
 			{
 				$links[] = html::anchor('works/edit/'.$work->id,__('Edit'));
 			}
 			
-			if ($this->acl_check_delete('Users_Controller','work',$work->user->member_id) &&
+			if ($this->acl_check_delete('Works_Controller','work',$work->user->member_id) &&
 				$work->state == 0)
 			{
 				$links[] = html::anchor(
@@ -1263,8 +1099,9 @@ class Works_Controller extends Controller
 		// bad parameter
 		if (!$work)
 			Controller::warning(PARAMETER);
-
-		$transfer = new Transfer_Model($work->transfer_id);
+		
+		if (Settings::get('finance_enabled'))
+			$transfer = new Transfer_Model($work->transfer_id);
 
 		$vote_model = new Vote_Model();
 
@@ -1351,8 +1188,10 @@ class Works_Controller extends Controller
 
 		switch ($work->state)
 		{
-			case 2:
+			case Vote_Model::STATE_REJECTED:
 
+				$state_text = '<span style="color: red">'.__('Rejected').'</span>';
+				
 				foreach ($sums as $i => $sum)
 				{
 					if ($sum <= 0)
@@ -1364,15 +1203,16 @@ class Works_Controller extends Controller
 				}
 
 				break;
-			case 3:
+				
+			case Vote_Model::STATE_APPROVED:
 				
 				$state_text = '<span style="color: green">'.__('Approved').'</span>';
 				
 				break;
 		}
 
-		if ($work->state == 2 &&
-			$this->acl_check_new('Users_Controller', 'work'))
+		if ($work->state == Vote_Model::STATE_REJECTED &&
+			$this->acl_check_new('Works_Controller', 'work'))
 		{
 			$links[] = html::anchor(
 					'works/add/'. $work->user_id .'/' . $work->id,
@@ -1435,7 +1275,7 @@ class Works_Controller extends Controller
 		$view->breadcrumbs = $this->breadcrumbs->html();
 		$view->content = new View('works/show');
 		$view->content->work = $work;
-		$view->content->transfer = $transfer;
+		$view->content->transfer = isset($transfer) ? $transfer : NULL;
 		$view->content->links = $links;
 		$view->content->vote_groups = $vote_groups;
 		$view->content->vote_grids = $vote_grids;
@@ -1461,7 +1301,7 @@ class Works_Controller extends Controller
 	 * @param integer $previous_rejected_work_id
  	 */
 	public function add($user_id = null, $previous_rejected_work_id = null)
-	{
+	{	
 		$breadcrumbs = breadcrumbs::add();
 
 		if (isset($user_id))
@@ -1472,7 +1312,7 @@ class Works_Controller extends Controller
 				Controller::error(RECORD);
 			
 			// access control
-			if (!$this->acl_check_new('Users_Controller', 'work', $user->member_id))
+			if (!$this->acl_check_new('Works_Controller', 'work', $user->member_id))
 				Controller::error(ACCESS);
 			
 			$selected = $user->id;
@@ -1506,15 +1346,16 @@ class Works_Controller extends Controller
 					)->enable_translation()
 					->link('works/show_by_user/'.$user->id, 'Works',
 							$this->acl_check_view(
-									'Users_Controller', 'work',
+									'Works_Controller', 'work',
 									$user->member_id
 							)
 					);
+			$member_id = $user->member_id;
 		}
 		else
 		{
 			// access control
-			if (!$this->acl_check_new('Users_Controller', 'work'))
+			if (!$this->acl_check_new('Works_Controller', 'work'))
 				Controller::error(ACCESS);
 			
 			$selected = NULL;
@@ -1528,17 +1369,20 @@ class Works_Controller extends Controller
 			$arr_users = array
 			(
 				NULL => '----- '.__('select user').' -----'
-			) + ORM::factory('user')->select_list('id', $concat);
+			) + ORM::factory('user')
+					->select_list('id', $concat);
 			
 			// breadcrumbs navigation
-			$breadcrumbs->link('works/pending', 'Pending works',
-					$this->acl_check_view('Users_Controller', 'work'));
+			$breadcrumbs->link('works/show_all', 'Works',
+					$this->acl_check_view('Works_Controller', 'work'));
+			
+			$member_id = NULL;
 		}
 
 		// breadcrumbs navigation
 		$breadcrumbs->text('Add');
 
-		if ($this->acl_check_view('approval', 'templates'))
+		if ($this->acl_check_view(get_class($this), 'approval_template', $member_id))
 		{
 			$arr_approval_templates = array
 			(
@@ -1547,7 +1391,7 @@ class Works_Controller extends Controller
 		}
 
 		// form
-		$this->_form = $form = new Forge('works/add' . (isset($user_id) ? '/' . $user_id : ''));
+		$this->_form = $form = new Forge();
 
 		$form->group('Basic information');
 		
@@ -1585,7 +1429,7 @@ class Works_Controller extends Controller
 				->callback(array($this, 'valid_price_per_km'))
 				->class('increase_decrease_buttons');
 
-		if ($this->acl_check_view('approval', 'templates'))
+		if ($this->acl_check_view(get_class($this), 'approval_template', $member_id))
 		{
 			$form->group('Advanced information');
 			
@@ -1635,121 +1479,99 @@ class Works_Controller extends Controller
 		}
 		else
 		{
-			$link_back = 'works/pending';
+			$link_back = 'works/show_all';
 		}
 
 		if ($form->validate())
 		{
 			$form_data = $form->as_array();
 			
-			// calculate suggested amount
-			$suggest_amount =
-				$form_data['hours'] * $form_data['payment_per_hour'] +
-				$form_data['km'] * $form_data['price_per_kilometre'];
-
-			// creates new work
-			$work = new Job_Model();
-			$work->user_id = $form_data['user_id'];
-			$work->added_by_id = $this->session->get('user_id');
-			$work->description = $form_data['description'];
-			$work->suggest_amount = $suggest_amount;
-			$work->date = date('Y-m-d', $form_data['date']);
-			$work->create_date = date('Y-m-d H:i:s');
-			$work->hours = $form_data['hours'];
-			$work->km = $form_data['km'];
-			
-			if (!empty($_POST['previous_rejected_work_id']))
-				$work->previous_rejected_work_id = $_POST['previous_rejected_work_id'];
-
-			if (isset($form_data['approval_template_id']) && $form_data['approval_template_id'])
-				$work->approval_template_id = $form_data['approval_template_id'];
-			else
-				$work->approval_template_id = $this->settings->get('default_work_approval_template');
-
-			$saved = $work->save();
-
-			// set up state of approval template
-			$approval_template = new Approval_template_Model($work->approval_template_id);
-			$approval_template->state = $approval_template->get_state($approval_template->id);
-			$saved = $saved && $approval_template->save();
-
-			// success
-			if ($saved)
+			try
 			{
-				$receivers = array();
+				// calculate suggested amount
+				$suggest_amount =
+					$form_data['hours'] * $form_data['payment_per_hour'] +
+					$form_data['km'] * $form_data['price_per_kilometre'];
 
-				$mail_message = new Mail_message_Model();
-				$user = new User_Model();
+				// creates new work
+				$work = new Job_Model();
+				
+				$work->transaction_start();
+				
+				$work->user_id		= $form_data['user_id'];
+				$work->added_by_id	= $this->user_id;
+				$work->description	= $form_data['description'];
+				$work->suggest_amount	= $suggest_amount;
+				$work->date		= date('Y-m-d', $form_data['date']);
+				$work->create_date	= date('Y-m-d H:i:s');
+				$work->hours		= $form_data['hours'];
+				$work->km		= $form_data['km'];
 
-				// work has been added by another user, sends message to user
-				if ($work->user_id != $this->session->get('user_id'))
-				{
-					$user->clear();
-					$user->where('id', $this->session->get('user_id'))->find();
+				if (!empty($_POST['previous_rejected_work_id']))
+					$work->previous_rejected_work_id = $_POST['previous_rejected_work_id'];
 
-					$receivers[] = $work->user_id;
+				if ($this->acl_check_view(get_class($this), 'approval_template', $member_id))
+					$work->approval_template_id = $form_data['approval_template_id'];
+				else
+					$work->approval_template_id = $this->settings->get('default_work_approval_template');
 
-					$mail_message->clear();
-					$mail_message->from_id = 1;
-					$mail_message->to_id = $form_data['user_id'];
-					$mail_message->subject = mail_message::format('your_work_add_subject');
-					$mail_message->body = mail_message::format('your_work_add', array
-					(
-						$user->name . ' ' . $user->surname,
-						url_lang::base() . 'works/show/' . $work->id
-					));
-					$mail_message->time = date('Y-m-d H:i:s');
-					$mail_message->from_deleted = 1;
-					$mail_message->save();
-				}
+				$work->save_throwable();
+
+				// set up state of approval template
+				Approval_template_Model::update_state(
+					$work->approval_template_id
+				);
 
 				// finds all aro ids assigned to vote about this work
 				$approval_template_item_model = new Approval_template_item_Model();
-				$aro_ids = $approval_template_item_model->get_aro_ids_by_approval_template_id(
-						$work->approval_template_id, $work->suggest_amount
+				$aro_ids = arr::from_objects(
+					$approval_template_item_model->get_aro_ids_by_approval_template_id(
+					$work->approval_template_id, $work->suggest_amount
+				), 'id');
+
+				$watchers = array_unique(
+					array($work->user_id, $this->user_id)
+					+ $aro_ids
 				);
 
-				// count of aro ids is not null
-				if (count($aro_ids))
-				{
-					// finds user to whom belongs work
-					$user->clear();
-					$user->where('id', $work->user_id)->find();
+				$watcher_model = new Watcher_Model();
 
-					$subject = mail_message::format('work_add_subject');
-					$body = mail_message::format('work_add', array
-					(
-						$user->name . ' ' . $user->surname,
-						url_lang::base() . 'works/show/' . $work->id
-					));
-
-					foreach ($aro_ids as $aro)
-					{
-						// is not necessary send message to  user who added work
-						if ($aro->id != $this->session->get('user_id'))
-						{
-							if (!in_array($aro->id, $receivers))
-							{
-								$receivers[] = $aro->id;
-
-								// sends message
-								$mail_message->clear();
-								$mail_message->from_id = 1;
-								$mail_message->to_id = $aro->id;
-								$mail_message->subject = $subject;
-								$mail_message->body = $body;
-								$mail_message->time = date('Y-m-d H:i:s');
-								$mail_message->from_deleted = 1;
-								$mail_message->save();
-							}
-						}
-					}
-				}
-
+				$watcher_model->add_watchers_to_object(
+					$watchers,
+					Watcher_Model::WORK,
+					$work->id
+				);
+				
+				$subject = mail_message::format('work_add_subject');
+				$body = mail_message::format('work_add', array
+				(
+					$work->user->name . ' ' . $work->user->surname,
+					url_lang::base().'works/show/'.$work->id
+				));
+				
+				// send message about work adding to all watchers
+				Mail_message_Model::send_system_message_to_item_watchers(
+					$subject,
+					$body,
+					Vote_Model::WORK,
+					$work->id
+				);
+				
+				$work->transaction_commit();
 				status::success('Work has been successfully added');
-				url::redirect('works/show/' . $work->id);
+				
+				if ($user_id)
+					url::redirect('users/show_work/' . $work->id);
+				else
+					url::redirect('works/show/' . $work->id);
 			}
-			url::redirect($link_back);
+			catch (Exception $e)
+			{
+				$work->transaction_rollback();
+				Log::add_exception($e);
+				status::error('Error - Cannot add work', $e);
+				url::redirect('works/show_all');
+			}
 		}
 
 		$headline = __('Add new work');
@@ -1782,7 +1604,7 @@ class Works_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_edit('Users_Controller', 'work', $work->user->member_id))
+		if (!$this->acl_check_edit('Works_Controller', 'work', $work->user->member_id))
 			Controller::error(ACCESS);
 
 		// work is locked
@@ -1791,11 +1613,15 @@ class Works_Controller extends Controller
 			status::warning('It is not possible edit locked work.');
 			url::redirect('works/show/' . $work->id);
 		}
+		
+		// test if path is from user profile
+		$is_from_user = (Path::instance()->uri(TRUE)->previous(0, 1) == 'users'
+			|| Path::instance()->uri(TRUE)->previous(1, 1) == 'show_by_user');
 
 		$user_model = new User_Model();
 
 		// check if user has access rights to edit work of all users
-		if ($this->acl_check_edit('Users_Controller', 'work'))
+		if ($this->acl_check_edit('Works_Controller', 'work'))
 		{
 			// gets all user's names
 			$users = $user_model->get_his_users_names($work->user_id);
@@ -1808,7 +1634,7 @@ class Works_Controller extends Controller
 		// transforms array of objects to classic array
 		$arr_users = arr::from_objects($users, 'username');
 
-		if ($this->acl_check_view('approval', 'templates'))
+		if ($this->acl_check_view(get_class($this), 'approval_template', $work->user->member_id))
 		{
 			$arr_approval_templates = array
 			(
@@ -1817,7 +1643,7 @@ class Works_Controller extends Controller
 		}
 
 		// creates form
-		$this->form = new Forge('works/edit/' . $work_id);
+		$this->form = new Forge();
 
 		$this->form->group('Basic information');
 		
@@ -1853,7 +1679,7 @@ class Works_Controller extends Controller
 				->rules('required|valid_numeric')
 				->value(num::decimal_point($work->suggest_amount));
 
-		if ($this->acl_check_view('approval', 'templates'))
+		if ($this->acl_check_view(get_class($this), 'approval_template', $work->user->member_id))
 		{
 			$this->form->group('Advanced information');
 			
@@ -1871,126 +1697,162 @@ class Works_Controller extends Controller
 		{
 			$form_data = $this->form->as_array();
 
-			// creates new work
-			$work = new Job_Model($work_id);
-			$work->user_id = $form_data['user_id'];
-			$work->added_by_id = $this->session->get('user_id');
-			$work->description = $form_data['description'];
-			$work->date = date('Y-m-d', $form_data['date']);
-			$work->hours = $form_data['hours'];
-			$work->km = $form_data['km'];
-			$work->suggest_amount = $form_data['suggest_amount'];
-
-			$old_approval_template_id = $work->approval_template_id;
-
-			if (isset($form_data['approval_template_id']) && $form_data['approval_template_id'])
-				$work->approval_template_id = $form_data['approval_template_id'];
-			else
-				$work->approval_template_id = $this->settings->get('default_work_approval_template');
-
-			$saved = $work->save();
-
-			// set up state of approval template
-			$approval_template = new Approval_template_Model($work->approval_template_id);
-			$approval_template->state = $approval_template->get_state($approval_template->id);
-			$saved = $saved && $approval_template->save();
-
-			if ($work->approval_template_id != $old_approval_template_id)
+			try
 			{
-				// set up state of old approval template
-				$approval_template = new Approval_template_Model($old_approval_template_id);
-				$approval_template->state = $approval_template->get_state($approval_template->id);
-				$saved = $saved && $approval_template->save();
-			}
+				$work->transaction_start();
+				
+				$work->user_id		= $form_data['user_id'];
+				$work->added_by_id	= $this->user_id;
+				$work->description	= $form_data['description'];
+				$work->date		= date('Y-m-d', $form_data['date']);
+				$work->hours		= $form_data['hours'];
+				$work->km		= $form_data['km'];
+				$work->suggest_amount	= $form_data['suggest_amount'];
 
-			// success
-			if ($saved)
-			{
-				$receivers = array();
+				$old_approval_template_id = $work->approval_template_id;
 
-				$mail_message = new Mail_message_Model();
-				$user = new User_Model();
+				if ($this->acl_check_view(get_class($this), 'approval_template', $work->user->member_id))
+					$work->approval_template_id = $form_data['approval_template_id'];
+				else
+					$work->approval_template_id = $this->settings->get('default_work_approval_template');
 
-				// work has been updated by another user, sends message to user
-				if ($work->user_id != $this->session->get('user_id'))
-				{
-					$user->clear();
-					$user->where('id', $this->session->get('user_id'))->find();
+				$work->save_throwable();
 
-					$receivers[] = $work->user_id;
-
-					$mail_message->clear();
-					$mail_message->from_id = 1;
-					$mail_message->to_id = $form_data['user_id'];
-					$mail_message->subject = mail_message::format('your_work_update_subject');
-					$mail_message->body = mail_message::format('your_work_update', array
-					(
-						$user->name . ' ' . $user->surname,
-						url_lang::base() . 'works/show/' . $work->id
-					));
-					$mail_message->time = date('Y-m-d H:i:s');
-					$mail_message->from_deleted = 1;
-					$mail_message->save();
-				}
-
-				// finds all aro ids assigned to vote about this work
-				$approval_template_item_model = new Approval_template_item_Model();
-				$aro_ids = $approval_template_item_model->get_aro_ids_by_approval_template_id(
-						$work->approval_template_id, $work->suggest_amount
+				// set up state of approval template				
+				Approval_template_Model::update_state(
+					$work->approval_template_id
 				);
 
-				// count of aro ids is not null
-				if (count($aro_ids))
+				// approval template has been changed
+				if ($work->approval_template_id != $old_approval_template_id)
 				{
-					// finds user to whom belongs work
-					$user->clear();
-					$user->where('id', $work->user_id)->find();
+					// set up state of old approval template
+					Approval_template_Model::update_state(
+						$old_approval_template_id
+					);
+					
+					$watcher_model = new Watcher_Model();
+					
+					// remove old watchers
+					$watcher_model->delete_watchers_by_object(
+						Watcher_Model::WORK,
+						$work->id
+					);
+					
+					// finds all aro ids assigned to vote about this work
+					$approval_template_item_model = new Approval_template_item_Model();
+					$aro_ids = arr::from_objects(
+						$approval_template_item_model->get_aro_ids_by_approval_template_id(
+						$work->approval_template_id, $work->suggest_amount
+					), 'id');
+					
+					$watchers = array_unique(
+						array($work->user_id, $this->user_id)
+						+ $aro_ids
+					);
 
-					$subject = mail_message::format('work_update_subject');
-					$body = mail_message::format('work_update', array
-					(
-						$user->name . ' ' . $user->surname,
-						url_lang::base() . 'works/show/' . $work->id
-					));
-
-					foreach ($aro_ids as $aro)
-					{
-						// is not necessary send message to  user who added work
-						if ($aro->id != $this->session->get('user_id'))
-						{
-							if (!in_array($aro->id, $receivers))
-							{
-								$receivers[] = $aro->id;
-
-								// sends message
-								$mail_message->clear();
-								$mail_message->from_id = 1;
-								$mail_message->to_id = $aro->id;
-								$mail_message->subject = $subject;
-								$mail_message->body = $body;
-								$mail_message->time = date('Y-m-d H:i:s');
-								$mail_message->from_deleted = 1;
-								$mail_message->save();
-							}
-						}
-					}
+					// add new watchers
+					$watcher_model->add_watchers_to_object(
+						$watchers,
+						Watcher_Model::WORK,
+						$work->id
+					);
 				}
-
+				
+				$subject = mail_message::format('work_update_subject');
+				$body = mail_message::format('work_update', array
+				(
+					$work->user->name . ' ' . $work->user->surname,
+					url_lang::base().'works/show/'.$work->id
+				));
+				
+				// send message about work update to all watchers
+				Mail_message_Model::send_system_message_to_item_watchers(
+					$subject,
+					$body,
+					Vote_Model::WORK,
+					$work->id
+				);
+				
+				$work->transaction_commit();
 				status::success('Work has been successfully updated');
 			}
+			catch (Exception $e)
+			{
+				$work->transaction_rollback();
+				Log::add_exception($e);
+				status::error('Error - Cannot update work', $e);
+			}
 
-			url::redirect('works/show/' . $work->id);
+			if ($is_from_user)
+				$this->redirect('users/show_work/', $work->id);
+			else
+				$this->redirect('works/show/', $work->id);
 		}
+		else
+		{
+			if ($is_from_user)
+			{
+				$breadcrumbs = breadcrumbs::add()
+						->link('members/show_all', 'Members',
+								$this->acl_check_view('Members_Controller', 'members'))
+						->disable_translation()
+						->link('members/show/'.$work->user->member->id,
+								'ID ' . $work->user->member->id . ' - ' .
+								$work->user->member->name,
+								$this->acl_check_view(
+										'Members_Controller', 'members',
+										$work->user->member->id
+								)
+						)->enable_translation()
+						->link('users/show_by_member/' . $work->user->member_id,
+								'Users',
+								$this->acl_check_view(
+										'Users_Controller', 'users',
+										$work->user->member_id
+								)
+						)->disable_translation()
+						->link('users/show/'.$work->user->id,
+								$work->user->name . ' ' . $work->user->surname .
+								' (' . $work->user->login . ')',
+								$this->acl_check_view(
+										'Users_Controller','users',
+										$work->user->member_id
+								)
+						)->enable_translation()
+						->link('works/show_by_user/'.$work->user->id, 'Works',
+								$this->acl_check_view(
+										'Works_Controller', 'work',
+										$work->user->member_id
+								)
+						)->link('users/show_work/'.$work->id, 'ID '.$work->id,
+								$this->acl_check_view(
+										'Works_Controller', 'work',
+										$work->user->member_id
+						));
+			}
+			else
+			{
+				$breadcrumbs = breadcrumbs::add()
+					->link('works/show_all', 'Works',
+						$this->acl_check_view('Works_Controller','work'))
+					->link('works/show/'.$work->id, 'ID '.$work->id,
+								$this->acl_check_view(
+										'Works_Controller', 'work',
+										$work->user->member_id
+						));
+			}
+			
+			$breadcrumbs->text('Edit');
 
-		$link_back = html::anchor('works/show/' . $work->id, __('Back to the work'));
-
-		$view = new View('main');
-		$view->title = __('Edit the work');
-		$view->content = new View('form');
-		$view->content->headline = __('Edit the work');
-		$view->content->link_back = $link_back;
-		$view->content->form = $this->form->html();
-		$view->render(TRUE);
+			$view = new View('main');
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->title = __('Edit the work');
+			$view->content = new View('form');
+			$view->content->headline = __('Edit the work');
+			$view->content->form = $this->form->html();
+			$view->render(TRUE);
+		}
 	}
 
 	/**
@@ -2012,7 +1874,7 @@ class Works_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_delete('Users_Controller', 'work', $work->user->member_id))
+		if (!$this->acl_check_delete('Works_Controller', 'work', $work->user->member_id))
 			Controller::error(ACCESS);
 
 		// work is locked
@@ -2021,153 +1883,56 @@ class Works_Controller extends Controller
 			status::success('It is not possible delete locked work.');
 			url::redirect('works/show/'.$work->id);
 		}
-
-		$approval_template_id = $work->approval_template_id;
-		$work_user_id= $work->user_id;
-		$work_description = $work->description;
-		$work_suggest_amount = $work->suggest_amount;
-		$saved = $work->delete();
-
-		// set up state of approval template
-		$approval_template = new Approval_template_Model($approval_template_id);
-		$approval_template->state = $approval_template->get_state($approval_template->id);
-		$saved = $saved && $approval_template->save();
-
-		if ($saved)
+		
+		try
 		{
-			$receivers = array();
-
-			$mail_message = new Mail_message_Model();
-			$user = new User_Model();
-
-			// work has been updated by another user, sends message to user
-			if ($work_user_id != $this->session->get('user_id'))
-			{
-				$user->clear();
-				$user->where('id',$this->session->get('user_id'))->find();
-
-				$receivers[] = $work_user_id;
-
-				$mail_message = new Mail_message_Model();
-				$mail_message->from_id = 1;
-				$mail_message->to_id = $work_user_id;
-				$mail_message->subject = mail_message::format('your_work_delete_subject');
-				$mail_message->body = mail_message::format('your_work_delete', array
-				(
-					$work_description, $user->name.' '.$user->surname
-				));
-				$mail_message->time = date('Y-m-d H:i:s');
-				$mail_message->from_deleted = 1;
-				$mail_message->save();
-			}
-
-			// finds all aro ids assigned to vote about this work
-			$approval_template_item_model = new Approval_template_item_Model();
-			$aro_ids = $approval_template_item_model->get_aro_ids_by_approval_template_id(
-					$approval_template_id, $work_suggest_amount
+			$work->transaction_start();
+			
+			$approval_template_id = $work->approval_template_id;
+			$work_user_id = $work->user_id;
+			
+			$subject = mail_message::format('work_delete_subject');
+			$body = mail_message::format('work_delete', array
+			(
+				$work->user->name.' '.$work->user->surname,
+				$work->description,
+				url_lang::base().'works/show/'.$work->id
+			));
+			
+			// send message about work delete to all watchers
+			Mail_message_Model::send_system_message_to_item_watchers(
+				$subject,
+				$body,
+				Vote_Model::WORK,
+				$work->id
 			);
+			
+			$watcher_model = new Watcher_Model();
+			
+			// remove all watchers
+			$watcher_model->delete_watchers_by_object(
+				Watcher_Model::WORK, $work->id
+			);
+			
+			// remove work
+			$work->delete_throwable();
 
-			// count of aro ids is not null
-			if (count($aro_ids))
-			{
-				// finds user to whom belongs work
-				$user->clear();
-				$user->where('id', $work_user_id)->find();
-
-				$subject = mail_message::format('work_delete_subject');
-				$body = mail_message::format('work_delete', array
-				(
-					$user->name.' '.$user->surname, $work_description
-				));
-
-				foreach ($aro_ids as $aro)
-				{
-					// is not necessary send message to  user who added work
-					if ($aro->id != $this->session->get('user_id'))
-					{
-						if (!in_array($aro->id, $receivers))
-						{
-							$receivers[] = $aro->id;
-
-							// sends message
-							$mail_message->clear();
-							$mail_message->from_id = 1;
-							$mail_message->to_id = $aro->id;
-							$mail_message->subject = $subject;
-							$mail_message->body = $body;
-							$mail_message->time = date('Y-m-d H:i:s');
-							$mail_message->from_deleted = 1;
-							$mail_message->save();
-						}
-					}
-				}
-			}
-
+			// set up state of approval template
+			Approval_template_Model::update_state(
+				$approval_template_id
+			);
+			
+			$work->transaction_commit();
 			status::success('Work has been successfully deleted');
 		}
+		catch (Exception $e)
+		{
+			$work->transaction_rollback();
+			status::error('Error - Cannot delete work', $e);
+			Log::add_exception($e);
+		}
+		
 		url::redirect('works/show_by_user/'.$work_user_id);
-	}
-
-	/** CALLBACK FUNCTIONS **/
-
-	/**
-	 * Callback function to show vote dropwdown in grid
-	 * 
-	 * @author Michal Kliment
-	 * @param object $item
-	 * @param string $name
-	 * @param object $input
-	 */
-	protected static function vote_form_field ($item, $name, $input)
-	{
-		static $approval_template_item = NULL;
-		
-		if (empty($approval_template_item))
-		{
-			$approval_template_item = new Approval_template_item_Model();
-		}
-		
-		$uid = Session::instance()->get('user_id');
-		
-		if ($item->approval_template_id &&
-			$approval_template_item->check_user_vote_rights($item->id, $uid))
-		{
-			if ($uid == $item->user_id)
-			{
-				$input->options(array
-				(
-					NULL	=> '--------',
-					0		=> __('Abstain')
-				));
-			}
-			echo $input->html();
-		}		
-	}
-
-	/**
-	 * Callback function to show comment textarea in grid
-	 * 
-	 * @author Michal Kliment
-	 * @param object $item
-	 * @param string $name
-	 * @param object $input
-	 */
-	protected static function comment_form_field ($item, $name, $input)
-	{
-		static $approval_template_item = NULL;
-		
-		if (empty($approval_template_item))
-		{
-			$approval_template_item = new Approval_template_item_Model();
-		}
-		
-		$uid = Session::instance()->get('user_id');
-		
-		if ($item->approval_template_id &&
-			$approval_template_item->check_user_vote_rights($item->id, $uid))
-		{
-			echo $input->html();
-		}
 	}
 	
 	/**

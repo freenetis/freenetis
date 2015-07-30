@@ -22,6 +22,18 @@ class Subnets_Controller extends Controller
 	private $subnet_id = NULL;
 	
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Redirects to show all
 	 */
 	public function index()
@@ -43,10 +55,26 @@ class Subnets_Controller extends Controller
 			$order_by_direction = 'ASC', $page_word = null, $page = 1)
 	{
 		// access check
-		if (!$this->acl_check_view('Devices_Controller', 'subnet'))
+		if (!$this->acl_check_view('Subnets_Controller', 'subnet'))
 		{
 			Controller::error(ACCESS);
 		}
+		
+		// check if subnets with DHCP server has set uped gateway
+		$subnets = ORM::factory('subnet')->get_all_dhcp_subnets_without_gateway();
+		
+		if (count($subnets))
+		{
+			$subnet_links = array();
+			foreach ($subnets as $s)
+			{
+				$subnet_links[] = html::anchor('subnets/show/' . $s->id, $s->name);
+			}
+			
+			$m = 'These subnets have not configured gateway (%s), set them please.';
+			status::mwarning($m, TRUE, implode(', ', $subnet_links));
+		}
+		
 		
 		$filter_form = new Filter_form('s');
 		
@@ -62,24 +90,42 @@ class Subnets_Controller extends Controller
 				Filter_form::OPER_NETWORK_IS_IN => 'cidr',
 				Filter_form::OPER_NETWORK_IS_NOT_IN => 'cidr',
 			));
-		
-		$filter_form->add('redirect')
-			->type('select')
-			->label('Redirection')
-			->values(arr::bool());
+                
+                $filter_form->add('netmask')
+			->type('network_address');
 		
 		$filter_form->add('member_name')
 			->label('Owner')
 			->type('combo')
 			->callback('json/member_name');
 		
+		$filter_form->add('redirect')
+			->type('select')
+			->label('Redirection')
+			->values(arr::bool());
+		
+		$filter_form->add('dhcp')
+			->type('select')
+			->label('DHCP')
+			->values(arr::bool());
+		
+		$filter_form->add('dns')
+			->type('select')
+			->label('DNS')
+			->values(arr::bool());
+		
+		$filter_form->add('qos')
+			->type('select')
+			->label('QoS')
+			->values(arr::bool());
+		
 		$filter_form->add('used')
 			->type('number');
 		
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
+		if (is_numeric($this->input->post('record_per_page')))
 		{
-			$limit_results = (int) $this->input->get('record_per_page');
+			$limit_results = (int) $this->input->post('record_per_page');
 		}
 		
 		// get count of records
@@ -114,7 +160,7 @@ class Subnets_Controller extends Controller
 			'filter'					=> $filter_form
 		)); 
 
-		if ($this->acl_check_new('Devices_Controller', 'subnet'))
+		if ($this->acl_check_new('Subnets_Controller', 'subnet'))
 		{
 			$grid->add_new_button('subnets/add', __('Add new subnet'),
 			array
@@ -124,7 +170,7 @@ class Subnets_Controller extends Controller
 			));
 		}
 		
-		if ($this->acl_check_view('Devices_Controller', 'subnet'))
+		if ($this->acl_check_view('Subnets_Controller', 'subnet'))
 		{
 			$grid->add_new_button('subnets/address_map/'.server::query_string(),
 				__('Address map'),
@@ -150,10 +196,44 @@ class Subnets_Controller extends Controller
 				->label(__('Owner').' '.help::hint('subnet_owner'))
 				->callback('callback::member_field');
 		
-		$grid->order_field('redirect')
-				->label(__('Redir'))
-				->bool(arr::rbool())
-				->class('center');
+		// access control
+		if ($this->acl_check_view('Subnets_Controller', 'redirect'))
+		{
+			$grid->order_field('redirect')
+					->label(__('Redir'))
+					->bool(arr::rbool())
+					->class('center');
+		}
+		
+		// access control
+		if ($this->acl_check_view('Subnets_Controller', 'dhcp'))
+		{
+			$grid->order_callback_field('dhcp')
+					->label(__('DHCP'))
+					->callback('callback::boolean')
+					->class('center')
+					->help(help::hint('subnet_dhcp'));
+		}
+		
+		// access control
+		if ($this->acl_check_view('Subnets_Controller', 'dns'))
+		{
+			$grid->order_callback_field('dns')
+					->label(__('DNS'))
+					->callback('callback::boolean')
+					->class('center')
+					->help(help::hint('subnet_dns'));
+		}
+		
+		// access control
+		if ($this->acl_check_view('Subnets_Controller', 'qos'))
+		{
+			$grid->order_callback_field('qos')
+					->label(__('QoS'))
+					->callback('callback::boolean')
+					->class('center')
+					->help(help::hint('subnet_qos'));
+		}
 		
 		$grid->order_callback_field('used')
 				->label(__('Used'))
@@ -163,14 +243,14 @@ class Subnets_Controller extends Controller
 		
 		$actions = $grid->grouped_action_field();
 		
-		if ($this->acl_check_view('Devices_Controller', 'subnet'))
+		if ($this->acl_check_view('Subnets_Controller', 'subnet'))
 		{
 			$actions->add_action('id')
 					->icon_action('show')
 					->url('subnets/show');
 		}
 		
-		if ($this->acl_check_edit('Devices_Controller', 'subnet'))
+		if ($this->acl_check_edit('Subnets_Controller', 'subnet'))
 		{
 			$actions->add_action('id')
 					->icon_action('edit')
@@ -178,7 +258,7 @@ class Subnets_Controller extends Controller
 					->class('popup_link');
 		}
 		
-		if ($this->acl_check_delete('Devices_Controller', 'subnet'))
+		if ($this->acl_check_delete('Subnets_Controller', 'subnet'))
 		{
 			$actions->add_action('id')
 					->icon_action('delete')
@@ -213,12 +293,12 @@ class Subnets_Controller extends Controller
 		}
 		
 		// access check
-		if (!$this->acl_check_view('Devices_Controller', 'subnet'))
+		if (!$this->acl_check_view('Subnets_Controller', 'subnet'))
 		{
 			Controller::error(ACCESS);
 		}
 		
-		// laod model
+		// load model
 		$subnet = new Subnet_Model($subnet_id);
 		
 		// correct data?
@@ -227,14 +307,29 @@ class Subnets_Controller extends Controller
 			Controller::error(RECORD);
 		}
 		
+		$total_available = (~ip2long($subnet->netmask) & 0xffffffff)+1;
+		
+		// subnet has gateway
+		$has_gateway = $subnet->has_gateway();
+		
+		if ($has_gateway)
+		{
+			$total_available = $total_available - 2;
+			
+			$from = 1;
+			$to = $total_available;
+		}
+		else
+		{
+			$from = 0;
+			$to = $total_available - 1;
+		}
+		
 		// clouds of subnet
 		$clouds = $subnet->get_clouds_of_subnet($subnet_id);
 			
 		// ip addresses of subnet
-		$ip_model = new Ip_address_Model();
-		$ips = $ip_model->get_ip_addresses_of_subnet($subnet_id);
-
-		$total_available = (~ip2long($subnet->netmask) & 0xffffffff)-1;
+		$ips = $subnet->ip_addresses;
 
 		$used = round(count($ips)/$total_available*100,1);
 		
@@ -242,19 +337,56 @@ class Subnets_Controller extends Controller
 
 		$ip_addresses = array();
 
-		for ($i=1; $i <= $total_available; $i++)
+		for ($i=$from; $i <= $to; $i++)
 		{
-			$ip_addresses[$i] = new stdClass();
-			$ip_addresses[$i]->ip_address_id = NULL;
-			$ip_addresses[$i]->device_id = NULL;
-			$ip_addresses[$i]->device_name = NULL;
-			$ip_addresses[$i]->member_id = NULL;
-			$ip_addresses[$i]->ip_address = long2ip($network+$i);
+			$ip_addresses[$i] = arr::to_object(array
+			(
+				'ip_address_id'	=> NULL,
+				'id'			=> NULL,
+				'device_id'		=> NULL,
+				'device_name'	=> NULL,
+				'device_type'	=> NULL,
+				'member_id'		=> NULL,
+				'member_name'	=> NULL,
+				'ip_address'	=> long2ip($network+$i),
+				'mac'			=> NULL,
+				'iface_id'		=> NULL,
+				'iface_name'	=> NULL,
+				'gateway'		=> 0,
+			));
 		}
+		
+		$enum_type_model = new Enum_type_Model();
 
 		foreach ($ips as $ip)
 		{
-			$ip_addresses[ip2long($ip->ip_address)-$network] = $ip;
+			if ($ip->iface_id)
+			{
+				$id = $ip->id;
+				$member_id = $ip->iface->device->user->member_id;
+				$member_name = $ip->iface->device->user->member->name;
+			}
+			else
+			{
+				$id = NULL;
+				$member_id = $ip->member_id;
+				$member_name = $ip->member->name;
+			}
+			
+			$ip_addresses[ip2long($ip->ip_address)-$network] = arr::to_object(array
+			(
+				'id'			=> $id,
+				'device_id'		=> $ip->iface->device_id,
+				'device_name'	=> $ip->iface->device->name,
+				'device_type'	=> $enum_type_model->get_value($ip->iface->device->type),
+				'member_id'		=> $member_id,
+				'member_name'	=> $member_name,
+				'ip_address'	=> $ip->ip_address,
+				'mac'			=> ($ip->iface->mac != '') ? $ip->iface->mac : '-',
+				'iface_id'		=> $ip->iface_id,
+				'iface_name'	=> $ip->iface->name,
+				'gateway'		=> $ip->gateway
+			));
 		}
 
 		// grid
@@ -264,36 +396,53 @@ class Subnets_Controller extends Controller
 				'use_selector'	=> false
 		));
 		
- 		$grid->field('ip_address_id')
-				->label(__('ID'));
+		$grid->field('ip_address')
+				->label('IP address');
 		
-		$grid->callback_field('ip_address')
-				->label(__('IP address'))
-				->callback('callback::ip_address_field');
+		$grid->callback_field('gateway')
+				->help(help::hint('gateway'))
+				->callback('boolean')
+				->class('center');
 		
-		$grid->callback_field('device_name')
-				->label(__('Device'))
-				->callback('callback::device_field');
+		$grid->link_field('iface_id')
+				->link('ifaces/show', 'mac', 'iface_name')
+				->label('MAC');
 		
-		$callback_link = '';
+		$grid->link_field('device_id')
+				->link('devices/show', 'device_name')
+				->label(__('Device'));
 		
-		if ($subnet->subnets_owner->member->id)
-		{
-			$callback_link = html::anchor(
-					'members/show/'.$subnet->subnets_owner->member->id,
-					$subnet->subnets_owner->member->name
-			);
-		}
+		$grid->field('device_type')
+				->label(__('Type'));
 		
-		$grid->callback_field('member_name')
-				->label(__('Member'))
-				->callback('callback::member_field', $callback_link);
+		$grid->link_field('member_id')
+				->link('members/show', 'member_name');
+		
+		$actions = $grid->grouped_action_field();
+		
+		$actions->add_action()
+				->icon_action('show')
+				->label('Show IP address')
+				->url('ip_addresses/show')
+				->class('popup_link');
+		
+		$actions->add_action()
+				->icon_action('edit')
+				->label('Edit IP address')
+				->url('ip_addresses/edit')
+				->class('popup_link');
+		
+		$actions->add_action()
+				->icon_action('delete')
+				->label('Delete IP address')
+				->url('ip_addresses/delete')
+				->class('delete_link');
 		
 		// load datasource
 		$grid->datasource($ip_addresses);
 
 		// bread crumbs
-		$breadcrumbs[] = ($this->acl_check_view('Devices_Controller','subnet')) ?
+		$breadcrumbs[] = ($this->acl_check_view('Subnets_Controller','subnet')) ?
 				html::anchor('subnets/show_all',__('Subnets')) : __('Subnets');
 		$breadcrumbs[] = $subnet->name." ($subnet->network_address/"
 						. network::netmask2cidr($subnet->netmask) .")";
@@ -323,7 +472,7 @@ class Subnets_Controller extends Controller
 	public function add($cloud_id = null) 
 	{		
 		// access check
-		if (!$this->acl_check_new('Devices_Controller', 'subnet'))
+		if (!$this->acl_check_new('Subnets_Controller', 'subnet'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -357,12 +506,40 @@ class Subnets_Controller extends Controller
 				->label(__('OSPF area ID').':')
 				->rules('valid_digit');
 		
-        if ($this->acl_check_new('Devices_Controller', 'redirect'))
+		// access control
+        if ($this->acl_check_new('Subnets_Controller', 'redirect'))
 		{
         	$form->dropdown('redirect')
 					->label(__('Redirection enabled'))
 					->options(arr::rbool())
 					->selected(0);
+		}
+		
+		// access control
+        if ($this->acl_check_new('Subnets_Controller', 'dhcp'))
+		{
+			$form->dropdown('dhcp')
+					->label('DHCP server')
+					->help(help::hint('subnet_dhcp'))
+					->options(arr::rbool());
+		}
+		
+		// access control
+        if ($this->acl_check_new('Subnets_Controller', 'dns'))
+		{
+			$form->dropdown('dns')
+					->label('DNS server')
+					->help(help::hint('subnet_dns'))
+					->options(arr::rbool());
+		}
+		
+		// access control
+        if ($this->acl_check_new('Subnets_Controller', 'qos'))
+		{
+			$form->dropdown('qos')
+					->label('QoS')
+					->help(help::hint('subnet_qos'))
+					->options(arr::rbool());
 		}
 
 		$form->dropdown('owner_id')
@@ -416,9 +593,32 @@ class Subnets_Controller extends Controller
 				$subnet_model->network_address = $form_data['network_address'];
 				$subnet_model->netmask = $form_data['netmask'];
 				$subnet_model->OSPF_area_id = $form_data['OSPF_area_id'];
+				
+				// access control
+				if ($this->acl_check_new('Subnets_Controller', 'dhcp'))
+				{
+					$subnet_model->dhcp = $form_data['dhcp'];
+				}
+				
+				// access control
+				if ($this->acl_check_new('Subnets_Controller', 'dns'))
+				{
+					$subnet_model->dns = $form_data['dns'];
+				}
+				
+				// access control
+				if ($this->acl_check_new('Subnets_Controller', 'qos'))
+				{
+					$subnet_model->qos = $form_data['qos'];
+				}
+				
+				if ($subnet_model->dhcp)
+				{
+					$subnet_model->dhcp_expired = 1;
+				}
 
-				// redirect
-				if ($this->acl_check_new('Devices_Controller', 'redirect'))
+				// access control
+				if ($this->acl_check_new('Subnets_Controller', 'redirect'))
 				{
 					$subnet_model->redirect = $form_data['redirect'];
 				}
@@ -426,12 +626,14 @@ class Subnets_Controller extends Controller
 				// save
 				$subnet_model->save_throwable();
 				
+				$owner_id = (int) $form_data['owner_id'];
+				
 				// subnet owner
-				if ($form_data['owner_id'])
+				if ($owner_id)
 				{
 					$subnets_owner = new Subnets_owner_Model();
 					$subnets_owner->subnet_id = $subnet_model->id;
-					$subnets_owner->member_id = $form_data['owner_id'];
+					$subnets_owner->member_id = $owner_id;
 					$subnets_owner->redirect = 0;
 
 					$subnets_owner->save_throwable();
@@ -444,16 +646,18 @@ class Subnets_Controller extends Controller
 					{
 						$ip_address_model->clear();
 						$ip_address_model->ip_address = $ip;
-						$ip_address_model->member_id = $form_data['owner_id'];
+						$ip_address_model->member_id = $owner_id;
 						$ip_address_model->subnet_id = $subnet_model->id;
 						$ip_address_model->save_throwable();
 					}
 				}
 				
+				$cloud = (int) $form_data['cloud'];
+				
 				// cloud		
-				if ($form_data['cloud'])
+				if ($cloud)
 				{
-					$cloud_model = new Cloud_Model($form_data['cloud']);
+					$cloud_model = new Cloud_Model($cloud);
 
 					if ($cloud_model->id)
 					{
@@ -489,7 +693,7 @@ class Subnets_Controller extends Controller
 			// bread crumbs
 			$breadcrumbs = breadcrumbs::add()
 					->link('subnets/show_all', 'Subnets',
-							$this->acl_check_view('Devices_Controller','subnet'))
+							$this->acl_check_view('Subnets_Controller','subnet'))
 					->text('Add new');
 
 			// view
@@ -518,7 +722,7 @@ class Subnets_Controller extends Controller
 		}
 		
 		// access check
-		if (!$this->acl_check_edit('Devices_Controller', 'subnet'))
+		if (!$this->acl_check_edit('Subnets_Controller', 'subnet'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -565,12 +769,43 @@ class Subnets_Controller extends Controller
 				->rules('valid_digit')
 				->value($subnet_model->OSPF_area_id);
 		
-        if ($this->acl_check_edit('Devices_Controller', 'redirect'))
+		// access control
+        if ($this->acl_check_edit('Subnets_Controller', 'redirect'))
 		{
         	$form->dropdown('redirect')
 					->label(__('Redirection enabled'))
 					->options(arr::rbool())
 					->selected($subnet_model->redirect);
+		}
+		
+		// access control
+		if ($this->acl_check_edit('Subnets_Controller', 'dhcp'))
+		{
+			$form->dropdown('dhcp')
+					->label('DHCP server')
+					->help(help::hint('subnet_dhcp'))
+					->options(arr::rbool())
+					->selected($subnet_model->dhcp);
+		}
+		
+		// access control
+		if ($this->acl_check_edit('Subnets_Controller', 'dns'))
+		{
+			$form->dropdown('dns')
+					->label('DNS server')
+					->help(help::hint('subnet_dns'))
+					->options(arr::rbool())
+					->selected($subnet_model->dns);
+		}
+		
+		// access control
+		if ($this->acl_check_edit('Subnets_Controller', 'qos'))
+		{
+			$form->dropdown('qos')
+					->label('QoS')
+					->help(help::hint('subnet_qos'))
+					->options(arr::rbool())
+					->selected($subnet_model->qos);
 		}
 
 		$form->dropdown('owner_id')
@@ -595,10 +830,30 @@ class Subnets_Controller extends Controller
 				$subnet_model->network_address = $form_data['network_address'];
 				$subnet_model->netmask = $form_data['netmask'];
 				$subnet_model->OSPF_area_id = $form_data['OSPF_area_id'];
-
-				if ($this->acl_check_edit('Devices_Controller', 'redirect'))
+				$subnet_model->dhcp_expired = 1;
+				
+				// access control
+				if ($this->acl_check_edit('Subnets_Controller', 'redirect'))
 				{
 					$subnet_model->redirect = $form_data['redirect'];
+				}
+				
+				// access control
+				if ($this->acl_check_edit('Subnets_Controller', 'dhcp'))
+				{
+					$subnet_model->dhcp = $form_data['dhcp'];
+				}
+				
+				// access control
+				if ($this->acl_check_edit('Subnets_Controller', 'dns'))
+				{
+					$subnet_model->dns = $form_data['dns'];
+				}
+				
+				// access control
+				if ($this->acl_check_edit('Subnets_Controller', 'qos'))
+				{
+					$subnet_model->qos = $form_data['qos'];
 				}
 
 				$subnet_model->save_throwable();
@@ -624,10 +879,12 @@ class Subnets_Controller extends Controller
 				}
 				
 				// owner is set
-				if ($form_data['owner_id'])
+				$owner_id = (int) $form_data['owner_id'];
+				
+				if ($owner_id)
 				{	
 					$subnet_model->subnets_owner->subnet_id = $subnet_model->id;
-					$subnet_model->subnets_owner->member_id = $form_data['owner_id'];
+					$subnet_model->subnets_owner->member_id = $owner_id;
 					$subnet_model->subnets_owner->redirect = 0;
 
 					$subnet_model->subnets_owner->save_throwable();
@@ -639,7 +896,7 @@ class Subnets_Controller extends Controller
 					{
 						$ip_address_model->clear();
 						$ip_address_model->ip_address = $ip;
-						$ip_address_model->member_id = $form_data['owner_id'];
+						$ip_address_model->member_id = $owner_id;
 						$ip_address_model->subnet_id = $subnet_model->id;
 						$ip_address_model->save_throwable();
 					}
@@ -661,7 +918,7 @@ class Subnets_Controller extends Controller
 			catch (Exception $e)
 			{
 				$subnet_model->transaction_rollback();
-				
+				Log::add_exception($e);
 				status::error('Error - subnet has not been successfully updated.');
 			}
 			
@@ -675,10 +932,10 @@ class Subnets_Controller extends Controller
 
 			$breadcrumbs = breadcrumbs::add()
 					->link('subnets/show_all', 'Subnets',
-							$this->acl_check_view('Devices_Controller','subnet'))
+							$this->acl_check_view('Subnets_Controller','subnet'))
 					->disable_translation()
 					->link('subnets/show/'.$subnet_model->id, $subnet_text,
-							$this->acl_check_view('Devices_Controller','subnet'))
+							$this->acl_check_view('Subnets_Controller','subnet'))
 					->enable_translation()
 					->text('Edit');
 
@@ -708,7 +965,7 @@ class Subnets_Controller extends Controller
 		}
 
 		// access check
-		if (!$this->acl_check_delete('Devices_Controller', 'subnet'))
+		if (!$this->acl_check_delete('Subnets_Controller', 'subnet'))
 		{
 				Controller::error(ACCESS);
 		}
@@ -771,7 +1028,7 @@ class Subnets_Controller extends Controller
 	public function address_map()
 	{
 		// access control
-		if (!$this->acl_check_view('Devices_Controller', 'subnet'))
+		if (!$this->acl_check_view('Subnets_Controller', 'subnet'))
 		{
 			Controller::error(ACCESS);
 		}

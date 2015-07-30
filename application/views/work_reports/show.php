@@ -2,8 +2,9 @@
 
 <div class="status_message_info"><?php echo __('This report is your concept, you can edit it till you think that it is ready for approval.') ?></div>
 
-<?php echo form::open(url_lang::base() . 'work_reports/concept_change/' . $work_report->id, array('id' => 'article_form')) ?>
+<?php echo form::open(url_lang::base() . 'work_reports/concept_change/' . $work_report->id, array('id' => 'article_form', 'method' => 'get')) ?>
 	<button type="submit" class="submit" style="width: auto; margin: 5px 0 15px; padding: 5px;"><?php echo __('Send this concept for approval.') ?></button>
+	<input type="hidden" name="path_qsurl" value="<?php echo url_lang::current() ?>">
 <?php echo form::close() ?>
 	
 <?php endif; ?>
@@ -86,8 +87,8 @@
 		<th><?php echo __('State') ?></th>
 		<td><b><?php echo $state_text ?></b></td>
 	</tr>
-	<?php if ($work_report->state == 3): ?>
-		<?php if($work_report->payment_type == Job_report_Model::PAYMENT_BY_CREDIT): ?>
+	<?php if ($work_report->state == Vote_Model::STATE_APPROVED): ?>
+		<?php if(Settings::get('finance_enabled') && $work_report->payment_type == Job_report_Model::PAYMENT_BY_CREDIT): ?>
 		<tr>
 			<th><?php echo __('Confirmed time') ?></th>
 			<td><?php echo $transfer->creation_datetime ?></td>
@@ -107,7 +108,5 @@
 
 <br /><br />
 <h3><?php echo __('Works') ?></h3>
-
-<a href="#" id="work_report__show_descr"><?php echo __('Show whole descriptions') ?></a> | 
 
 <?php echo $works_grid ?>

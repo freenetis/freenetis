@@ -23,6 +23,20 @@ class Approval_template_items_Controller extends Controller
 	private $approval_template = NULL;
 	/** @var Approval_template_item_Model */
 	private $ati = NULL;
+	
+	/**
+	 * Only checks whether approval are enabled
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function __construct()
+	{
+	    parent::__construct();
+	    
+	    // approval are not enabled
+	    if (!Settings::get('approval_enabled'))
+			Controller::error (ACCESS);
+	}
 
 	/**
 	 * Index redirects to show all

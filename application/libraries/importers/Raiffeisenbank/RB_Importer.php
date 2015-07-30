@@ -70,9 +70,13 @@ class RB_Importer
 	 *  specific_symbol => 9876543210
 	 *  amount => 720.00
 	 *  fee => -6.90
+	 * @param integer $notification_email State of e-mail notification
+	 * @param integer $notification_sms State of SMS notification
 	 *
 	 */
-	public function store_transfer_ebanka($data = null)
+	public function store_transfer_ebanka(
+			$data = null, $notification_email = Notifications_Controller::KEEP,
+			$notification_sms = Notifications_Controller::KEEP)
 	{
 		// param check
 		if (!$data || !is_object($data))
@@ -497,6 +501,25 @@ class RB_Importer
 									$data->date_time, "Transakční poplatek",
 									$member->id, $id
 							);
+						}
+						
+						/**
+						 * Send information about received payment to member
+						 * 
+						 * @author Ondřej Fibich
+						 * @since 1.1
+						 */
+						try
+						{
+							Message_Model::activate_special_notice(
+									Message_Model::RECEIVED_PAYMENT_NOTICE_MESSAGE,
+									$member->id, self::$user_id,
+									$notification_email, $notification_sms
+							);
+						}
+						catch (Exception $e)
+						{
+							Log::add_exception($e);
 						}
 					}  // if (is_object($member) && $member->id)
 					$this->stats->member_fees_nr++;

@@ -1,24 +1,27 @@
-<script type="text/javascript">
+<script type="text/javascript"><!--
 $(document).ready(function(){
 	
 	// filters data used by javascript
-	var types = <?php echo json_encode($js_data) ?>
+	var types = <?php echo json_encode($js_data) ?>;
 	
 	var selected_operations = {
-<?php foreach ($operations as $i => $operation): ?>
-<?php if ($operation != ""): ?>
-		'<?php echo $i ?>': ["<?php echo $operation ?>"],
-<?php endif ?>
-<?php endforeach ?>
-	}
+<?php 
+	foreach ($operations as $i => $operation): 
+		if ($operation != ''):
+			echo "\t\t$i: ['$operation'],\n"; endif;
+	endforeach
+?>
+	};
 	
 	var selected_values = {
-<?php foreach ($types as $i => $type): ?>
-<?php if (isset($js_data[$type]["returns"]) && $js_data[$type]["returns"] == 'key'): ?>
-		'<?php echo $i ?>': ["<?php echo implode('","', $values[$i]) ?>"],
-<?php endif ?>
-<?php endforeach ?>
-	}
+<?php 
+	foreach ($types as $i => $type):
+		if (isset($js_data[$type]['returns']) && $js_data[$type]['returns'] == 'key'):
+			echo "\t\t$i: ['" . implode('\',\'', $values[$i]) . "'],\n";
+		endif;
+	endforeach
+?>
+	};
 
 	/**
 	 * Type of filter changed
@@ -236,7 +239,7 @@ $(document).ready(function(){
 	}
 	
 });
-</script>
+//--></script>
 		
 <?php echo form::open(url::base(TRUE).url::current(FALSE), array('method' => 'get', 'id' => 'filter_form')); ?>
 	<fieldset>
@@ -269,8 +272,18 @@ $(document).ready(function(){
 	<?php echo form::hidden('tables['.$type.']', $table, " class='b'") ?>
 <?php endforeach ?>
 		</div>
-<?php echo form::button(array('type' => 'submit', 'class' => 'submit', 'value' => __('Apply'))) ?>
-<?php echo ($can_add) ? html::anchor(url_lang::base().'filter_queries/add'.server::query_string().'&url='.$base_url, __('Save'), array('class' => 'save-button popup_link')) : '' ?>
+			
+		<button type="submit" class="submit filter-button">
+			<?php echo html::image(array('src' => 'media/images/icons/filter.png', 'width' => 14, 'height' => 14, 'style' => 'float:left')) ?>&nbsp;
+			<?php echo __('Filter') ?>
+		</button>
+			
+		<?php if ($can_add): ?>
+			<a href="<?php echo url_lang::base().'filter_queries/add'.server::query_string().'&url='.$base_url ?>" class="save-button popup_link submit">
+				<?php echo html::image(array('src' => 'media/images/icons/save.png', 'width' => 14, 'height' => 14, 'style' => 'float:left')) ?>&nbsp;
+				<?php echo __('Save filter') ?>
+			</a>
+		<?php endif; ?>
 	</div>
 	
 </fieldset>

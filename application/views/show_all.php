@@ -30,7 +30,7 @@ if (isset($form))
     <li<?php echo ($current == $url) ? ' class="current"' : '' ?>><a href="<?php echo $url ?>"><?php echo $name ?></a></li>
     <?php endforeach; ?>
 </ul>
-
+<div class="clear"/>
 <?php endif ?>
 
 <?php echo $table ?>

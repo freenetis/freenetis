@@ -20,6 +20,19 @@
 class Email_Controller extends Controller
 {
 	/**
+	 * Constructor, only test if email is enabled
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		if (!module::e('email'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Shows email form
 	 */
 	public function index()
@@ -109,10 +122,6 @@ class Email_Controller extends Controller
 	 */
 	public function send_email_to_developers()
 	{
-		// Use connect() method to load Swiftmailer and connect using the 
-		// parameters set in the email config file
-		$swift = email::connect();
-
 		// From, subject and HTML message
 		$email = @$_POST['uemail'];
 		$uname = @$_POST['uname'];
@@ -134,6 +143,10 @@ class Email_Controller extends Controller
 			status::error('Wrong email filled in!');
 			url::redirect(url::base());
 		}
+		
+		// Use connect() method to load Swiftmailer and connect using the 
+		// parameters set in the email config file
+		$swift = email::connect();
 
 		$fn_version = '-';
 		
@@ -186,7 +199,7 @@ class Email_Controller extends Controller
 	public function show($email_id = null)
 	{
 		// access
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Email_queues_Controller', 'email_queue'))
 		{
 			Controller::error(ACCESS);
 		}

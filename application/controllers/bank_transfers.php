@@ -31,6 +31,17 @@ class Bank_transfers_Controller extends Controller
 	public static $drawings = 4;
 	
 	/**
+	 * Constructor, only test if finance is enabled
+	 */
+	public function __construct()
+	{		
+		parent::__construct();
+		
+		if (!Settings::get('finance_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Redirects to show all
 	 */
 	public function index()
@@ -65,8 +76,8 @@ class Bank_transfers_Controller extends Controller
 			Controller::error(ACCESS);
 		}
 			
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		$allowed_order_type = array
 		(
@@ -79,39 +90,37 @@ class Bank_transfers_Controller extends Controller
 		
 		if (strtolower($order_by_direction) != 'desc')
 			$order_by_direction = 'desc';
-
-		// creates fields for filtering unidentified transfers
-		$filter = new Table_Form(
-				url_lang::base() . 'bank_transfers/show_by_bank_account/' . $bank_account_id,
-				'get', array
-		(
-				new Table_Form_Item('text', 'datetime', 'Date and time'),
-				new Table_Form_Item('text', 'name', 'Account name'),
-				"tr",
-				new Table_Form_Item('text', 'variable_symbol', 'Variable symbol'),
-				new Table_Form_Item('text', 'amount', 'Amount'),
-				"tr",
-				new Table_Form_Item('text', 'account_nr', 'Account number'),
-				new Table_Form_Item('text', 'bank_nr', 'Bank code'),
-				"tr",
-				new Table_Form_Item('submit', 'submit', 'Filter')
-		));
 		
-		$arr_gets = array();
-		foreach ($this->input->get() as $key=>$value)
-			$arr_gets[] = $key.'='.$value;
-		$query_string = '?'.implode('&',$arr_gets);
-
+		// Create filter form
+		$filter_form = new Filter_form();
+		
+		$filter_form->add('datetime')
+				->type('date')
+				->label('Date and time');
+		
+		$filter_form->add('name')
+				->label('Counteraccount')
+				->callback('json/bank_account_name');
+		
+		$filter_form->add('variable_symbol')
+				->callback('json/variable_symbol');
+		
+		$filter_form->add('account_nr')
+				->label('Account number');
+		
+		$filter_form->add('amount')
+				->type('number');
+		
 		// model
 		$bt_model = new Bank_transfer_Model();			
-		$total_bank_transfers = $bt_model->count_bank_transfers($bank_account_id, $filter->values());
+		$total_bank_transfers = $bt_model->count_bank_transfers($bank_account_id, $filter_form->as_sql());
 		
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_bank_transfers)
 			$sql_offset = 0;
 		
 		$bts = $bt_model->get_bank_transfers(
 				$bank_account_id, $sql_offset, (int)$limit_results, $order_by,
-				$order_by_direction, $filter->values()
+				$order_by_direction, $filter_form->as_sql()
 		);
 		
 		$headline = __('Transfers of bank account');
@@ -133,8 +142,7 @@ class Bank_transfers_Controller extends Controller
 				'limit_results'			=> $limit_results,
 				'variables'				=>	$bank_account_id.'/',
 				'url_array_ofset'		=> 1,
-				'query_string'			=> $query_string,
-				'filter'				=> $filter->view
+				'filter'				=> $filter_form
 		));
 		
 		if ($ba->member_id == 1)
@@ -229,7 +237,7 @@ class Bank_transfers_Controller extends Controller
 	 * @param integer $account_id
 	 */
 	public function show_by_bank_statement(
-			$bank_statement_id = NULL, $limit_results = 500, $order_by = 'id',
+			$bank_statement_id = NULL, $limit_results = 50, $order_by = 'id',
 			$order_by_direction = 'desc', $page_word = null, $page = 1)
 	{
 		if (!isset($bank_statement_id))
@@ -245,8 +253,8 @@ class Bank_transfers_Controller extends Controller
 		if (!$this->acl_check_view('Accounts_Controller', 'bank_transfers'))
 			Controller::error(ACCESS);
 			
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		$allowed_order_type = array
 		(
@@ -280,7 +288,7 @@ class Bank_transfers_Controller extends Controller
 			'selector_increace'    	=> 500,
 			'selector_min' 			=> 500,
 			'selector_max_multiplier'=> 10,
-			'base_url'    			=> Config::get('lang').'/bank_transfers/show_by_bank_account/'
+			'base_url'    			=> Config::get('lang').'/bank_transfers/show_by_bank_statement/'
 									. $bank_statement_id.'/'.$limit_results.'/'.$order_by.'/'.$order_by_direction ,
 			'uri_segment'    		=> 'page',
 			'total_items'    		=> $total_bank_transfers,
@@ -344,7 +352,7 @@ class Bank_transfers_Controller extends Controller
 				$bt_model->get_sum_of_outbound_by_statement($bank_statement_id);
 		
 		$sum_table = new View('table_2_columns');
-		$sum_table->table_data = $summary;
+		$sum_table->table_data = array_map('money::format', $summary);
 				
 		$breadcrumbs = breadcrumbs::add()
 				->link('bank_accounts/show_all', 'Bank accounts')
@@ -379,8 +387,8 @@ class Bank_transfers_Controller extends Controller
         	Controller::error(ACCESS);
 		
         // get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array
@@ -395,35 +403,35 @@ class Bank_transfers_Controller extends Controller
 		if (strtolower($order_by_direction) != 'desc')
 			$order_by_direction = 'asc';
 		
-		// creates fields for filtering unidentified transfers
-		$filter = new Table_Form(
-				url_lang::base()."bank_transfers/unidentified_transfers", "get", array
-		(
-				new Table_Form_Item('text', 'datetime', 'Date and time'),
-				new Table_Form_Item('text', 'name', 'Account name'),
-				"tr",
-				new Table_Form_Item('text', 'variable_symbol', 'Variable symbol'),
-				new Table_Form_Item('text', 'amount', 'Amount'),
-				"tr",
-				new Table_Form_Item('text', 'account_nr', 'Account number'),		
-				"td", new Table_Form_Item('submit', 'submit', 'Filter')
-		));
+		// Create filter form
+		$filter_form = new Filter_form();
 		
-		$arr_gets = array();
-		foreach ($this->input->get() as $key=>$value)
-			$arr_gets[] = $key.'='.$value;
-		$query_string = '?'.implode('&',$arr_gets);
+		$filter_form->add('datetime')
+				->type('date')
+				->label('Date and time');
+		
+		$filter_form->add('name')
+				->label('Account name')
+				->table('ba');
+		
+		$filter_form->add('variable_symbol');
+		
+		$filter_form->add('amount')
+				->type('number');
+		
+		$filter_form->add('account_nr')
+				->label('Account number');
 		
 		// bank transfer model
 		$bt_model = new Bank_transfer_Model();
-		$total_transfers = $bt_model->count_unidentified_transfers($filter->values());
-		
+		$total_transfers = $bt_model->count_unidentified_transfers($filter_form->as_sql());
+
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_transfers)
 			$sql_offset = 0;
 		
 		$bank_transfers = $bt_model->get_unidentified_transfers(
 				$sql_offset, (int)$limit_results, $order_by,
-				$order_by_direction, $filter->values()
+				$order_by_direction, $filter_form->as_sql()
 		);
 		
 		$headline = __('Unidentified transfers');
@@ -443,34 +451,32 @@ class Bank_transfers_Controller extends Controller
 			'order_by'					=> $order_by,
 			'order_by_direction'		=> $order_by_direction,
 			'limit_results'				=> $limit_results,
-			'query_string'				=> $query_string,
 			'url_array_ofset'			=> 0,
-			'filter'					=> $filter->view
+			'filter'					=> $filter_form
 		));
 		
 		$grid->order_field('id')
 				->label('ID');
 		
 		$grid->order_field('datetime')
-				->label(__('Date and time'));
+				->label('Date and time');
 		
 		if ($this->acl_check_view('Accounts_Controller', 'bank_accounts'))
 		{
 			$grid->order_field('account_nr')
-					->label(__('Account number'));
+					->label('Account number');
 			
 			$grid->order_field('bank_nr')
-					->label(__('Bank code'));
+					->label('Bank code');
 		}
 		
 		$grid->order_field('name')
-				->label(__('Account name'));
+				->label('Account name');
 		
-		$grid->order_field('variable_symbol')
-				->label(__('Variable symbol'));
+		$grid->order_field('variable_symbol');
 		
-		$grid->order_field('amount')
-				->label(__('Amount'));
+		$grid->order_callback_field('amount')
+				->callback('callback::money');
 		
 		if ($this->acl_check_new('Accounts_Controller', 'transfers'))
 		{
@@ -482,7 +488,6 @@ class Bank_transfers_Controller extends Controller
 		}
 		
 		$grid->datasource($bank_transfers);
-		
 		
 		$breadcrumbs = breadcrumbs::add()
 				->link('bank_accounts/show_all', 'Bank accounts',
@@ -688,7 +693,7 @@ class Bank_transfers_Controller extends Controller
 			{
 				$db->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cannot assign transfer.');
+				status::error('Error - cannot assign transfer.', $e);
 			}
 			url::redirect('bank_transfers/unidentified_transfers');
 		}
@@ -736,8 +741,7 @@ class Bank_transfers_Controller extends Controller
 		// form		
 		$form = new Forge('bank_transfers/add/'.$baa_id);
 		
-		$form->set_attr('class', 'form_class')
-				->set_attr('method', 'post');
+		$form->set_attr('method', 'post');
 		
 		// counteraccount
 		$form->group('Counteraccount');
@@ -986,7 +990,7 @@ class Bank_transfers_Controller extends Controller
 			{
 				$db->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cannot add bank transfer.');
+				status::error('Error - cannot add bank transfer.', $e);
 			}
 			url::redirect('bank_transfers/show_by_bank_account/'.$baa_id);
 		}
@@ -1134,7 +1138,7 @@ class Bank_transfers_Controller extends Controller
 			{
 				$db->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cannot add bank transfer.');				
+				status::error('Error - cannot add bank transfer.', $e);				
 			}
 			
 			url::redirect('bank_transfers/show_by_bank_account/'.$baa_id);

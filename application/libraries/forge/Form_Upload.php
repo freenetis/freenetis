@@ -181,7 +181,7 @@ class Form_Upload extends Form_Input {
 	'cpt'   => array('application/mac-compactpro'),
 	'class' => array('application/octet-stream'),
 	'css'   => array('text/css'),
-	'csv'   => array('text/x-comma-separated-values', 'application/vnd.ms-excel'),
+	'csv'   => array('text/csv', 'text/x-comma-separated-values', 'application/vnd.ms-excel'),
 	'deb'   => array('application/x-debian-package'),
 	'dbk'   => array('application/docbook+xml'),
 	'dir'   => array('application/x-director'),

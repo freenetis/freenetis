@@ -49,6 +49,17 @@ class condition
 	}
 	
 	/**
+	 * Check if the log queue is uncloded.
+	 * 
+	 * @param object $item Data row
+	 * @return boolean
+	 */
+	public static function is_log_queue_unclosed($item)
+	{
+		return ($item->state != Log_queue_Model::STATE_CLOSED);
+	}
+	
+	/**
 	 * Check if current row is not locked.
 	 * Data row has to have locked column.
 	 *
@@ -124,4 +135,117 @@ class condition
 	{
 		return ($item->port_vlan != Vlan_Model::DEFAULT_VLAN_TAG);
 	}
+	
+	/**
+	 * Check if connection is undecided.
+	 *
+	 * @author Ondřej Fibich
+	 * @param object $item	Data row
+	 * @return boolean
+	 */
+	public static function is_connection_request_undecided($item)
+	{
+		return ($item->state == Connection_request_Model::STATE_UNDECIDED);
+	}
+	
+	/**
+	 * Check whether the approval of applicant can be made without submited
+	 * registration or applicant has submited the registration.
+	 * 
+	 * @param object $item Member object
+	 * @return boolen
+	 */
+	public static function is_applicant_registration($item)
+	{
+		return Settings::get('self_registration_enable_approval_without_registration') ||
+				$item->registration;
+	}
+	
+	/**
+	 * Is item in the new state?
+	 * 
+	 * @param object $item
+	 * @return boolena
+	 */
+	public static function is_item_new($item)
+	{
+		return ($item->state == Vote_Model::STATE_NEW);
+	}
+	
+	/**
+	 * Checks whether the given notification message may be activated automatically.
+	 * 
+	 * @param object $item
+	 * @return boolean
+	 */
+	public static function is_message_automatical_config($item)
+	{
+		return Message_Model::can_be_activate_automatically($item->type);
+	}
+	
+	/**
+	 * Checks if notification message may be activated directly
+	 * 
+	 * @param object $item
+	 * @return boolean
+	 */
+	public static function is_activatable_directlty($item)
+	{
+		$message = new Message_Model($item->id);
+		
+		return Message_Model::can_be_activate_directly($message->type);
+	}
+	
+	/**
+	 * Checks whether the given notification message is user message.
+	 * 
+	 * @param object $item
+	 * @return boolean
+	 */
+	public static function is_message_type_of_user($item)
+	{
+		return ($item->type == Message_Model::USER_MESSAGE);
+	}
+	
+	/**
+	 * Checks whether the given bank account has capability for automatical
+	 * sownload of bank statements.
+	 * 
+	 * @param object $item
+	 * @return boolean
+	 */
+	public static function is_automatical_down_of_statement_available($item)
+	{
+		try
+		{
+			$bas = Bank_Account_Settings::factory($item->type);
+			$bas->load_column_data($item->settings);
+			return $bas->can_download_statements_automatically();
+		}
+		catch (InvalidArgumentException $e)
+		{
+			return FALSE;
+		}
+	}
+	
+	/**
+	 * Checks whether the given bank account has capability for importing of
+	 * bank statement.
+	 * 
+	 * @param object $item
+	 * @return boolean
+	 */
+	public static function is_import_of_statement_available($item)
+	{
+		try
+		{
+			$bas = Bank_Account_Settings::factory($item->type);
+			return $bas->can_import_statements();
+		}
+		catch (InvalidArgumentException $e)
+		{
+			return FALSE;
+		}
+	}
+	
 }

@@ -19,6 +19,17 @@
 class Bank_accounts_Controller extends Controller
 {
 	/**
+	 * Constructor, only test if finance is enabled
+	 */
+	public function __construct()
+	{		
+		parent::__construct();
+		
+		if (!Settings::get('finance_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Index redirects to show all
 	 */
 	public function index()
@@ -61,27 +72,23 @@ class Bank_accounts_Controller extends Controller
 		if ($this->acl_check_new('Accounts_Controller', 'bank_accounts'))
 		{
 			$baa_grid->add_new_button(
-					'bank_accounts/add/1', __('Add new bank account of association')
+					'bank_accounts/add/1', 'Add new bank account of association'
 			);
 		}
-
-		/*if ($this->acl_check_new('Accounts_controller', 'bank_transfers'))
-		{
-			$baa_grid->add_new_button(
-					'bank_accounts/fio_settings', __('Fio settings')
-			);
-		}*/
 		
 		$baa_grid->field('id')
-				->label(__('ID'));
+				->label('ID');
 		
 		$baa_grid->field('baname')
-				->label(__('Account name'));
+				->label('Account name');
+		
+		$baa_grid->callback_field('type')
+				->callback('callback::bank_account_type');
 		
 		$baa_grid->field('account_number');
 		
 		$baa_grid->field('mname')
-				->label(__('Member name'));
+				->label('Member name');
 		
 		$actions = $baa_grid->grouped_action_field();
 		
@@ -103,10 +110,27 @@ class Bank_accounts_Controller extends Controller
 		
 		if ($this->acl_check_new('Accounts_Controller', 'bank_transfers'))
 		{
-			$actions->add_action('id')
+			$actions->add_conditional_action('id')
+					->condition('is_import_of_statement_available')
 					->icon_action('import')
 					->url('import/upload_bank_file')
 					->label('Import');
+		}
+		
+		if ($this->acl_check_view('Accounts_Controller', 'bank_account_auto_down_config'))
+		{
+			$actions->add_conditional_action('id')
+					->condition('is_automatical_down_of_statement_available')
+					->icon_action('settings_auto')
+					->url('bank_accounts_auto_down_settings/show')
+					->label('Setup automatical downloading of statements');
+		}	
+		
+		if ($this->acl_check_edit('Accounts_Controller', 'bank_accounts'))
+		{
+			$actions->add_conditional_action('id')
+					->icon_action('edit')
+					->url('bank_accounts/edit');
 		}
 			
 		$baa_grid->datasource($baa);		
@@ -115,9 +139,9 @@ class Bank_accounts_Controller extends Controller
 		if ($this->acl_check_view('Accounts_Controller', 'bank_accounts'))
 		{
 			// get new selector
-			if (is_numeric($this->input->get('record_per_page')))
+			if (is_numeric($this->input->post('record_per_page')))
 			{
-				$limit_results = (int) $this->input->get('record_per_page');
+				$limit_results = (int) $this->input->post('record_per_page');
 			}
 			
 			// parameters control
@@ -133,31 +157,29 @@ class Bank_accounts_Controller extends Controller
 				$order_by_direction = 'asc';
 			}
 			
-			// creates fields for filtering unidentified transfers
-			$filter = new Table_Form(
-					url_lang::base() . 'bank_accounts/show_all', 'get', array
-			(
-					new Table_Form_Item('text', 'name', 'Account name'),
-					new Table_Form_Item('text', 'account_nr', 'Account number'),
-					"tr",
-					new Table_Form_Item('text', 'bank_nr', 'Bank code'),
-					"td", new Table_Form_Item('submit', 'submit', 'Filter')
-			));
-			
-			$arr_gets = array();
-			foreach ($this->input->get() as $key=>$value)
-				$arr_gets[] = $key.'='.$value;
-			$query_string = '?'.implode('&',$arr_gets);
-			
+			// Create filter form
+			$filter_form = new Filter_form();
+
+			$filter_form->add('name')
+					->label('Account name')
+					->table('ba')
+					->callback('json/bank_account_name');
+
+			$filter_form->add('account_nr')
+					->label('Account number');
+
+			$filter_form->add('bank_nr')
+					->label('Bank code');
+
 			// bank accounts			
-			$total_baccounts = $bank_account_model->count_bank_accounts($filter->values());
+			$total_baccounts = $bank_account_model->count_bank_accounts($filter_form->as_sql());
 			
 			if (($sql_offset = ($page - 1) * $limit_results) > $total_baccounts)
 				$sql_offset = 0;
 			
 			$ba = $bank_account_model->get_bank_accounts(
 					$sql_offset, (int)$limit_results, $order_by,
-					$order_by_direction, $filter->values()
+					$order_by_direction, $filter_form->as_sql()
 			);
 			
 			$title = __('Bank accounts').'&nbsp;'.help::hint('bank_accounts');
@@ -178,31 +200,30 @@ class Bank_accounts_Controller extends Controller
 				'order_by'					=> $order_by,
 				'order_by_direction'		=> $order_by_direction,
 				'limit_results'				=> $limit_results,
-				'filter'					=> $filter->view,
-				'query_string'				=> $query_string
+				'filter'					=> $filter_form,
 			));
 			
 			// adding bank account
 			if ($this->acl_check_new('Accounts_Controller', 'bank_accounts'))
 			{
-				$grid->add_new_button('bank_accounts/add', __('Add new bank account'));
+				$grid->add_new_button('bank_accounts/add', 'Add new bank account');
 			}
 			
 			$grid->order_field('id')
 					->label('ID');
 			
 			$grid->order_field('baname')
-					->label(__('Account name'));
+					->label('Account name');
 			
 			$grid->order_field('account_nr')
-					->label(__('Account number'));
+					->label('Account number');
 			
 			$grid->order_field('bank_nr')
-					->label(__('Bank code'));
+					->label('Bank code');
 			
 			$grid->order_link_field('member_id')
 					->link('members/show', 'member_name')
-					->label(__('Member name'));
+					->label('Member name');
 			
 			$actions = $grid->grouped_action_field();
 		
@@ -243,7 +264,7 @@ class Bank_accounts_Controller extends Controller
 	 * Function adds bank account.
 	 * If member id 1 is specified, then it is new bank account of association.
 	 */
-	public function add($member_id = null)
+	public function add($member_id = NULL)
 	{
 		// access
 		if (!$this->acl_check_new('Accounts_Controller', 'bank_accounts'))
@@ -252,7 +273,7 @@ class Bank_accounts_Controller extends Controller
 		}
 		
 		// form
-		if (!isset($member_id) || $member_id != 1)
+		if (!isset($member_id) || $member_id != Member_Model::ASSOCIATION)
 		{
 			// members list
 			$arr_members = ORM::factory('member')->select_list();
@@ -273,14 +294,15 @@ class Bank_accounts_Controller extends Controller
 		}
 		else
 		{
-			$form = new Forge("bank_accounts/add/$member_id");		
+			$form = new Forge('bank_accounts/add/' . $member_id);
+		
+			$form->dropdown('type')
+					->options(Bank_account_Model::get_type_names())
+					->style('width:200px');		
 		}
 		
 		$form->input('account_name')
 				->rules('required|length[3,50]');
-		
-		$form->input('account_comment')
-				->label('Comment');
 		
 		$form->input('account_nr')
 				->label('Account number')
@@ -307,23 +329,34 @@ class Bank_accounts_Controller extends Controller
 				$member_id = $form_data["member_id"];
 			}
 			
+			// determinig type
+			if ($member_id == Member_Model::ASSOCIATION)
+			{
+				$type = $form_data["type"];
+			}
+			else
+			{
+				$type = Bank_account_Model::TYPE_OTHER;
+			}
+			
 			// real bank account
 			$bank_account = new Bank_account_Model();
-			$bank_account->name = $form_data["account_name"];
-			$bank_account->member_id = $member_id;				
-			$bank_account->account_nr = $form_data["account_nr"];
-			$bank_account->bank_nr = $form_data["bank_nr"];
-			$bank_account->IBAN = $form_data["IBAN"];
-			$bank_account->SWIFT = $form_data["SWIFT"];
+			$bank_account->name = $form_data['account_name'];
+			$bank_account->member_id = $member_id;
+			$bank_account->type = $type;
+			$bank_account->account_nr = $form_data['account_nr'];
+			$bank_account->bank_nr = $form_data['bank_nr'];
+			$bank_account->IBAN = $form_data['IBAN'];
+			$bank_account->SWIFT = $form_data['SWIFT'];
 			$bank_account->save();
 			// only member 1 - association itself - has related double-entry accounts to added bank account
-			if ($member_id == 1)
+			if ($member_id == Member_Model::ASSOCIATION)
 			{			
 				// these three double-entry accounts are related to one bank account through relation table
 				// double-entry bank account
 				$doubleentry_bank_account = new Account_Model();
 				$doubleentry_bank_account->member_id = $member_id;
-				$doubleentry_bank_account->name = $form_data["account_name"];
+				$doubleentry_bank_account->name = $form_data['account_name'];
 				$doubleentry_bank_account->account_attribute_id = Account_attribute_Model::BANK;
 				$doubleentry_bank_account->comment = __('Bank accounts');
 				$doubleentry_bank_account->add($bank_account);
@@ -331,7 +364,7 @@ class Bank_accounts_Controller extends Controller
 				// double-entry account of bank fees
 				$bank_fees_account = new Account_Model();
 				$bank_fees_account->member_id = $member_id;
-				$bank_fees_account->name = $form_data["account_name"].' - '.__('Bank fees');
+				$bank_fees_account->name = $form_data['account_name'].' - '.__('Bank fees');
 				$bank_fees_account->account_attribute_id = Account_attribute_Model::BANK_FEES;
 				$bank_fees_account->comment = __('Bank fees');
 				$bank_fees_account->add($bank_account);
@@ -339,7 +372,7 @@ class Bank_accounts_Controller extends Controller
 				// double-entry account of bank interests
 				$bank_interests_account = new Account_Model();
 				$bank_interests_account->member_id = $member_id;
-				$bank_interests_account->name = $form_data["account_name"].' - '.__('Bank interests');
+				$bank_interests_account->name = $form_data['account_name'].' - '.__('Bank interests');
 				$bank_interests_account->account_attribute_id = Account_attribute_Model::BANK_INTERESTS;
 				$bank_interests_account->comment = __('Bank interests');
 				$bank_interests_account->add($bank_account);
@@ -370,90 +403,147 @@ class Bank_accounts_Controller extends Controller
 		$view->content = new View('form');
 		$view->content->headline = $headline;
 		$view->content->form = $form->html();
-		$view->render(TRUE);
-		
+		$view->render(TRUE);	
 	}
-
-
-			/**
-	 * Settings for daily Fio imports.
-	 * @author Jiri Svitak
+	
+	/**
+	 * Enables to edit bank account of association.
+	 * 
+	 * @param integer $bank_account_id
 	 */
-	/*public fun ction fio_settings()
+	public function edit($bank_account_id = NULL)
 	{
-		// access control
-		if (!$this->acl_check_new('Accounts_Controller', 'bank_transfers'))
-			Controller::error(ACCESS);
-
-		$arr_bool = array
-		(
-			'1' => __('Yes'),
-			'0' => __('No')
-		);
-
-		// creating of new forge
-		$this->form = new Forge('bank_accounts/fio_settings');
-
-		$this->form->group('General settings');
-
-		$this->form->radio('fio_import_daily')
-				->label(__('Enable automatic Fio import').":&nbsp;".
-						help::hint('fio_import_daily'))
-				->options($arr_bool)
-				->default(Settings::get('fio_import_daily'));
-
-		$this->form->input('fio_user')
-				->label(__('User') . ':')
-				->value(Settings::get('fio_user'));
-
-		$this->form->input('fio_password')
-				->label(__('Password') . ':&nbsp;'.
-						help::hint('fio_password'))
-				->value(Settings::get('fio_password'));
-
-		$this->form->input('fio_account_number')
-				->label(__('Account number') . ':&nbsp;'.
-						help::hint('fio_account_number'))
-				->value(Settings::get('fio_account_number'));
-
-		$this->form->input('fio_view_name')
-				->label(__('View name') . ':&nbsp;'.
-						help::hint('fio_view_name'))
-				->value(Settings::get('fio_account_number'));
-
-		$this->form->submit('submit')->value(__('Save'));
-
-		special::required_forge_style($this->form, ' *', 'required');
-
-		// form validate
-		if ($this->form->validate())
+		// param
+		if (!intval($bank_account_id))
 		{
-			$form_data = $this->form->as_array(FALSE);
-			$issaved = true;
-
-			foreach ($form_data as $name => $value)
-			{
-				$issaved = $issaved && Settings::set($name, $value);
-			}
-
-			if ($issaved)
-			{	// if all action were succesfull
-				status::success('System variables have been successfully updated.');
-			}
-			else
-			{	// if not
-				status::error('System variables havent been successfully updated.');
-			}
-
-			url::redirect('bank_accounts/fio_settings');
+			self::warning(PARAMETER);
 		}
-		// create view for this template
+		
+		// access
+		if (!$this->acl_check_edit('Accounts_Controller', 'bank_accounts'))
+		{
+			self::error(ACCESS);
+		}
+		
+		$bank_account = new Bank_account_Model($bank_account_id);
+		
+		// exists?
+		if (!$bank_account || !$bank_account->id ||
+			$bank_account->member_id != Member_Model::ASSOCIATION)
+		{
+			self::error(RECORD);
+		}
+		
+		try
+		{
+			$ba_driver = Bank_Account_Settings::factory($bank_account->type);
+			$ba_driver->load_column_data($bank_account->settings);
+		}
+		catch (InvalidArgumentException $e)
+		{
+			$ba_driver = NULL;
+		}
+		
+		// form
+		$form = new Forge();
+		
+		$form->group('Basic information');
+
+		$form->dropdown('type')
+				->options(Bank_account_Model::get_type_names())
+				->selected($bank_account->type)
+				->style('width:200px');
+		
+		$form->input('IBAN')
+				->value($bank_account->IBAN);
+		
+		$form->input('SWIFT')
+				->value($bank_account->SWIFT);
+		
+		// bank account settings
+		if ($ba_driver && count($ba_driver->get_column_fields()))
+		{
+			$form->group('Settings');
+			
+			$columns = $ba_driver->get_column_fields();
+			
+			foreach ($columns as $column => $info)
+			{
+				switch ($info['type'])
+				{
+					case Bank_Account_Settings::FIELD_TYPE_BOOL:
+						$input = $form->checkbox($column)->checked($ba_driver->$column);
+						break;
+					
+					default:
+						$input = $form->input($column)->value($ba_driver->$column);
+						break;
+				}
+				
+				if (isset($info['name']) && !empty($info['name']))
+					$input->label($info['name']);
+				
+				if (isset($info['help']) && !empty($info['help']))
+					$input->help(help::hint($info['help']));
+				
+				if (isset($info['rules']) && !empty($info['rules']))
+					$input->rules($info['rules']);
+			}
+		}
+		
+		// submit button
+		$form->submit('Edit');
+		
+		// validation
+		if ($form->validate())
+		{
+			$form_data = $form->as_array();
+			
+			// real bank account
+			$bank_account->type = $form_data['type'];
+			$bank_account->IBAN = $form_data['IBAN'];
+			$bank_account->SWIFT = $form_data['SWIFT'];
+			
+			if ($ba_driver && count($ba_driver->get_column_fields()))
+			{
+				unset($form_data['type']);
+				unset($form_data['IBAN']);
+				unset($form_data['SWIFT']);
+
+				foreach ($form_data as $key => $value)
+				{
+					$ba_driver->$key = $value;
+				}
+
+				$bank_account->settings = $ba_driver->get_column_data();
+			}
+			
+			$bank_account->save();
+			
+			// redirection
+			url::redirect('bank_accounts/show_all');
+		}
+		
+		$headline = __('Edit bank account');
+		
+		// breadcrubs
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show/1', 'Profile of association',
+						$this->acl_check_view('Members_Controller', 'members'))
+				->link('bank_accounts/show_all', 'Bank accounts')
+				->disable_translation()
+				->text($bank_account->account_nr . '/' . $bank_account->bank_nr)
+				->text($headline)
+				->html();
+		
+		// view
 		$view = new View('main');
-		$view->title = __('Fio settings');
-		$view->breadcrumbs = __('Fio settings');
+		$view->title = $headline;
+		$view->breadcrumbs = $breadcrumbs;
 		$view->content = new View('form');
-		$view->content->form = $this->form->html();
-		$view->content->headline = __('Fio settings');
-		$view->render(TRUE);
-	}*/
+		$view->content->headline = $headline;
+		$view->content->form = $form->html();
+		$view->render(TRUE);	
+	}
+	
 }

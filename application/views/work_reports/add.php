@@ -145,7 +145,7 @@
 		
 	});
 	
---></script>
+//--></script>
 
 <h2><?php echo __('Add new work report') ?></h2>
 
@@ -153,7 +153,7 @@
 
 <?php echo form::open(url::base(TRUE) . url::current(TRUE), array('id' => 'article_form')) ?>
 
-	<table cellspacing="0" class="form">
+	<table cellspacing="0" class="form" style="width: 100%">
 		<tr>
 			<th colspan="3" class="group" style="text-align: left"><?php echo __('Work report details') ?></th>
 		</tr>
@@ -161,13 +161,13 @@
 			<th colspan="3"><label><?php echo __('Description of work report') ?></label></th>
 		</tr>
 		<tr>
-			<td colspan="3">
-				<?php echo form::textarea(array('name' => 'description_edit', 'style' => 'margin: 10px; width: 700px')) ?>
+			<td colspan="3" style="padding: 10px">
+				<?php echo form::textarea(array('name' => 'description_edit', 'style' => 'width: 100%')) ?>
 				<?php echo form::hidden('description'); ?>
 			</td>
 		</tr>
 		<tr>
-			<th><label><?php echo __('Approval template') ?></label></th>
+			<th><label><?php if ($this->acl_check_view('Work_reports_Controller', 'approval_template', $member_id)) echo __('Approval template') ?></label></th>
 			<th><label><?php echo __('Worker') ?></label></th>
 			<th><label><?php echo __('Payment type') ?></label></th>
 		</tr>
@@ -175,7 +175,7 @@
 			<td>
 				<?php if (count($arr_approval_templates)): ?>
 				<?php echo form::dropdown(array('name' => 'approval_template_id', 'style' => 'width: 200px; margin: 10px;'), $arr_approval_templates, Settings::get('default_work_approval_template')) ?>
-				<?php else: ?>
+				<?php elseif ($this->acl_check_view('Work_reports_Controller', 'approval_template', $member_id)): ?>
 				<div style="width: 200px; margin: 10px;" class="bold"><?php echo ORM::factory('approval_template', Settings::get('default_work_approval_template'))->name ?></div>
 				<?php endif; ?>
 			</td>
@@ -190,13 +190,13 @@
 		</tr>
 	</table>
 
-	<table cellspacing="0" class="form" id="type_table">
+	<table cellspacing="0" class="form" id="type_table" style="width: 100%">
 		<tr>
 			<th><?php echo __('Type of report') ?></th>
 			<th><?php echo __('Specification of type') ?></th>
 		</tr>
 		<tr>
-			<td><input type="radio" name="report_type" class="radio" id="report_type1" /> <label for="report_type1" class="bold"><?php echo __('Work report per month') ?></label></td>
+			<td style="padding-left: 10px"><input type="radio" name="report_type" class="radio" id="report_type1" /> <label for="report_type1" class="bold"><?php echo __('Work report per month') ?></label></td>
 			<td style="width: 500px" class="report_type_spect">
 				<?php echo form::hidden('type'); ?>
 				<?php echo __('Year') ?>: <?php echo form::dropdown(array('name' => 'report_year'), date::years(date('Y') - 1, date('Y')), date('Y')) ?>
@@ -204,7 +204,7 @@
 			</td>
 		</tr>
 		<tr>
-			<td><input type="radio" name="report_type" class="radio" id="report_type2" /> <label for="report_type2" class="bold"><?php echo __('Grouped works') ?></label></td>
+			<td style="padding-left: 10px"><input type="radio" name="report_type" class="radio" id="report_type2" /> <label for="report_type2" class="bold"><?php echo __('Grouped works') ?></label></td>
 			<td class="report_type_spect">
 				<?php echo __('Count of works') ?>: <input type="text" name="works_count" id="works_count" maxlength="2" style="width: 40px" />
 				<a href="#" id="add_work" style="text-decoration: none; display: none;"><?php echo html::image(array('src' => '/media/images/icons/ico_add.gif', 'alt' => __('Add'))) ?> <?php echo __('Add work') ?></a>

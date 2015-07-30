@@ -40,6 +40,18 @@ class Ifaces_Controller extends Controller
 	private $iface_type = NULL;
 	
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Index redirect to show all
 	 */
 	public function index()
@@ -61,7 +73,7 @@ class Ifaces_Controller extends Controller
 			$order_by_direction = 'asc', $page_word = null, $page = 1)
 	{
 		// access rights	
-		if(!$this->acl_check_view('Devices_Controller','iface'))
+		if(!$this->acl_check_view('Ifaces_Controller','iface'))
 			Controller::error(ACCESS);
 		
 		$filter_form = new Filter_form('i');
@@ -101,8 +113,8 @@ class Ifaces_Controller extends Controller
 				->callback('json/member_name');
 		
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// model
 		$iface_model = new Iface_Model();
@@ -134,7 +146,7 @@ class Ifaces_Controller extends Controller
 			'filter' => $filter_form
 		));
 		
-		if ($this->acl_check_new('Devices_Controller','iface'))
+		if ($this->acl_check_new('Ifaces_Controller','iface'))
 		{
 			$grid->add_new_button('ifaces/add', 'Add new interface');
 		}
@@ -160,21 +172,21 @@ class Ifaces_Controller extends Controller
 		
 		$actions = $grid->grouped_action_field();
 		
-		if ($this->acl_check_view('Devices_Controller','iface'))
+		if ($this->acl_check_view('Ifaces_Controller','iface'))
 		{
 			$actions->add_action('id')
 					->icon_action('show')
 					->url('ifaces/show');
 		}
 		
-		if ($this->acl_check_edit('Devices_Controller','iface'))
+		if ($this->acl_check_edit('Ifaces_Controller','iface'))
 		{
 			$actions->add_action('id')
 					->icon_action('edit')
 					->url('ifaces/edit');
 		}
 		
-		if ($this->acl_check_delete('Devices_Controller','iface'))
+		if ($this->acl_check_delete('Ifaces_Controller','iface'))
 		{
 			$actions->add_action('id')
 					->icon_action('delete')
@@ -219,7 +231,7 @@ class Ifaces_Controller extends Controller
 		$member_id = $iface->device->user->member_id;
 		
 		// access control
-		if (!$this->acl_check_view('Devices_Controller', 'iface', $member_id))
+		if (!$this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
 			Controller::error(ACCESS);
 		
 		// ip addresses
@@ -232,7 +244,7 @@ class Ifaces_Controller extends Controller
 		)); 
 		
 		if ($this->acl_check_new(
-				'Devices_Controller', 'ip_address',
+				'Ip_addresses_Controller', 'ip_address',
 				$iface->device->user->member_id
 			))
 		{
@@ -249,14 +261,22 @@ class Ifaces_Controller extends Controller
 		$grid_ip_addresses->field('ip_address')
 				->label('IP address');
 		
-		$grid_ip_addresses->link_field('subnet_id')
-				->link('subnets/show', 'subnet_name')
-				->label('Subnet');
+		if ($this->acl_check_view('Subnets_Controller', 'subnet'))
+		{
+			$grid_ip_addresses->link_field('subnet_id')
+					->link('subnets/show', 'subnet_name')
+					->label('Subnet');
+		}
+		else
+		{
+			$grid_ip_addresses->field('subnet_name')
+					->label('Subnet');
+		}
 		
 		$actions = $grid_ip_addresses->grouped_action_field();
 		
 		if ($this->acl_check_view(
-				'Devices_Controller', 'ip_address',
+				'Ip_addresses_Controller', 'ip_address',
 				$iface->device->user->member_id
 			))
 		{
@@ -266,7 +286,7 @@ class Ifaces_Controller extends Controller
 		}
 		
 		if ($this->acl_check_edit(
-				'Devices_Controller', 'ip_address',
+				'Ip_addresses_Controller', 'ip_address',
 				$iface->device->user->member_id
 			))
 		{
@@ -276,7 +296,7 @@ class Ifaces_Controller extends Controller
 		}
 		
 		if ($this->acl_check_delete(
-				'Devices_Controller', 'ip_address',
+				'Ip_addresses_Controller', 'ip_address',
 				$iface->device->user->member_id
 			))
 		{
@@ -349,7 +369,7 @@ class Ifaces_Controller extends Controller
 			$breadcrumbs = breadcrumbs::add()
 				->link(
 					'ifaces/show_all', 'Interfaces',
-					$this->acl_check_view('Devices_Controller', 'iface')
+					$this->acl_check_view('Ifaces_Controller', 'iface')
 				)
 				->text($name)
 				->html();
@@ -358,6 +378,7 @@ class Ifaces_Controller extends Controller
 		$headline = __('Interface detail').' - '.$iface->name;		
 		$view = new View('main');
 		$view->breadcrumbs = $breadcrumbs;
+		$view->action_logs = action_logs::object_last_modif($iface, $iface_id);
 		$view->title = $headline;
 		$view->content = new View('ifaces/show');
 		
@@ -432,12 +453,16 @@ class Ifaces_Controller extends Controller
 					'total_items'				=> count($ifaces)
 				));
 				
-				if ($this->acl_check_new(get_class($this), 'iface', $member_id))
+				/**
+				 * @todo Add method to add interface to bridge
+				 */
+				
+				/*if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
 				{
 					$grid->add_new_button(
 							'ifaces/add/' . $iface->device->id, 'Add new interface'
 					);
-				}
+				}*/
 
 				$grid->callback_field('type')
 						->callback('callback::iface_type_field')
@@ -452,7 +477,7 @@ class Ifaces_Controller extends Controller
 
 				$actions = $grid->grouped_action_field();
 
-				if ($this->acl_check_view('Devices_Controller', 'iface', $member_id))
+				if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
 				{
 					$actions->add_action('id')
 							->icon_action('show')
@@ -460,7 +485,7 @@ class Ifaces_Controller extends Controller
 							->class('popup_link');
 				}
 
-				if ($this->acl_check_delete('Devices_Controller', 'iface', $member_id))
+				if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
 				{
 					$actions->add_action('id')
 							->icon_action('delete')
@@ -538,7 +563,7 @@ class Ifaces_Controller extends Controller
 	public function add($device_id = NULL, $type = NULL,
 			$add_button = FALSE, $connect_type = NULL) 
 	{
-		if (!$this->acl_check_new('Devices_Controller', 'iface'))
+		if (!$this->acl_check_new('Ifaces_Controller', 'iface'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -588,7 +613,7 @@ class Ifaces_Controller extends Controller
 		{
 			$breadcrumbs = breadcrumbs::add()->link(
 					'ifaces/show_all', 'Interfaces',
-					$this->acl_check_view('Devices_Controller', 'iface')
+					$this->acl_check_view('Ifaces_Controller', 'iface')
 				)->text('Add new interface')
 				->html();
 		}
@@ -1146,7 +1171,7 @@ class Ifaces_Controller extends Controller
 				{
 					$iface->transaction_rollback();
 					Log::add_exception($e);
-					status::error('Error - Cannot add interface.');
+					status::error('Error - Cannot add interface.', $e);
 				}
 			}
 			
@@ -1284,7 +1309,7 @@ class Ifaces_Controller extends Controller
 			self::error(RECORD);
 		}
 		
-		if (!$this->acl_check_edit('Devices_Controller', 'iface'))
+		if (!$this->acl_check_edit('Ifaces_Controller', 'iface'))
 		{
 			self::error(ACCESS);
 		}
@@ -1319,10 +1344,10 @@ class Ifaces_Controller extends Controller
 		
 		$breadcrumbs = breadcrumbs::add()
 				->link('links/show_all', 'Links',
-						$this->acl_check_view('Devices_Controller', 'segment'))
+						$this->acl_check_view('Links_Controller', 'link'))
 				->link('links/show/' . $link->id, $link->name . ' (' .
 						Link_Model::get_medium_type($link->medium) . ')',
-						$this->acl_check_view('Devices_Controller', 'segment'))
+						$this->acl_check_view('Links_Controller', 'link'))
 				->disable_translation()
 				->text($headline);
 		
@@ -1363,7 +1388,7 @@ class Ifaces_Controller extends Controller
 		$member_id = $iface->device->user->member_id;
 		
 		// access control
-		if (!$this->acl_check_edit('Devices_Controller', 'iface', $member_id))
+		if (!$this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
 		{
 			Controller::error(ACCESS);
 		}
@@ -1418,7 +1443,8 @@ class Ifaces_Controller extends Controller
 				->label('MAC')
 				->rules('valid_mac_address')
 				->style('width:620px')
-				->value($iface->mac);
+				->value($iface->mac)
+				->callback(array($this, 'valid_unique_mac_in_subnets'));
 		}
 
 		$base_form->textarea('comment')
@@ -2009,6 +2035,21 @@ class Ifaces_Controller extends Controller
 				}
 
 				$iface->save_throwable();
+				
+				// expired subnets (#465)
+				$expired_subnets = array();
+				
+				$ip_adress_model = new Ip_address_Model();
+				$ip_addresses = $ip_adress_model->get_all_ip_addresses_of_iface(
+					$iface->id, TRUE
+				);
+				
+				foreach ($ip_addresses as $ip)
+				{
+					$expired_subnets[] = $ip->subnet_id;
+				}
+				
+				ORM::factory('subnet')->set_expired_subnets($expired_subnets);
 
 				$iface->transaction_commit();
 
@@ -2019,13 +2060,13 @@ class Ifaces_Controller extends Controller
 			{
 				$iface->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - Cannot edit interface');
+				status::error('Error - Cannot edit interface', $e);
 			}
 		}
 		
 		$name = strval($iface);
 		
-		if (url::slice(url_lang::uri(Path::instance()->previous()),0,1) != 'ifaces')
+		if (Path::instance()->uri(TRUE)->previous(0,1) != 'ifaces')
 		{
 			$breadcrumbs = breadcrumbs::add()
 				->link(
@@ -2073,7 +2114,7 @@ class Ifaces_Controller extends Controller
 				->link(
 					'devices/show_iface/'.$iface->id,
 					$name, $this->acl_check_view(
-						'Devices_Controller', 'iface',
+						'Ifaces_Controller', 'iface',
 						$iface->device->user->member->id
 					)
 				)->text('Edit')
@@ -2085,11 +2126,11 @@ class Ifaces_Controller extends Controller
 				->link(
 					'ifaces/show_all',
 					'Interfaces',
-					$this->acl_check_view('Devices_Controller','iface')
+					$this->acl_check_view('Ifaces_Controller','iface')
 				)->link(
 					'ifaces/show/'.$iface->id, $name,
 					$this->acl_check_view(
-						'Devices_Controller', 'iface',
+						'Ifaces_Controller', 'iface',
 						$iface->device->user->member->id
 					)
 				)->text('Edit')
@@ -2133,7 +2174,7 @@ class Ifaces_Controller extends Controller
 		// additional infor for AP and reamings
 		$roaming_id = ORM::factory('link')->get_roaming();
 		
-		if ($iface->link->id == $roaming_id || (
+		if (($iface->link->id == $roaming_id && $roaming_id !== NULL) || (
 				$iface->type == Iface_Model::TYPE_WIRELESS &&
 				$iface->wireless_mode == Iface_Model::WIRELESS_MODE_AP
 			))
@@ -2172,7 +2213,7 @@ class Ifaces_Controller extends Controller
 		$member_id = $iface->device->user->member_id;
 		
 		// access control
-		if (!$this->acl_check_delete('Devices_Controller', 'iface', $member_id))
+		if (!$this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
 		{
 			Controller::error(ACCESS);
 		}
@@ -2228,7 +2269,7 @@ class Ifaces_Controller extends Controller
 		$member_id = $iface->device->user->member_id;
 		
 		// access control
-		if (!$this->acl_check_delete('Devices_Controller', 'iface', $member_id))
+		if (!$this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
 		{
 			Controller::error(ACCESS);
 		}
@@ -2279,7 +2320,7 @@ class Ifaces_Controller extends Controller
 		$member_id = $iface->device->user->member_id;
 
 		// access control
-		if (!$this->acl_check_delete('Devices_Controller', 'iface', $member_id))
+		if (!$this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
 		{
 			Controller::error(ACCESS);
 		}
@@ -2314,7 +2355,8 @@ class Ifaces_Controller extends Controller
 		}
 		catch (Exception $e)
 		{
-			status::error('Error - cant remove interface.');
+			Log::add_exception($e);
+			status::error('Error - cant remove interface.', $e);
 		}
 
 		if ($redirect_to_link)
@@ -2374,6 +2416,30 @@ class Ifaces_Controller extends Controller
 					));
 				}
 			}
+		}
+	}
+	
+	/**
+	 * Callback function to validate MAC adress in order to have this MAC
+	 * in maximum count of one.
+	 * 
+	 * @author Ondřej Fibich
+	 * @param Form_Field $input 
+	 */
+	public function valid_unique_mac_in_subnets($input = NULL)
+	{
+		// validators cannot be accessed
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
+		
+		$iface = new Iface_Model();
+		
+		if (!$iface->is_mac_unique($this->iface_id, $input->value))
+		{
+			$m = 'This MAC is in collision with other interfaces on the same subnet';
+			$input->add_error('required', __($m) . '!');
 		}
 	}
 	

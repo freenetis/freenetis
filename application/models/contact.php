@@ -66,6 +66,45 @@ class Contact_Model extends ORM
 				WHERE contact_id = ? AND user_id = ?
 		", $this->id, $user_id)->current()->count;
 	}
+	
+	/**
+	 * Check if the given user own this contact and also whether the contact
+	 * is an e-mail address with set up redirection from the inner mail.
+	 * 
+	 * @param integer $user_id
+	 * @return boolean
+	 */
+	public function is_user_redirected_email($user_id)
+	{
+		if (!$this->id || $this->type != self::TYPE_EMAIL)
+		{
+			return false;
+		}
+		
+		return $this->db->query("
+				SELECT COUNT(contact_id) AS count
+				FROM users_contacts
+				WHERE contact_id = ? AND user_id = ? AND mail_redirection = 1
+		", $this->id, $user_id)->current()->count;
+	}
+	
+	/**
+	 * Set state of e-mail inner mail redirection.
+	 * 
+	 * @param integer $user_id
+	 * @param boolean $redirect IS redirection enabled?
+	 */
+	public function set_user_redirected_email($user_id, $redirect)
+	{
+		if ($this->id && $this->type == self::TYPE_EMAIL)
+		{		
+			$this->db->query("
+					UPDATE users_contacts
+					SET mail_redirection = ?
+					WHERE contact_id = ? AND user_id = ?
+			", $redirect ? 1 : 0, $this->id, $user_id);
+		}
+	}
 
 	/**
 	 * Search for relation between users and countacts (users_contacts)
@@ -144,13 +183,13 @@ class Contact_Model extends ORM
 	{
 		return $this->db->query("
 				SELECT c.id, c.type, IF(n.country_code IS NULL, c.value,
-					CONCAT(n.country_code, c.value)) AS value
+					CONCAT(n.country_code, c.value)) AS value, u.user_id
 				FROM contacts c
 				LEFT JOIN users_contacts u ON u.contact_id = c.id
 				LEFT JOIN contacts_countries o ON o.contact_id = c.id
 				LEFT JOIN countries n ON n.id = o.country_id
 				WHERE u.user_id = ?" . ($type ? " AND c.type = ?" : "") . "
-				ORDER BY c.type
+				ORDER BY c.type, c.value
 		", $user_id, $type);
 	}
 
@@ -165,7 +204,7 @@ class Contact_Model extends ORM
 		return $this->db->query("
 				SELECT IF(n.country_code IS NULL, c.value,
 					CONCAT(n.country_code, c.value)) AS value,
-					c.type, p.description, p.contact_id, p.id
+					c.type, p.description, p.contact_id, p.id, p.user_id
 				FROM contacts c
 				LEFT JOIN private_users_contacts p ON p.contact_id = c.id
 				LEFT JOIN contacts_countries o ON o.contact_id = c.id

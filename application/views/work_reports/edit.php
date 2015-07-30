@@ -48,7 +48,7 @@
 			if (da.length == 3 &&
 				new Date(da[0], da[1] - 1, da[2]).getDay() % 6 == 0)
 			{
-				$(this).parent().parent().css('background', '#f1f1f1');
+				$(this).parent().parent().find('td').css('background', '#e3e3e3');
 			}
 		});
 		
@@ -56,7 +56,7 @@
 		
 	});
 	
---></script>
+//--></script>
 
 <?php if ($work_report->concept): ?>
 <div class="status_message_info"><?php echo __('This report is your concept, you can edit it till you think that it is ready for approval.') ?></div>	
@@ -68,7 +68,7 @@
 
 <?php echo form::open(url::base(TRUE) . url::current(TRUE), array('id' => 'article_form')) ?>
 
-	<table cellspacing="0" class="form">
+	<table cellspacing="0" class="form" style="width: 100%">
 		<tr>
 			<th colspan="3" class="group" style="text-align: left"><?php echo __('Work report details') ?></th>
 		</tr>
@@ -76,8 +76,8 @@
 			<th colspan="3"><label><?php echo __('Description of work report') ?></label></th>
 		</tr>
 		<tr>
-			<td colspan="3">
-				<?php echo form::textarea(array('name' => 'description', 'value' => $work_report->description, 'style' => 'margin: 10px; width: 700px')) ?>
+			<td colspan="3" style="padding: 10px">
+				<?php echo form::textarea(array('name' => 'description', 'value' => $work_report->description, 'style' => 'width: 100%')) ?>
 			</td>
 		</tr>
 		<tr>
@@ -89,7 +89,7 @@
 			<td style="padding: 5px; width: 240px;">
 				<?php if (count($arr_approval_templates)): ?>
 				<?php echo form::dropdown(array('name' => 'approval_template_id', 'style' => 'width: 200px; margin: 10px;'), $arr_approval_templates, $work_report->approval_template_id) ?>
-				<?php else: ?>
+				<?php elseif ($this->acl_check_view('Work_reports_Controller', 'approval_template', $work_report->user->member_id)): ?>
 				<div style="margin: 10px;" class="bold"><?php echo $work_report->approval_template->name ?></div>
 				<?php endif; ?>
 			</td>
@@ -102,7 +102,7 @@
 		</tr>
 	</table>
 
-	<table cellspacing="0" class="form" id="type_table">
+	<table cellspacing="0" class="form" id="type_table" style="width: 100%">
 		<tr>
 			<th><?php echo __('Type of report') ?></th>
 			<th><?php echo __('Specification of type') ?></th>

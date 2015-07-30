@@ -53,7 +53,7 @@
 		<th><?php echo html::image(array('src' => 'media/images/states/locked.png')); ?></th>
 		<th><?php echo html::anchor('phone_invoices/lock_set/' . $phone_invoice->id, $phone_invoice->locked ? __('Unlock invoice') : __('Lock invoice')) ?></th>
 	</tr>
-	<?php if ($phone_invoice->locked): ?>
+	<?php if (Settings::get('finance_enabled') && $phone_invoice->locked): ?>
 	<tr>
 		<th><?php echo html::image(array('src' => 'media/images/icons/grid_action/money.png')); ?></th>
 		<th><?php echo html::anchor('phone_invoices/pay/' . $phone_invoice->id, __('Discount private services from phone keepers credit account')) ?></th>

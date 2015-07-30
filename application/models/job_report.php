@@ -66,7 +66,15 @@ class Job_report_Model extends ORM
 	 */
 	public static function get_payment_types()
 	{
-		return array_map('__', self::$PAYMENT_TYPES);
+		$types = array();
+		
+		foreach (self::$PAYMENT_TYPES as $key => $value)
+		{
+			if ($key != self::PAYMENT_BY_CREDIT || Settings::get('finance_enabled'))
+				$types[$key] = __($value);
+		}
+		
+		return $types;
 	}
 	
 	/**
@@ -173,40 +181,7 @@ class Job_report_Model extends ORM
 		}
 		
 		return $cache[$this->id];
-	}
-	
-	/**
-	 * Gets count of unvoted work reports of voter
-	 * 
-	 * @param integer $user_id	ID of voter
-	 * @return integer
-	 */
-	public function get_count_of_unvoted_work_reports_of_voter($user_id)
-	{
-		return $this->db->query("
-				SELECT IFNULL(COUNT(*), 0) AS count
-				FROM (
-					SELECT jr.id
-					FROM groups_aro_map g
-					LEFT JOIN approval_types at ON at.aro_group_id = g.group_id
-					LEFT JOIN approval_template_items ati ON at.id = ati.approval_type_id
-					LEFT JOIN job_reports jr ON jr.approval_template_id = ati.approval_template_id
-					LEFT JOIN jobs j ON j.job_report_id = jr.id
-					LEFT JOIN votes v ON v.fk_id = j.id AND v.user_id = ?
-					WHERE
-						g.aro_id = ? AND
-						j.job_report_id IS NOT NULL AND
-						v.id IS NULL AND
-						jr.concept = 0
-					GROUP BY
-						jr.id, at.min_suggest_amount
-					HAVING
-						MIN(j.state) <= 1 AND
-						SUM(j.suggest_amount) >= at.min_suggest_amount
-				) q
-		", $user_id, $user_id)->current()->count;
-	}
-	
+	}	
 	
 	/**
 	 * Gets votes of a voter on a work report
@@ -220,9 +195,9 @@ class Job_report_Model extends ORM
 		return $this->db->query("
 				SELECT v.id, v.vote
 				FROM jobs j
-				LEFT JOIN votes v ON v.fk_id = j.id AND v.user_id = ?
+				JOIN votes v ON v.fk_id = j.id AND v.user_id = ? AND v.type = ?
 				WHERE j.job_report_id = ?
-		", $user_id, $work_report_id);
+		", $user_id, Vote_Model::WORK, $work_report_id);
 	}
 	
 	/**
@@ -343,11 +318,12 @@ class Job_report_Model extends ORM
 	 * @param string $order_by_direction
 	 * @param string $filter_sql
 	 * @param boolean $lower Should be operant to state < (= otherwise)
+	 * @param integer $user_id
 	 * @return Mysql_Result
 	 */
-	private function _get_all_work_reports_with_state(
-			$state, $limit_from = 0, $limit_results = 50, $order_by = 'id',
-			$order_by_direction = 'ASC', $filter_sql = '', $lower = FALSE)
+	public function get_all_work_reports(
+			$limit_from = 0, $limit_results = 50, $order_by = 'id',
+			$order_by_direction = 'ASC', $filter_sql = '', $user_id = NULL)
 	{
 		// order by direction check
 		if (strtolower($order_by_direction) != 'desc')
@@ -369,18 +345,64 @@ class Job_report_Model extends ORM
 						ROUND(SUM(j.hours), 2) AS hours, SUM(j.km) AS km, r.payment_type,
 						IF(MIN(state) <= 1, MIN(state), MAX(state)) AS state,
 						IFNULL(t.amount, IF(r.payment_type = 1, ?, 0)) AS rating,
-						r.transfer_id
+						r.transfer_id, (agree_count - disagree_count) AS approval_state,
+						IFNULL(v.agree_count, 0) AS agree_count,
+						IFNULL(v.abstain_count, 0) AS abstain_count,
+						IFNULL(v.disagree_count, 0) AS disagree_count,
+						v.comment AS vote_comments, uv.vote AS your_votes
 					FROM job_reports r
 					LEFT JOIN transfers t ON t.id = r.transfer_id
-					LEFT JOIN users u ON u.id = r.user_id
-					LEFT JOIN jobs j ON r.id = j.job_report_id
+					JOIN users u ON u.id = r.user_id
+					JOIN jobs j ON r.id = j.job_report_id
+					LEFT JOIN
+					(
+						SELECT
+							job_id,
+							SUM(agree) AS agree_count,
+							SUM(abstain) AS abstain_count,
+							SUM(disagree) AS disagree_count,
+							GROUP_CONCAT(
+								CONCAT(
+									u.name,' ',u.surname,' (',v.time,'): \n',
+									IF(vote = ?, ?, IF(vote = ?, ?, ?))
+								)
+								ORDER BY time
+								SEPARATOR ', \n\n'
+							) AS comment
+						FROM
+						(
+							SELECT
+								v.*, j.id AS job_id,
+								IF(vote = ?, 1, 0) AS agree,
+								IF(vote = ?, 1, 0) AS abstain,
+								IF(vote = ?, 1, 0) AS disagree
+							FROM votes v
+							JOIN jobs j ON v.type = 1 AND fk_id = j.id
+							AND j.job_report_id IS NOT NULL
+							GROUP BY j.job_report_id, v.user_id
+						) v
+						JOIN users u ON v.user_id = u.id
+						GROUP BY job_id
+					) v ON v.job_id = j.id
+					LEFT JOIN votes uv ON uv.fk_id = j.id AND uv.user_id = ? AND uv.type = 1
 					WHERE r.concept = 0
 					GROUP BY r.id
-					HAVING state " . ($lower ? '<' : '=') . " ?
-					ORDER BY " . $this->db->escape_column($order_by) . " " . $order_by_direction . "
-					LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
 				) wr $filter_sql
-		", __('Payment by cash'), $state);
+				ORDER BY " . $this->db->escape_column($order_by) . " " . $order_by_direction . "
+				LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
+		", array
+		(
+			__('Payment by cash'),
+			Vote_Model::AGREE,
+			Vote_Model::get_vote_option_name(Vote_Model::AGREE),
+			Vote_Model::DISAGREE,
+			Vote_Model::get_vote_option_name(Vote_Model::DISAGREE),
+			Vote_Model::get_vote_option_name(Vote_Model::ABSTAIN),
+			Vote_Model::AGREE,
+			Vote_Model::ABSTAIN,
+			Vote_Model::DISAGREE,
+			$user_id
+		));
 	}
 	
 	/**
@@ -418,8 +440,7 @@ class Job_report_Model extends ORM
 	 * @param string $filter_sql
 	 * @return integer
 	 */
-	private function _count_all_work_reports_with_state(
-			$state, $lower = FALSE, $filter_sql = '')
+	public function count_all_work_reports($filter_sql = '')
 	{
 		// where
 		if (!empty($filter_sql))
@@ -441,102 +462,8 @@ class Job_report_Model extends ORM
 					LEFT JOIN jobs j ON r.id = j.job_report_id
 					WHERE r.concept = 0
 					GROUP BY r.id
-					HAVING state " . ($lower ? '<' : '=') . " ?
 				) wr $filter_sql
-		", $state));
-	}
-
-	/**
-	 * Gets all pending work reports 
-	 *
-	 * @param integer $limit_from
-	 * @param integer $limit_results
-	 * @param string $order_by
-	 * @param string $order_by_direction
-	 * @param string $filter_sql			Search filter
-	 * @return Mysql_Result
-	 */
-	public function get_all_pending_work_reports(
-			$limit_from = 0, $limit_results = 50, $order_by = 'id',
-			$order_by_direction = 'ASC', $filter_sql = '')
-	{
-		return $this->_get_all_work_reports_with_state(
-				2, $limit_from, $limit_results, $order_by,
-				$order_by_direction, $filter_sql, TRUE
-		);
-	}
-
-	/**
-	 * Gets all approved work reports 
-	 *
-	 * @param integer $limit_from
-	 * @param integer $limit_results
-	 * @param string $order_by
-	 * @param string $order_by_direction
-	 * @param string $filter_sql			Search filter
-	 * @return Mysql_Result
-	 */
-	public function get_all_approved_work_reports(
-			$limit_from = 0, $limit_results = 50, $order_by = 'id',
-			$order_by_direction = 'ASC', $filter_sql = '')
-	{
-		return $this->_get_all_work_reports_with_state(
-				3, $limit_from, $limit_results, $order_by,
-				$order_by_direction, $filter_sql
-		);
-	}
-
-	/**
-	 * Gets all rejected work reports 
-	 *
-	 * @param integer $limit_from
-	 * @param integer $limit_results
-	 * @param string $order_by
-	 * @param string $order_by_direction
-	 * @param string $filter_sql			Search filter
-	 * @return Mysql_Result
-	 */
-	public function get_all_rejected_work_reports(
-			$limit_from = 0, $limit_results = 50, $order_by = 'id',
-			$order_by_direction = 'ASC', $filter_sql = '')
-	{
-		return $this->_get_all_work_reports_with_state(
-				2, $limit_from, $limit_results, $order_by,
-				$order_by_direction, $filter_sql
-		);
-	}
-
-	/**
-	 * Counts all pending work reports 
-	 * 
-	 * @param string $filter_sql	Search filter
-	 * @return integer
-	 */
-	public function count_all_pending_work_reports($filter_sql = '')
-	{
-		return $this->_count_all_work_reports_with_state(2, TRUE);
-	}
-
-	/**
-	 * Counts all approved work reports 
-	 * 
-	 * @param string $filter_sql	Search filter
-	 * @return integer
-	 */
-	public function count_all_approved_work_reports($filter_sql = '')
-	{
-		return $this->_count_all_work_reports_with_state(3, FALSE, $filter_sql);
-	}
-
-	/**
-	 * Counts all rejected work reports 
-	 * 
-	 * @param string $filter_sql	Search filter
-	 * @return integer
-	 */
-	public function count_all_rejected_work_reports($filter_sql = '')
-	{
-		return $this->_count_all_work_reports_with_state(2, FALSE, $filter_sql);
+		"));
 	}
 	
 	/**

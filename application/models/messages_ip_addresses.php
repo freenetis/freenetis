@@ -35,20 +35,33 @@ class Messages_ip_addresses_Model extends Model
 	}
 	
 	/**
-	 * Deletes redirection of ip address
+	 * Deletes redirection of IP address or multiple IP addresses
 	 * 
-	 * @author Michal Kliment
+	 * @author Michal Kliment, Ondrej Fibich
 	 * @param integer $message_id
-	 * @param integer $ip_address_id
+	 * @param integer|array $ip_address_id
 	 * @return integer
 	 */
 	public function delete_redirection_of_ip_address ($message_id, $ip_address_id)
 	{
-		return $this->db->delete('messages_ip_addresses', array
-		(
-				'message_id'	=> $message_id,
-				'ip_address_id'	=> $ip_address_id
-		))->count();
+		if (!is_array($ip_address_id))
+		{
+			return $this->db->delete('messages_ip_addresses', array
+			(
+					'message_id'	=> $message_id,
+					'ip_address_id'	=> $ip_address_id
+			))->count();
+		}
+		else if (count($ip_address_id))
+		{
+			return $this->db->from('messages_ip_addresses')
+					->where('message_id', $message_id)
+					->in('ip_address_id', array_map('intval', $ip_address_id))
+					->delete()
+					->count();
+		}
+		
+		return 0;
 	}
 	
 	/**
@@ -92,14 +105,20 @@ class Messages_ip_addresses_Model extends Model
 	 */
 	public function add_redirection_to_ip_address ($message_id, $ip_address_id, $comment)
 	{
-		return $this->db->insert('messages_ip_addresses', array
-		(
-				'message_id'	=> $message_id,
-				'ip_address_id'	=> $ip_address_id,
-				'user_id'		=> Session::instance()->get('user_id'),
-				'comment'		=> $comment,
-				'datetime'		=> date('Y-m-d H:i:s')
-		))->count();
+		// check for wrong redirection (#541)
+		if (trim(ORM::factory('message', $message_id)->text) != '')
+		{
+			return $this->db->insert('messages_ip_addresses', array
+			(
+					'message_id'	=> $message_id,
+					'ip_address_id'	=> $ip_address_id,
+					'user_id'		=> Session::instance()->get('user_id'),
+					'comment'		=> $comment,
+					'datetime'		=> date('Y-m-d H:i:s')
+			))->count();
+		}
+		
+		return NULL;
 	}
 	
 }

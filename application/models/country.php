@@ -45,8 +45,24 @@ class Country_Model extends ORM
 		return $this->where(array
 		(
 			'country_code IS NOT'	=> NULL,
-			'country_code !='		=> ''
+			'country_code !='		=> '',
+			'enabled'				=> 1
 		))->select_list('id', $concat, 'country_code');
+	}
+	
+	/**
+	 * Gets list of countries for combo box only with country code
+	 * 
+	 * @return array
+	 */
+	public function select_country_code_list()
+	{
+		return $this->where(array
+		(
+			'country_code IS NOT'	=> NULL,
+			'country_code !='		=> '',
+			'enabled'				=> 1
+		))->select_list('id', 'country_code', 'country_code');
 	}
 
 	/**
@@ -121,4 +137,44 @@ class Country_Model extends ORM
 		return ($query->count() == 1) ? $query->current()->country_code : '';
 	}
 
+	/**
+	 * Enable countries to use
+	 * 
+	 * @author David Raška
+	 * @param array $countries
+	 */
+	public function enable_countries($countries)
+	{
+		$result = $this->db->query("
+				UPDATE countries
+				SET enabled=0;
+		");
+		
+		if ($result)
+		{
+			if (is_array($countries) && count($countries) > 0)
+			{
+				$countries = array_map('mysql_real_escape_string', $countries);
+
+				$in = implode(', ', $countries);
+
+
+				$result = $this->db->query("
+						UPDATE countries
+						SET enabled=1
+						WHERE id IN ($in)
+				");
+
+				return (bool)$result;
+			}
+			else
+			{
+				return TRUE;
+			}
+		}
+		else
+		{
+			return FALSE;
+		}
+	}
 }

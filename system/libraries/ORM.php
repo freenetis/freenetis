@@ -514,6 +514,16 @@ class ORM_Core {
 
 		return $object;
 	}
+	
+	/**
+	 * Return name of current table
+	 * 
+	 * @return string
+	 */
+	public function get_table_name()
+	{
+		return $this->table_name;
+	}
 
 	/**
 	 * Binds another one-to-one object to this model.  One-to-one objects
@@ -1867,6 +1877,18 @@ class ORM_Core {
 		")->current()->count == 1);
 		// get result
 		return $cache[$column_name];
+	}
+	
+	/**
+	 * Truncate table content
+	 * 
+	 * @author Ondřej Fibicho
+	 */
+	public function truncate()
+	{
+		$this->db->query("
+			TRUNCATE `$this->table_name`
+		");
 	}
 	
 	/**

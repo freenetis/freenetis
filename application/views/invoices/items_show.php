@@ -37,10 +37,14 @@
 	</tr>
 	<tr>
 		<th><?php echo __('Price') ?></th>
-		<td><?php echo $invoice_item->price ?></td>
+		<td><?php echo callback::money($invoice_item, 'price') ?></td>
+	</tr>
+	<tr>
+		<th><?php echo __('Tax rate') ?></th>
+		<td><?php echo callback::percent2($invoice_item, 'vat') ?></td>
 	</tr>
 	<tr>
 		<th><?php echo __('Price vat') ?></th>
-		<td><?php echo $invoice_item->price_vat ?></td>
+		<td><?php echo callback::price_vat_field($invoice_item, 'price') ?></td>
 	</tr>
 </table>

@@ -400,7 +400,8 @@ abstract class Database_Driver {
 				// added for suport of GPS -->
 				'point'        => array('type' => 'string', 'binary' => TRUE),
 				'linestring'   => array('type' => 'string', 'binary' => TRUE),
-				'polygon'      => array('type' => 'string', 'binary' => TRUE)
+				'polygon'      => array('type' => 'string', 'binary' => TRUE),
+				'geometry'     => array('type' => 'string', 'binary' => TRUE),
 				// <-- added for suport of GPS
 			);
 

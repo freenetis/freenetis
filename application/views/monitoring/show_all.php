@@ -1,4 +1,4 @@
-<h2><?php echo __('Monitoring') ?><div style="float: right; font-weight: normal; font-size: 65%"><?php echo module_state::get_state('monitoring', TRUE) ?></div></h2>
+<h2><?php echo $title ?><div style="float: right; font-weight: normal; font-size: 65%"><?php echo module::get_state('monitoring', TRUE) ?></div></h2>
 <br /><br />
 <?php echo $form ?><br />
 <?php echo $filter_form ?><br />

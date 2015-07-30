@@ -20,7 +20,17 @@
  */
 class Fees_Controller extends Controller
 {
-
+	/**
+	 * Constructor, only test if finance is enabled
+	 */
+	public function __construct()
+	{		
+		parent::__construct();
+		
+		if (!Settings::get('finance_enabled'))
+			Controller::error (ACCESS);
+	}
+	
 	private $fee_id = NULL;
 
 	/**
@@ -42,28 +52,42 @@ class Fees_Controller extends Controller
 	 * @param string $order_by_direction
 	 */
 	public function show_all(
-			$limit_results = 200, $order_by = 'id', $order_by_direction = 'ASC')
+			$limit_results = 200, $order_by = 'from',
+			$order_by_direction = 'ASC', $page_word = 'page', $page = 1)
 	{
 		// check if logged user have access right to view all fees
-		if (!$this->acl_check_view('Settings_Controller', 'fees'))
+		if (!$this->acl_check_view('Fees_Controller', 'fees'))
 			Controller::Error(ACCESS);
 
 		// to-do - pagination
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
-		$allowed_order_type = array('id', 'type', 'fee', 'from', 'to');
+		$allowed_order_type = array('id', 'type', 'name', 'fee', 'from', 'to');
 		
 		if (!in_array(strtolower($order_by), $allowed_order_type))
-			$order_by = 'id';
+			$order_by = 'from';
 		
 		if (strtolower($order_by_direction) != 'desc')
 			$order_by_direction = 'asc';
 
 		$fee_model = new Fee_Model();
-		$fees = $fee_model->get_all_fees($order_by, $order_by_direction);
+		
 		$total_fees = $fee_model->count_all();
+		
+		// limit check
+		if (($sql_offset = ($page - 1) * $limit_results) > $total_fees)
+			$sql_offset = 0;
+		
+		$fees = $fee_model->get_all_fees(
+			$sql_offset, $limit_results, $order_by, $order_by_direction
+		);
+		
+		// path to form
+		$path = Config::get('lang') . '/fees/show_all/' . $limit_results . '/'
+				. $order_by . '/' . $order_by_direction.'/'.$page_word.'/'
+				. $page;
 
 		// create grid
 		$grid = new Grid('fees', '', array
@@ -74,8 +98,7 @@ class Fees_Controller extends Controller
 				'selector_increace'			=> 200,
 				'selector_min'				=> 200,
 				'selector_max_multiplier'	=> 10,
-				'base_url'					=> Config::get('lang') . '/fees/show_all/'
-											. $limit_results . '/' . $order_by . '/' . $order_by_direction,
+				'base_url'					=> $path,
 				'uri_segment'				=> 'page',
 				'total_items'				=> $total_fees,
 				'items_per_page'			=> $limit_results,
@@ -87,13 +110,14 @@ class Fees_Controller extends Controller
 
 		// add button for new translation
 		// check if logged user have access right to add new translation
-		if ($this->acl_check_new('Settings_Controller', 'fees'))
+		if ($this->acl_check_new('Fees_Controller', 'fees'))
 		{
 			$grid->add_new_button('fees/add', __('Add new fee'));
 		}
 
 		// set grid fields
-		$grid->order_field('id');
+		$grid->order_field('id')
+			->label('ID');
 		
 		$grid->order_field('type');
 		
@@ -111,7 +135,7 @@ class Fees_Controller extends Controller
 		$actions = $grid->grouped_action_field();
 
 		// check if logged user have access right to edit this enum types
-		if ($this->acl_check_edit('Settings_Controller', 'fees'))
+		if ($this->acl_check_edit('Fees_Controller', 'fees'))
 		{
 			$actions->add_conditional_action()
 					->icon_action('edit')
@@ -120,7 +144,7 @@ class Fees_Controller extends Controller
 		}
 
 		// check if logged user have access right to delete this enum_types
-		if ($this->acl_check_delete('Settings_Controller', 'fees'))
+		if ($this->acl_check_delete('Fees_Controller', 'fees'))
 		{
 			$actions->add_conditional_action()
 					->icon_action('delete')
@@ -142,16 +166,16 @@ class Fees_Controller extends Controller
 	}
 
 	/**
-	 * Adds new enum type
+	 * Adds new fee
 	 * 
-	 * @author Michal Kliment
+	 * @author David Raška
 	 */
 	public function add($fee_type_id = NULL)
 	{
 		// access control
-		if (!$this->acl_check_new('Settings_Controller', 'fees'))
+		if (!$this->acl_check_new('Fees_Controller', 'fees'))
 			Controller::error(ACCESS);
-
+		
 		if ($fee_type_id && is_numeric($fee_type_id))
 		{
 			$enum_type_model = new Enum_type_Model();
@@ -174,143 +198,95 @@ class Fees_Controller extends Controller
 			$enum_type_model = new Enum_type_Model();
 			$enum_types = $enum_type_model->get_values($enum_type_name->id);
 		}
-
-		$form = array
-		(
-			'name' => '',
-			'fee' => 0,
-			'from' => array
-			(
-				'day' => date('j'),
-				'month' => date('n'),
-				'year' => date('Y')
-			),
-			'to' => array
-			(
-				'day' => date('j'),
-				'month' => date('n'),
-				'year' => date('Y')
-			),
-			'type_id' => 1
-		);
-
-		$errors = array
-			(
-			'fee' => '',
-			'from' => '',
-			'to' => '',
-			'type_id' => ''
-		);
-
-
-		$days = array();
-		for ($i = 1; $i <= 31; $i++)
-			$days[$i] = $i;
-
-		$months = array();
-		for ($i = 1; $i <= 12; $i++)
-			$months[$i] = $i;
-
-		$years = array();
-		for ($i = date('Y') - 100; $i <= date('Y') + 100; $i++)
-			$years[$i] = $i;
-
-
-		if ($_POST)
+		
+		$form = new Forge();
+		
+		$form->dropdown('type_id')
+			->label('Type')
+			->options($enum_types);
+		
+		$form->input('name')
+			->label('Tariff name');
+		
+		$form->input('fee')
+			->rules('valid_numeric')
+			->value(0);
+		
+		$form->date('from')
+			->rules('required')
+			->callback(array($this, 'valid_interval'))
+			->label('Date from');
+		
+		$form->date('to')
+			->rules('required')
+			->label('Date to');
+		
+		$form->submit('Add');
+		
+		if ($form->validate())
 		{
-			$post = new Validation($_POST);
-			$post->add_rules('fee', 'required', 'numeric');
-
-			$post->add_rules('from', array('valid', 'date'));
-			$post->add_rules('to', array('valid', 'date'));
-
-			// new system is not restricted on overlapping intervals in global scale
-			// overlapping will be checked individually with each member
-			$post->add_callbacks('type_id', array($this, 'valid_interval'));
+			$form_data = $form->as_array();
 			
-			if ($post->validate())
+			$fee = new Fee_Model();
+			
+			try
 			{
-				$fee = new Fee_Model();
-				$fee->type_id = $post->type_id;
-				$fee->name = $post->name;
-				$fee->fee = $post->fee;
-				$fee->from = date::round_month(
-						$post->from['day'],
-						$post->from['month'],
-						$post->from['year']
-				);
-				$fee->to = date::round_month(
-						$post->to['day'],
-						$post->to['month'],
-						$post->to['year'], TRUE
-				);
-				// clears form content
-				unset($form_data);
-
+				$fee->transaction_start();
+				
+				$fee->type_id = $form_data['type_id'];
+				$fee->name = $form_data['name'];
+				$fee->fee = $form_data['fee'];
+				$fee->from = date("Y-m-d", $form_data['from']);
+				$fee->to = date("Y-m-d", $form_data['to']);
+				
+				$fee->save_throwable();
+				
+				$fee->transaction_commit();
+				
 				// for popup adding
 				if ($this->popup)
 				{
-					// save fee
-					$fee->save();
-
-					$fee_name = ($fee->name != '') ? "$fee->name - " : "";
-					$from = str_replace('-', '/', $fee->from);
-					$to = str_replace('-', '/', $fee->to);
-					$fee_name = "$fee_name$fee->fee " . __($this->settings->get('currency')) . " ($from-$to)";
+					$this->redirect('fees/show_all', $fee->id);
 				}
 				else
 				{
-					// has fee been successfully saved?
-					if ($fee->save())
-					{
-						status::success('Fee has been successfully added');
-					}
-					else
-					{
-						status::error('Error - can\'t add new fee.');
-					}
-
-					// classic adding
-					url::redirect(url_lang::base() . 'fees/show_all');
+					status::success('Fee has been successfully added');
+					
+					$this->redirect('fees/show_all');
 				}
 			}
-			else
+			catch (Exception $e)
 			{
-				$form = arr::overwrite($form, $post->as_array());
-				$errors = arr::overwrite($errors, $post->errors('errors'));
+				$fee->transaction_rollback();
+				status::error('Error - can\'t add new fee.');
+				Log::add_exception($e);
+				
+				$this->redirect('fees/show_all');
 			}
 		}
+		
+		$headline = __('Add new fee');
 		
 		// bread crumbs
 		$breadcrumbs = breadcrumbs::add()
 				->link('fees/show_all', 'Fees',
-						$this->acl_check_view('Settings_Controller', 'fees'))
+						$this->acl_check_view('Fees_Controller', 'fees'))
 				->text('Add new fee');
 
 		// view for adding translation
 		$view = new View('main');
-		$view->title = __('Add new fee');
+		$view->title = $headline;
 		$view->breadcrumbs = $breadcrumbs->html();
 		$view->content = new View('fees/add');
-		$view->content->name = $form['name'];
-		$view->content->fee = $form['fee'];
-		$view->content->from = $form['from'];
-		$view->content->to = $form['to'];
-		$view->content->type_id = $form['type_id'];
-		$view->content->errors = $errors;
-		$view->content->days = $days;
-		$view->content->months = $months;
-		$view->content->years = $years;
-		$view->content->types = $enum_types;
-		$view->content->fee_model = isset($fee) && $fee->id ? $fee : NULL;
-		$view->content->fee_name = isset($fee_name) ? $fee_name : NULL;
+		$view->content->headline = $headline;
+		$view->content->form = $form->html();
 		$view->render(TRUE);
 	}
 
 	/**
 	 * Edits fee
 	 * 
-	 * @author Michal Kliment
+	 * @author David Raška
 	 * @param integer $fee_id
 	 */
 	public function edit($fee_id = NULL)
@@ -319,7 +295,7 @@ class Fees_Controller extends Controller
 			Controller::warning(PARAMETER);
 		
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'fees'))
+		if (!$this->acl_check_edit('Fees_Controller', 'fees'))
 			Controller::error(ACCESS);
 
 		$fee = new Fee_Model($fee_id);
@@ -334,120 +310,87 @@ class Fees_Controller extends Controller
 		$enum_type_model = new Enum_type_Model();
 		$enum_types = $enum_type_model->get_values($enum_type_name->id);
 
-		$this->fee_id = $fee->id;
+		$form = new Forge();
+		
+		$form->dropdown('type_id')
+			->label('Type')
+			->options($enum_types)
+			->selected($fee->type_id);
+		
+		$form->input('name')
+			->label('Tariff name')
+			->value($fee->name);
+		
+		$form->input('fee')
+			->rules('valid_numeric')
+			->value($fee->fee);
+		
+		$form->date('from')
+			->rules('required')
+			->callback(array($this, 'valid_interval'))
+			->label('Date from')
+			->value(strtotime($fee->from));
+		
+		$form->date('to')
+			->rules('required')
+			->label('Date to')
+			->value(strtotime($fee->to));
+		
+		$form->submit('Edit');
 
-		$form = array
-		(
-			'name' => $fee->name,
-			'fee' => $fee->fee,
-			'from' => array
-			(
-				'day' => (int) substr($fee->from, 8, 2),
-				'month' => (int) substr($fee->from, 5, 2),
-				'year' => (int) substr($fee->from, 0, 4)
-			),
-			'to' => array
-			(
-				'day' => (int) substr($fee->to, 8, 2),
-				'month' => (int) substr($fee->to, 5, 2),
-				'year' => (int) substr($fee->to, 0, 4)
-			),
-			'type_id' => $fee->type_id
-		);
-
-		$errors = array
-		(
-			'fee' => '',
-			'from' => '',
-			'to' => '',
-			'type_id' => ''
-		);
-
-
-		$days = array();
-		for ($i = 1; $i <= 31; $i++)
-			$days[$i] = $i;
-
-		$months = array();
-		for ($i = 1; $i <= 12; $i++)
-			$months[$i] = $i;
-
-		$years = array();
-		for ($i = date('Y') - 100; $i <= date('Y') + 100; $i++)
-			$years[$i] = $i;
-
-
-		if ($_POST)
+		if ($form->validate())
 		{
-			$post = new Validation($_POST);
-			$post->add_rules('fee', 'required', 'numeric');
-
-			$post->add_rules('from', array('valid', 'date'));
-			$post->add_rules('to', array('valid', 'date'));
-
-			// new system is not restricted on overlapping intervals in global scale
-			// overlapping will be checked individually with each member
-			$post->add_callbacks('type_id', array($this, 'valid_interval'));
-
-			if ($post->validate())
+			$form_data = $form->as_array();
+			
+			$fee = new Fee_Model($fee_id);
+			
+			try
 			{
-				$fee = new Fee_Model($fee_id);
-				$fee->type_id = $post->type_id;
-				$fee->name = $post->name;
-				$fee->fee = $post->fee;
-				$fee->from = date::round_month(
-						$post->from['day'],
-						$post->from['month'],
-						$post->from['year']
-				);
-				$fee->to = date::round_month(
-						$post->to['day'],
-						$post->to['month'],
-						$post->to['year']
-				);
-				// clears form content
-				unset($form_data);
-				// has fee been successfully saved?
-				if ($fee->save())
-				{
-					status::success('Fee has been successfully updated');
-					url::redirect(url_lang::base() . 'fees/show_all');
-				}
-				else
-				{
-					status::error('Error - cant edit fee.');
-				}
+				$fee->transaction_start();
+				
+				$fee->type_id = $form_data['type_id'];
+				$fee->name = $form_data['name'];
+				$fee->fee = $form_data['fee'];
+				$fee->from = date("Y-m-d", $form_data['from']);
+				$fee->to = date("Y-m-d", $form_data['to']);
+				
+				$fee->save_throwable();
+				
+				$fee->transaction_commit();
+				
+				status::success('Fee has been successfully updated.');
+
+				$this->redirect('fees/show_all');
 			}
-			else
+			catch (Exception $e)
 			{
-				$form = arr::overwrite($form, $post->as_array());
-				$errors = arr::overwrite($errors, $post->errors('errors'));
+				$fee->transaction_rollback();
+				status::error('Error - cant edit fee.');
+				Log::add_exception($e);
+				
+				if (!$this->popup)
+				{
+					$this->redirect('fees/show_all');
+				}
 			}
 		}
-
+		
+		$headline = __('Edit fee');
+		
 		// bread crumbs
 		$breadcrumbs = breadcrumbs::add()
 				->link('fees/show_all', 'Fees',
-						$this->acl_check_view('Settings_Controller', 'fees'))
+						$this->acl_check_view('Fees_Controller', 'fees'))
 				->text($fee->name . ' (' . $fee->id . ')')
 				->text('Edit fee');
 
 		// view for adding translation
 		$view = new View('main');
-		$view->title = __('Edit fee');
+		$view->title = $headline;
 		$view->breadcrumbs = $breadcrumbs->html();
-		$view->content = new View('fees/edit');
-		$view->content->fee_id = $fee_id;
-		$view->content->name = $form['name'];
-		$view->content->fee = $form['fee'];
-		$view->content->from = $form['from'];
-		$view->content->to = $form['to'];
-		$view->content->type_id = $form['type_id'];
-		$view->content->errors = $errors;
-		$view->content->days = $days;
-		$view->content->months = $months;
-		$view->content->years = $years;
-		$view->content->types = $enum_types;
+		$view->content = new View('fees/add');
+		$view->content->headline = $headline;
+		$view->content->form = $form->html();
 		$view->render(TRUE);
 	}
 
@@ -464,7 +407,7 @@ class Fees_Controller extends Controller
 			Controller::warning(PARAMETER);
 
 		// access control
-		if (!$this->acl_check_delete('Settings_Controller', 'fees'))
+		if (!$this->acl_check_delete('Fees_Controller', 'fees'))
 			Controller::error(ACCESS);
 
 		$fee = new Fee_Model($fee_id);
@@ -496,34 +439,33 @@ class Fees_Controller extends Controller
 	/**
 	 * Checks overlapping of fee validity intervals.
 	 * 
-	 * @param Validation $post
+	 * @param Input $input
 	 */
-	public function valid_interval($post = NULL)
+	public function valid_interval($input = NULL)
 	{
-		if (empty($post) || !is_object($post) || !($post instanceof Validation))
+		// validators cannot be accessed
+		if (empty($input) || !is_object($input))
 		{
 			self::error(PAGE);
 		}
-
-		$from_date = date::round_month(
-				$post->from['day'], $post->from['month'], $post->from['year']
-		);
 		
-		$to_date = date::round_month(
-				$post->to['day'], $post->to['month'], $post->to['year'], TRUE
-		);
-
-		$diff = date::diff_month($to_date, $from_date);
+		$arr_from = date_parse_from_format(DateTime::ISO8601, $this->input->post('from'));
+		$arr_to = date_parse_from_format(DateTime::ISO8601, $this->input->post('to'));
 		
-		if ($diff < -1)
-		{
-			$post->add_error('from', 'bigger');
-			return;
-		}
-
+		$date_from = date::round_month($arr_from['day'], $arr_from['month'], $arr_from['year']);
+		$date_to = date::round_month($arr_to['day'], $arr_to['month'], $arr_to['year']);
+		
+		$diff = date::diff_month($date_to, $date_from);
+		
 		if ($diff < 0)
 		{
-			$post->add_error('to', 'minimal');
+			$input->add_error('required', __('Date from must be smaller then date to.'));
+			return;
+		}
+		
+		if ($diff == 0)
+		{
+			$input->add_error('required', __('Minimal duration is one month.'));
 			return;
 		}
 	}

@@ -57,9 +57,25 @@ version_compare(PHP_VERSION, '5.1.3', '<') and exit('Kohana requires PHP 5.1.3 o
 // $Id: index.php 1631 2007-12-28 00:11:38Z Shadowhand $
 //
 
-// Define the front controller name and docroot
-define('DOCROOT', getcwd().DIRECTORY_SEPARATOR);
-define('KOHANA',  substr(__FILE__, strlen(DOCROOT)));
+// Tests if system is running in unit testing mode
+$unittest = (empty($_SERVER['SERVER_NAME']) && strpos(@$_SERVER['SCRIPT_NAME'], 'phpunit'));
+
+// If unit testing change relative address of system and appplication folders
+if ($unittest)
+{
+	$kohana_application = dirname(__FILE__) . '/' . $kohana_application;
+	$kohana_system = dirname(__FILE__) . '/' . $kohana_system;
+	
+	// Define the front controller name and docroot
+	define('DOCROOT', dirname(__FILE__) . '/');
+	define('KOHANA',  substr(__FILE__, strlen(DOCROOT)));
+}
+else
+{
+	// Define the front controller name and docroot
+	define('DOCROOT', getcwd().DIRECTORY_SEPARATOR);
+	define('KOHANA',  substr(__FILE__, strlen(DOCROOT)));
+}
 
 // Define application and system paths
 define('APPPATH', str_replace('\\', '/', realpath($kohana_application)).'/');
@@ -83,4 +99,15 @@ unset($kohana_application, $kohana_system);
 // Mail to developers
 define('DEVELOPER_EMAIL_ADDRESS', 'bugs@freenetis.org');
 
-require SYSPATH.'core/Bootstrap'.EXT;
+// URL to AXO documentation web application
+define('AXODOC_URL', 'http://axo.doc.freenetis.org/');
+
+// If unit testing just initilize do not execute
+if($unittest)
+{
+    require 'tests/BootstrapPHPUnit'.EXT;
+}
+else
+{
+    require SYSPATH.'core/Bootstrap'.EXT;
+}

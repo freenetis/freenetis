@@ -30,6 +30,7 @@ class upload {
 			'css'   => array('text/css'),
 			'csv'   => array('text/x-comma-separated-values', 'application/vnd.ms-excel'),
 			'deb'   => array('application/x-debian-package'),
+			'dbf'	=> array('application/dbf'),
 			'dbk'   => array('application/docbook+xml'),
 			'dir'   => array('application/x-director'),
 			'dcr'   => array('application/x-director'),
@@ -49,6 +50,7 @@ class upload {
 			'html'  => array('text/html'),
 			'hqx'   => array('application/mac-binhex40'),
 			'ics'   => array('text/calendar'),
+			'isdoc' => array('text/xml'),
 			'iso'   => array('application/x-iso9660-image'),
 			'jar'   => array('application/java-archive'),
 			'jpeg'  => array('image/jpeg', 'image/pjpeg'),
@@ -246,10 +248,9 @@ class upload {
 		// Get the default extension of the file
 		$extension = strtolower(substr(strrchr($file['name'], '.'), 1));
 
-		
-		
 		// Get the mime types for the extension
-		$mime_types = $mimes[$extension];
+		if (array_key_exists($extension, self::$mimes))
+			$mime_types = self::$mimes[$extension];
 
 		// Make sure there is an extension, that the extension is allowed, and that mime types exist
 		return ( ! empty($extension) AND in_array($extension, $allowed_types) AND is_array($mime_types));

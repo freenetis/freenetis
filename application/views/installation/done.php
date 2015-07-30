@@ -10,7 +10,7 @@
 <body>
 
 <div id="main">
-	<h1><span><?php echo $this->settings->get('title') ?></span></h1>
+	<h1><span><?php echo $this->settings->get('title') ?></span><i><?php echo Version::get_version() ?></i></h1>
 	<div class="flags">
 			<?php echo  special::create_language_flags(array('cs' => 'Česky', 'en' => 'English')) ?>
 		</div>
@@ -20,7 +20,7 @@
 			<p><?php echo __('Installation has been successfully finished') . '<br>' .
 				__('Now you can login using account name and password you entered during installation.') ?></p>
 		    <?php echo form::open(url_lang::base().'login') ?>
-		    <?php echo form::submit('submit', __('Login')) ?>
+		    <?php echo form::submit('submit', __('Login'), ' class="submit"') ?>
 		    <?php echo form::close() ?>
 		</div>
 		<div class="clear"></div>

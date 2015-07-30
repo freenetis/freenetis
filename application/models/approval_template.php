@@ -62,6 +62,19 @@ class Approval_template_Model extends ORM
 				LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
 		");
 	}
+	
+	/**
+	 * Update state of approval template
+	 * 
+	 * @author Michal Kliment
+	 * @param integer $approval_template_id
+	 */
+	public static function update_state($approval_template_id)
+	{
+		$approval_template = new Approval_template_Model($approval_template_id);
+		$approval_template->state = $approval_template->get_state();
+		$approval_template->save_throwable();
+	}
 
 	/**
 	 * Function to get state of approval template

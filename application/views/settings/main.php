@@ -2,12 +2,16 @@
 
 <?php if (isset($create)) echo $create; ?>
 
+<?php if(isset($this->sections)): ?>
 <ul class="tabs">
 		<?php foreach ($this->sections as $section => $name): ?>
 		<li class="ui-corner-all<?php echo ($current == $section) ? ' current' : '' ?>"><a id="<?php echo $section ?>-link" href="<?php echo url_lang::base().'settings/'.$section ?>"><?php echo $name ?></a></li>
 		<?php endforeach; ?>
 		
 </ul>
+<?php else: ?>
+</br>
+<?php endif ?>
 
 <div id="settings-content" class="clear">
 

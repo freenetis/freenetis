@@ -39,11 +39,20 @@ class Json_Controller extends Controller
 	public function __construct()
 	{
 		parent::__construct();
-		self::send_json_headers();
+		//self::send_json_headers();
 	}
 	
 	/**
-	 * Function to return accounts belong to account type
+	 * @see MY_Controller#is_preprocesor_enabled()
+	 */
+	protected function is_preprocesor_enabled()
+	{
+		return FALSE;
+	}
+	
+	/**
+	 * Function to return accounts belong to account type. Returned array has
+	 * name of account as key and its ID as a value due to JSON eval order bug.
 	 * 
 	 * @author Michal Kliment
 	 * @param number $origin_account_id
@@ -51,7 +60,12 @@ class Json_Controller extends Controller
 	public function get_accounts_by_type($origin_account_id = NULL)
 	{
 		// access control
-		if (!$this->acl_check_view('Accounts_Controller', 'transfers'))
+		$origin_account = new Account_Model($origin_account_id);
+		
+		if ($origin_account->id == 0)
+			Controller::error(RECORD);
+		
+		if (!$this->acl_check_new('Accounts_Controller', 'transfers', $origin_account->member_id))
 			Controller::error(ACCESS);
 
 		$id = $this->input->get('id');
@@ -63,12 +77,65 @@ class Json_Controller extends Controller
 		$arr_accounts = array();
 		foreach ($accounts as $account)
 		{	// convert the object into array (used for HTML select list)
-			$arr_accounts[$account->id] = 
-					$account->name . ' ' . $account->id . ' (' . $account->addr . ')';
+			$name = $account->name . ' ' . $account->id . ' (' . $account->addr . ')';
+			$arr_accounts[$name] = $account->id;
 		}
-		asort($arr_accounts, SORT_LOCALE_STRING);
 
 		echo json_encode($arr_accounts);
+	}
+	
+	/**
+	 * Returns address from address server
+	 *
+	 * @author David Raška
+	 */
+	public function get_address()
+	{
+		if (Address_points_Controller::is_address_point_server_active())
+		{
+			$curl = new Curl_HTTP_Client();
+			$result = $curl->fetch_url(Settings::get('address_point_url').server::query_string());
+
+			if ($curl->get_http_response_code() == 200 && $result !== FALSE)
+			
+			if ($result !== FALSE)
+			{
+				echo $result;
+			}
+			else
+			{
+				json_encode(array());
+			}
+		}
+		else
+		{
+			json_encode(array());
+		}
+	}
+	
+	/**
+	 * Returns fee details in json format
+	 *
+	 * @author David Raška
+	 */
+	public function get_fee_by_id()
+	{
+		// access control
+		if (!$this->acl_check_view('Fees_Controller', 'fees'))
+			Controller::Error(ACCESS);
+
+		$id = (int) $this->input->get('id');
+
+		$fee_model = new Fee_Model($id);
+
+		$fee = array(
+			'id' =>		$fee_model->id,
+			'from' =>	$fee_model->from,
+			'to' =>		$fee_model->to,
+			'type' =>	$fee_model->type_id
+		);
+
+		echo json_encode($fee);
 	}
 
 	/**
@@ -79,7 +146,7 @@ class Json_Controller extends Controller
 	public function get_fees_by_type()
 	{
 		// access control
-		if (!$this->acl_check_view('Settings_Controller', 'fees'))
+		if (!$this->acl_check_view('Fees_Controller', 'fees'))
 			Controller::Error(ACCESS);
 
 		$id = (int) $this->input->get('id');
@@ -133,6 +200,123 @@ class Json_Controller extends Controller
 	}
 
 	/**
+	 * Callback AJAX funxtion to obtain MAC address from given IP and subnet.
+	 * 
+	 * @author Ondřej Fibich
+	 */
+	public function obtain_mac_address()
+	{
+		$subnet_id = $this->input->get('subnet_id');
+		$ip_address = $this->input->get('ip_address');
+		
+		$ip_address_model = new Ip_address_Model();
+		
+		// find gateway of subnet
+		$gateway = $ip_address_model->get_gateway_of_subnet($subnet_id);
+
+		if ($gateway && $gateway->id && valid::ip($ip_address))
+		{
+			// first try SNMP
+			if (module::e('snmp'))
+			{
+				try
+				{
+					$snmp = Snmp_Factory::factoryForDevice($gateway->ip_address);
+
+					// try find MAC address in DHCP
+					$mac_address = $snmp->getDHCPMacAddressOf($ip_address);
+
+					die(json_encode(array
+					(
+						'state' => 1,
+						'mac' => $mac_address
+					)));
+				}
+				// MAC table is not in DHCP
+				catch (DHCPMacAddressException $e)
+				{
+					try
+					{
+						// try find MAC address in ARP table
+						$mac_address = $snmp->getARPMacAddressOf($ip_address);
+
+						die(json_encode(array
+						(
+							'state' => 1,
+							'mac' => $mac_address
+						)));
+					}
+					catch(Exception $e)
+					{
+						Log::add_exception($e);
+						die(json_encode(array
+						(
+							'state' => 0,
+							'message' => $e->getMessage()
+						)));
+					}
+				}
+				catch (Exception $e)
+				{
+					Log::add_exception($e);
+					die(json_encode(array
+					(
+						'state' => 0,
+						'message' => $e->getMessage()
+					)));
+				}
+			}
+			// now try CGI scripts
+			else if (module::e('cgi'))
+			{	
+				$vars = arr::to_object(array
+				(
+					'GATEWAY_IP_ADDRESS'	=> $gateway->ip_address,
+					'IP_ADDRESS'			=> $ip_address
+				));
+				
+				$url = text::object_format($vars, Settings::get('cgi_arp_url'));
+				
+				$mac_address = @file_get_contents($url);
+				
+				if ($mac_address !== FALSE)
+				{
+					die(json_encode(array
+					(
+						'state' => 1,
+						'mac' => $mac_address
+					)));
+				}
+				else
+				{
+					die(json_encode(array
+					(
+						'state' => 0,
+						'message' => __('Invalid output data')
+					)));
+				}
+			}
+			else
+			{
+				die(json_encode(array
+				(
+					'state' => 0,
+					'message' => __('SNMP or CGI scripts not enabled')
+				)));
+			}
+		}
+		else
+		{
+			die(json_encode(array
+			(
+				'state' => 0,
+				'message' => __('Invalid input data')
+			)));
+		}
+	}
+
+
+	/**
 	 * Callback AJAX function to filter's whisper for organization identifier
 	 *
 	 * @author Michal Kliment
@@ -149,6 +333,27 @@ class Json_Controller extends Controller
 				->orderby('organization_identifier')
 				->find_all()
 				->select_list('id', 'organization_identifier');
+
+		echo json_encode(array_values($members));
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for VAT organization identifier
+	 *
+	 * @author Michal Kliment
+	 */
+	public function vat_organization_identifier()
+	{
+		$term = $this->input->get('term');
+
+		$member_model = new Member_Model();
+
+		$members = $member_model->where('vat_organization_identifier !=', '')
+				->like('vat_organization_identifier', $term)
+				->groupby('vat_organization_identifier')
+				->orderby('vat_organization_identifier')
+				->find_all()
+				->select_list('id', 'vat_organization_identifier');
 
 		echo json_encode(array_values($members));
 	}
@@ -416,7 +621,50 @@ class Json_Controller extends Controller
 	}
 	
 	/**
-	 * Performs action of ip_address_check jQuery frm validator.
+	 * Performs action of mac_address_check jQuery form validator.
+	 * Checks whether the MAC is unique on subnet.
+	 *
+	 * @author Ondrej Fibich 
+	 */
+	public function mac_address_check()
+	{
+		$mac = trim($this->input->get('mac'));
+		$subnet = new Subnet_Model($this->input->get('subnet_id'));
+		$ip_address_id = $this->input->get('ip_address_id');
+		
+		if (!$subnet || !$subnet->id)
+		{
+			die(json_encode(array
+			(
+				'state'		=> false,
+				'message'	=> __('Subnet not exists.')
+			)));
+		}
+		
+		if ($subnet->is_mac_unique_in_subnet($mac, $ip_address_id))
+		{
+			die(json_encode(array('state' => true)));
+		}
+		else
+		{
+			$link = html::anchor(
+					'/subnets/show/' . $subnet->id,
+					__('subnet', NULL, 1), 'target="_blank"'
+			);
+			
+			$m = 'MAC address of this interface is already in the '
+				. 'selected %s assigned to another interface';
+			
+			die(json_encode(array
+			(
+				'state'		=> false,
+				'message'	=> __($m, $link)
+			)));
+		}
+	}
+	
+	/**
+	 * Performs action of ip_address_check jQuery form validator.
 	 *
 	 * @author Ondrej Fibich 
 	 */
@@ -446,7 +694,7 @@ class Json_Controller extends Controller
 		$subnet = $subnet_model->get_net_and_mask_of_subnet();
 		
 		// checks mask
-		if (!valid::ip_check_subnet(ip2long($ip_str), $subnet->net + 0, $subnet->mask))
+		if (!valid::ip_check_subnet(ip2long($ip_str), $subnet->net + 0, ip2long($subnet->netmask)))
 		{
 			die(json_encode(array
 			(
@@ -680,6 +928,21 @@ class Json_Controller extends Controller
 		echo json_encode(array_values($address_points));
 	}
 	
+	public function bank_account_name()
+	{
+		$term = $this->input->get('term');
+
+		$bam = new Bank_account_Model();
+
+		$bank_accounts = $bam->like('name', $term)
+				->groupby('name')
+				->orderby('name')
+				->find_all()
+				->select_list();
+
+		echo json_encode(array_values($bank_accounts));
+	}
+	
 	/**
 	 * Callback AJAX function to return link by iface id
 	 * 
@@ -699,6 +962,34 @@ class Json_Controller extends Controller
 		{
 			die(json_encode(null));
 		}
+	}
+	
+	/**
+	 * Callback AJAX function to return iface and device that are connected
+	 * to given iface.
+	 * 
+	 * @author Ondřej Fibich
+	 */
+	public function get_iface_and_device_connected_to_iface()
+	{
+		$iface = new Iface_Model($this->input->get('iface_id'));
+		$parent_iface = new Iface_Model($this->input->get('parent_iface_id'));
+		
+		if ($iface->id)
+		{
+			$connected_iface = $iface->get_iface_connected_to_iface();
+			
+			if ($connected_iface && (!$parent_iface->id || $parent_iface->id != $connected_iface->id))
+			{
+				die(json_encode(array
+				(
+					'iface'		=> $connected_iface->as_array(),
+					'device'	=> $connected_iface->device->as_array()
+				)));
+			}
+		}
+		
+		die(json_encode(null));
 	}
 	
 	/**
@@ -758,6 +1049,31 @@ class Json_Controller extends Controller
 		if ($device_template && $device_template->id)
 		{
 			echo $device_template->values;
+		}
+		else
+		{
+			echo json_encode(array());
+		}
+	}
+	
+	/**
+	 * AJAX function for loading device template active links
+	 * 
+	 * @author David Raška
+	 */
+	public function get_device_template_active_links()
+	{
+		$template_id = $this->input->get('template');
+		$device_active_link_model = new Device_active_link_Model();
+		
+		$templates = $device_active_link_model->get_device_active_links(
+				$template_id,
+				Device_active_link_Model::TYPE_TEMPLATE
+		)->result_array();
+		
+		if ($templates)
+		{
+			echo json_encode($templates);
 		}
 		else
 		{
@@ -1002,5 +1318,785 @@ class Json_Controller extends Controller
 			echo json_encode($result);
 		}
 	}
+	
+	/**
+	 * Calculated additional of applicant
+	 * 
+	 * @author Ondřej Fibich
+	 * @see Members_Controller#approve_applicant
+	 */
+	public function calculate_additional_payment_of_applicant()
+	{
+		$entrance_date = $this->input->get('entrance_date');
+		$connected_from = $this->input->get('connected_from');
+		$data = array('amount' => 0);
+		
+		if (preg_match('/^\d{4}\-\d{1,2}\-\d{1,2}$/', $entrance_date) !== FALSE &&
+			preg_match('/^\d{4}\-\d{1,2}\-\d{1,2}$/', $connected_from) !== FALSE &&
+			$entrance_date != '0000-00-00' &&
+			$connected_from != '0000-00-00')
+		{
+			$mf = new Members_fee_Model();
+			$data['amount'] = $mf->calculate_additional_payment_of_applicant($connected_from, $entrance_date);
+		}
+		
+		echo json_encode($data);
+	}
+	
+	/**
+	 * Prints all free IP addresses similar to given IP address
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function get_free_ip_addresses()
+	{
+		$ip_address = $this->input->get('term');
+		
+		$ip_address_model = new Ip_address_Model();
+		
+		try
+		{
+			$ip_addresses = $ip_address_model->get_free_ip_addresses($ip_address);
+		}
+		catch (Exception $e)
+		{
+			$ip_addresses = array();
+		}
+		
+		echo json_encode($ip_addresses);
+	}
 
+	/**
+	 * Callback AJAX function to filter's whisper for name
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_name()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_names($term);
+		
+		$names = array();
+		foreach ($invoices as $invoice)
+			$names[] = $invoice->partner;
+		
+		echo json_encode($names);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for street
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_street()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_streets($term);
+		
+		$streets = array();
+		foreach ($invoices as $invoice)
+			$streets[] = $invoice->street;
+		
+		echo json_encode($streets);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for town
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_town()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_towns($term);
+		
+		$towns = array();
+		foreach ($invoices as $invoice)
+			$towns[] = $invoice->town;
+		
+		echo json_encode($towns);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for zip code
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_zip_code()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_zip_codes($term);
+		
+		$zip_codes = array();
+		foreach ($invoices as $invoice)
+			$zip_codes[] = $invoice->zip_code;
+		
+		echo json_encode($zip_codes);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for street name
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_street_number()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_street_numbers($term);
+		
+		$street_numbers = array();
+		foreach ($invoices as $invoice)
+			$street_numbers[] = $invoice->street_number;
+		
+		echo json_encode($street_numbers);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for company
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_company()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_companies($term);
+		
+		$companies = array();
+		foreach ($invoices as $invoice)
+			$companies[] = $invoice->partner_company;
+		
+		echo json_encode($companies);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for country
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_country()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_countries($term);
+		
+		$countries = array();
+		foreach ($invoices as $invoice)
+			$countries[] = $invoice->country;
+		
+		echo json_encode($countries);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for organization identifier
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_organization_id()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_organization_ids($term);
+		
+		$organization_ids = array();
+		foreach ($invoices as $invoice)
+			$organization_ids[] = $invoice->organization_identifier;
+		
+		echo json_encode($organization_ids);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for organization identifier
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_vat_organization_id()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_vat_organization_ids($term);
+		
+		$vat_organization_ids = array();
+		foreach ($invoices as $invoice)
+			$vat_organization_ids[] = $invoice->vat_organization_identifier;
+		
+		echo json_encode($vat_organization_ids);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for account number
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_account_nr()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_account_nrs($term);
+		
+		$account_nrs = array();
+		foreach ($invoices as $invoice)
+			$account_nrs[] = $invoice->account_nr;
+		
+		echo json_encode($account_nrs);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for phone number
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_phone_nr()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_phone_numbers($term);
+		
+		$phone_nrs = array();
+		foreach ($invoices as $invoice)
+			$phone_nrs[] = $invoice->phone_number;
+		
+		echo json_encode($phone_nrs);
+	}
+	
+	/**
+	 * Callback AJAX function to filter's whisper for email
+	 *
+	 * @author Jan Dubina
+	 */
+	public function invoice_email()
+	{
+		$term = $this->input->get('term');
+		
+		$invoice_model = new Invoice_Model();
+		$invoices = $invoice_model->get_all_emails($term);
+		
+		$emails = array();
+		foreach ($invoices as $invoice)
+			$emails[] = $invoice->email;
+		
+		echo json_encode($emails);
+	}
+	
+	/**
+	 * Callback AJAX funxtion to get device and iface to which is device connected.
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function get_connected_to_device_and_iface()
+	{
+		$subnet_id = $this->input->get('subnet_id');
+		$mac_address = $this->input->get('mac_address');
+		
+		$port_nr = 0;
+		
+		$ip_address_model = new Ip_address_Model();
+		
+		// find gateway of subnet
+		$gateway_ip_address = $ip_address_model
+			->where(array
+			(
+				'subnet_id' => $subnet_id,
+				'gateway' => 1
+			))->find();
+		
+		// IP is on VLAN iface  => take physical (parent) interface
+		if ($gateway_ip_address->iface->type == Iface_Model::TYPE_VLAN)
+			$iface = $gateway_ip_address->iface->ifaces_relationships->current()->parent_iface;
+		// IP is on normal iface
+		else
+			$iface = $gateway_ip_address->iface;
+		
+		$device = $iface->device;
+		
+		$x = 100;
+		
+		while (true)
+		{
+			$x--;
+			
+			// unending loop protection
+			if ($x == 0)
+				break;
+			
+			// device is not connected to any device or is not connected to any association device
+			if ($iface->get_iface_connected_to_iface() === NULL ||
+				$iface->get_iface_connected_to_iface()->device->user->member_id != Member_Model::ASSOCIATION)
+			{
+				// we end
+				break;
+			}
+			
+			// take device to which is our device connected
+			$device = $iface->get_iface_connected_to_iface()->device;
+			
+			// find IP address of device
+			$ip_address = $ip_address_model
+				->get_ip_addresses_of_device($device->id)->current();
+			
+			# only for switch
+			if ($device->has_ports() && $ip_address)
+			{
+				if (module::e('snmp'))
+				{
+					try
+					{
+						$snmp = Snmp_Factory::factoryForDevice($ip_address->ip_address);
+
+						// try find port number
+						$port_nr = $snmp->getPortNumberOf($mac_address);
+					}
+					catch (Exception $e)
+					{
+						die(json_encode(array
+						(
+							'state' => 0,
+							'message' => $e->getMessage()
+						)));
+					}
+				}
+				else
+				{
+					die(json_encode(array
+					(
+						'state' => 0,
+						'message' => __('SNMP not enabled')
+					)));
+				}
+
+				// and try find port in database
+				$iface = ORM::factory('iface')
+					->where(array
+					(
+						'type'		=> Iface_Model::TYPE_PORT,
+						'device_id'	=> $device->id,
+						'number'	=> $port_nr
+					))
+					->find();
+			}
+			else
+			{
+				$found = FALSE;
+				
+				// for each ifaces of device
+				foreach ($device->ifaces as $device_iface)
+				{
+					// take first iface with unending loop detection
+					if ($device_iface->get_iface_connected_to_iface()
+						&& $device_iface->get_iface_connected_to_iface()->id != $iface->id)
+					{
+						$iface = $device_iface;
+						
+						$found = TRUE;
+						
+						break;
+					}
+				}
+				
+				// this device has not any iface to which we can connect
+				if (!$found)
+				{
+					die(json_encode(array
+					(
+						'state' => 0,
+						'message' => __('Error - cannot find device')
+					)));
+				}
+			}
+		}
+		
+		// we know port number which is not im db
+		if ($device->id && $port_nr && $iface->device_id != $device->id)
+		{	
+			// try create it
+			try
+			{
+				$iface->transaction_start();
+				
+				$iface->clear();
+				$iface->type = Iface_Model::TYPE_PORT;
+				$iface->device_id = $device->id;
+				$iface->number = $port_nr;
+				$iface->name = __('Port').' '.$port_nr;
+				$iface->save_throwable();
+				
+				$iface->transaction_commit();
+			}
+			catch (Exception $e)
+			{
+				$iface->transaction_rollback();
+			}
+		}
+		
+		// success, return device and iface
+		if ($device->id && $iface->id)
+		{
+			die(json_encode(array
+			(
+				'state' => 1,
+				'device_id' => $device->id,
+				'iface_id' => $iface->id
+			)));
+		}
+		// fail
+		else
+		{
+			die(json_encode(array
+			(
+				'state' => 0,
+				'message' => __('Error - cannot find device')
+			)));
+		}
+	}
+	
+	/**
+	 * Sends request to ARES API
+	 * 
+	 * @author Michal Kliment
+	 * @param type $type
+	 * @param type $params
+	 * @return type
+	 */
+	private function send_ares_request($type, $params)
+	{
+		switch ($type)
+		{
+			case 'standard':
+			
+				$url = 'http://wwwinfo.mfcr.cz/cgi-bin/ares/darv_std.cgi?obchodni_firma=' .
+					urlencode(text::cs_utf2ascii($params['name']));
+				
+				if (isset($params['town']))
+					$url .= '&nazev_obce=' . urlencode($params['town']);
+				
+				$url .= '&diakritika=false&max_pocet=1&czk=utf';
+				
+				break;
+			
+			case 'basic':
+				
+				$url = 'http://wwwinfo.mfcr.cz/cgi-bin/ares/darv_bas.cgi?ico=' .
+					$params['organization_identifier'];
+				
+				break;
+			
+			default:
+				return array
+				(
+					'state' => 0,
+					'Unknown ARES request type'
+				);
+		}
+		
+		$file = @file_get_contents($url);
+			
+		if ($file)
+		{
+			$xml = @simplexml_load_string($file);
+
+			if ($xml)
+			{
+				$ns = $xml->getDocNamespaces();
+
+				$data = $xml->children($ns['are']);
+
+				// return data
+				return array
+				(
+					'state' => 1,
+					'ns'	=> $ns,
+					'data'	=> $data
+				);
+			}
+			else
+			{
+				// bad output data
+				return array
+				(
+					'state' => 0,
+					'text'	=> __('Invalid output data')
+				);
+			}
+		}
+		else
+		{
+			// some problem with ARES
+			return array
+			(
+				'state' => 0,
+				'text'	=> __('ARES is probably down')
+			);
+		}
+	}
+	
+	/**
+	 * Loads data about member from ARES
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function load_member_data_from_ares()
+	{
+		$result = array
+		(
+			'state' => 0,
+			'text'	=> __('Invalid input data')
+		);
+		
+		$organization_identifier = $this->input->get('organization_identifier');
+		
+		// organization identifier is set
+		if ($organization_identifier != '')
+		{	
+			// find data by organization identifier
+			$result = $this->send_ares_request('basic', array
+			(
+				'organization_identifier' => $organization_identifier
+			));
+
+			// no error in request
+			if ($result['state'])
+			{
+				$el = $result['data']->children($result['ns']['D'])->VBAS;
+
+				// record was found
+				if (strval($el->ICO) == $organization_identifier)
+				{
+					$result['name'] = strval($el->OF);
+
+					// found record is person
+					if ($el->PF->KPF == 101)
+					{
+						// split name in firstname and surname
+						$names = explode(" ", $result['name']);
+
+						$result['firstname'] = array_shift($names);
+						$result['lastname'] = array_pop($names);
+					}
+
+					$result['organization_identifier'] = strval($el->ICO);
+					$result['vat_organization_identifier'] = strval($el->DIC);
+					
+					// address
+					$result['zip_code'] = strval($el->AA->PSC);
+					$result['town'] = strval($el->AA->N);
+					$result['quarter'] = strval($el->AA->NCO);
+					$result['street'] = strval($el->AA->NU);
+					$result['street_number'] = strval($el->AA->CD);
+					$result['other_street_number'] = strval($el->AA->CA);
+				}
+				else
+				{
+					// record not found
+					$result['state'] = 0;
+					$result['text'] = __('Item not found');
+				}
+			}
+		}
+		else
+		{
+			$name = $this->input->get('name');
+			$town = new Town_Model((int) $this->input->get('town_id'));
+		
+			// name is set
+			if ($name != '')
+			{
+				// town is set
+				if ($town && $town->id)
+				{
+					// try find by name and town
+					$result = $this->send_ares_request('standard', array
+					(
+						'name' => $name,
+						'town' => $town->town
+					));
+
+					// no error in request
+					if ($result['state'])
+					{
+						// record was found
+						if (strval($result['data']->Odpoved->Pocet_zaznamu))
+						{
+							$el = $result['data']->Odpoved->Zaznam;
+
+							$result['name'] = strval($el->Obchodni_firma);
+
+							// found record is person
+							if ($el->Pravni_forma->children($result['ns']['dtt'])->Kod_PF == 101)
+							{
+								// split name in firstname and surname
+								$names = explode(" ", $result['name']);
+
+								$result['firstname'] = array_shift($names);
+								$result['lastname'] = array_pop($names);
+							}
+
+							$result['organization_identifier'] = strval($el->ICO);
+							$result['vat_organization_identifier'] = strval($el->DIC);
+
+							// address
+							$result['zip_code'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->PSC);
+							$result['town'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Nazev_obce);
+							$result['quarter'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Nazev_casti_obce);
+							$result['street'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Nazev_ulice);
+							$result['street_number'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Cislo_domovni);
+							$result['other_street_number'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Cislo_do_adresy);
+						}
+						else
+						{
+							// record not found
+							$result['state'] = 0;
+							$result['text'] = __('Item not found');
+						}
+					}
+				}
+				
+				// record not found by name and town, try only by name
+				if (!$result['state'])
+				{
+					$result = $this->send_ares_request('standard', array
+					(
+						'name' => $name
+					));
+
+					if ($result['state'])
+					{
+						// record was found
+						if (strval($result['data']->Odpoved->Pocet_zaznamu) > 0)
+						{
+							$el = $result['data']->Odpoved->Zaznam;
+
+							$result['name'] = strval($el->Obchodni_firma);
+
+							// found record is person
+							if ($el->Pravni_forma->children($result['ns']['dtt'])->Kod_PF == 101)
+							{
+								// split name in firstname and surname
+								$names = explode(" ", $result['name']);
+
+								$result['firstname'] = array_shift($names);
+								$result['lastname'] = array_pop($names);
+							}
+
+							$result['organization_identifier'] = strval($el->ICO);
+							$result['vat_organization_identifier'] = strval($el->DIC);
+
+							// address
+							$result['zip_code'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->PSC);
+							$result['town'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Nazev_obce);				
+							$result['quarter'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Nazev_casti_obce);
+							$result['street'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Nazev_ulice);
+							$result['street_number'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Cislo_domovni);
+							$result['other_street_number'] = strval($el->Identifikace->Adresa_ARES->children($result['ns']['dtt'])->Cislo_do_adresy);
+						}
+						else
+						{
+							// record not found
+							$result['state'] = 0;
+							$result['text'] = __('Item not found');
+						}
+					}
+				}
+			}
+		}
+		
+		// record was found
+		if ($result['state'])
+		{
+			$town_model = new Town_Model();
+			$street_model = new Street_Model();
+			
+			if ($result['quarter'] == $result['town'] || $result['quarter'] == '')
+				$result['quarter'] = NULL;
+			
+			// if street is empty, use town as street
+			if ($result['street'] == '')
+			{
+				$result['street'] = ($result['quarter'] !== NULL) ? $result['quarter'] : $result['town'];
+			}
+			
+			// try find town in db
+			$town = $town_model->where(array
+			(
+				'town'		=> $result['town'],
+				'zip_code'	=> $result['zip_code'],
+				'quarter'	=> $result['quarter']
+			))->find();
+			
+			// not exist, create it
+			if (!$town->id && $result['town'] != '')
+			{
+				try
+				{
+					$town->transaction_start();
+					$town->clear();
+					$town->town = $result['town'];
+					$town->zip_code = $result['zip_code'];
+					$town->quarter = $result['quarter'];
+					$town->save_throwable();
+					$town->transaction_commit();
+				}
+				catch (Exception $e)
+				{
+					$town->transaction_rollback();
+				}
+				
+			}
+			
+			$result['town_id'] = $town->id;
+			
+			// try find street in db
+			$street = $street_model->where(array
+			(
+				'town_id'	=> $result['town_id'],
+				'street'	=> $result['street']
+			))->find();
+			
+			// not exist, create it
+			if (!$street->id && $result['street'] != '')
+			{
+				try
+				{
+					$street->transaction_start();
+					$street->clear();
+					$street->town_id = $result['town_id'];
+					$street->street = $result['street'];
+					$street->save_throwable();
+					$street->transaction_commit();
+				}
+				catch (Exception $e)
+				{
+					$street->transaction_rollback();
+				}
+				
+			}
+			
+			$result['street_id'] = $street->id;
+			
+			if ($result['street_number'] == '' && $result['other_street_number'] != '')
+				$result['street_number'] = $result['other_street_number'];
+			
+			// unset useless variables
+			unset($result['quarter']);
+			unset($result['ns']);
+			unset($result['data']);
+		}
+		
+		die(json_encode($result));
+	}
 }

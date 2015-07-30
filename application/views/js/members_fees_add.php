@@ -97,3 +97,28 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 		$("#from").datepicker("option", "maxDate", new Date($("#to").val()));
 		$("#to").datepicker("option", "minDate", new Date($("#from").val()));
 	});
+	
+	// select correct fee if new was created
+	$('#fee_id').live('addOption', function (e, new_option_id)
+	{
+		$.ajaxSetup({
+			async: false
+		});
+		
+		$('#fee_type_id').change();
+		
+		$.ajaxSetup({
+			async: true
+		});
+		
+		$.getJSON("<?php echo url_lang::base() ?>json/get_fee_by_id?id=" + new_option_id, function(data)
+		{
+			$('#fee_id').val(data['id']);
+			
+			fee_intervals[data['id']] = new Array();
+			fee_intervals[data['id']]['from'] = data['from'];
+			fee_intervals[data['id']]['to'] = data['to'];
+			
+			$('#fee_id').change();
+		})
+	});

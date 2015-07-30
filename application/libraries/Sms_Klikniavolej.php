@@ -142,7 +142,7 @@ class Sms_Klikniavolej extends Sms
 		else
 		{
 			$this->status = FALSE;
-			$this->error = $response[1];
+			$this->error = @$response[1];
 			return false;
 		}
 	}
@@ -290,7 +290,7 @@ class Sms_Klikniavolej extends Sms
 		}
 		else
 		{
-			$this->error = $response[1];
+			$this->error = @$response[1];
 			return false;
 		}
 	}

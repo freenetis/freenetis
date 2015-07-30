@@ -32,7 +32,8 @@
 	}
 	
 	$.validator.passwordRating = function(password, username) {
-		if (!password || password.length < 8)
+		var ln = (window['security_password_length'] != undefined) ? security_password_length : 8;
+		if (!password || password.length < ln)
 			return rating(0, "too-short");
 		if (username && password.toLowerCase().match(username.toLowerCase()))
 			return rating(0, "similar-to-username");
@@ -61,7 +62,7 @@
 		"strong": "Strong"
 	}
 	
-	$.validator.addMethod("password", function(value, element, usernameField) {
+	$.validator.addMethod("main_password", function(value, element, usernameField) {
 		// use untrimmed value
 		var password = element.value,
 		// get username for comparison, if specified
@@ -79,10 +80,10 @@
 		.addClass("password-meter-message-" + rating.messageKey)
 		.text($.validator.passwordRating.messages[rating.messageKey]);
 		// display process bar instead of error message
-		
-		return rating.rate > 2;
+		var rt = (window['security_password_level'] != undefined) ? security_password_level : 2;
+		return rating.rate >= rt;
 	}, "&nbsp;");
 	// manually add class rule, to make username param optional
-	$.validator.classRuleSettings.password = { password: true };
+	$.validator.classRuleSettings.main_password = { main_password: true };
 	
 })(jQuery);

@@ -59,57 +59,50 @@ class Account_attribute_Model extends ORM
 	public function get_accounting_system(
 			$limit_from = 0, $limit_results = 20,
 			$order_by = 'id', $order_by_direction = 'asc',
-			$filter_values = array())
+			$filter_sql = '', $date_sql = '')
 	{
 		$where = '';
-		$datetime_from_t1 = " AND t1.datetime >= '0000-00-00'";
-		$datetime_to_t1 = " AND t1.datetime <= '9999-12-31'";
-		$datetime_from_t2 = " AND t2.datetime >= '0000-00-00'";
-		$datetime_to_t2 = " AND t2.datetime <= '9999-12-31'";
+		$datetime = '';
 		// order by direction check
 		if (strtolower($order_by_direction) != 'desc')
 		{
 			$order_by_direction = 'asc';
 		}
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach ($filter_values as $key => $value)
-			{
-				if ($key == 'name')
-				{
-					$where =  " WHERE aa.name LIKE " . $this->db->escape("%$value%") . " COLLATE utf8_general_ci";
-				}
-				if ($key == 'datetime_from' && preg_match("/^\d{4}\-\d{2}\-\d{2}$/", $value))
-				{
-					$datetime_from_t1 = " AND t1.datetime >= '$value'";
-					$datetime_from_t2 = " AND t2.datetime >= '$value'";
-				}
-				if ($key == 'datetime_to' && preg_match("/^\d{4}\-\d{2}\-\d{2}$/", $value))
-				{
-					$datetime_to_t1 = " AND t1.datetime <= '$value'";
-					$datetime_to_t2 = " AND t2.datetime <= '$value'";
-				}
-			}
+			$where = "WHERE $filter_sql";
 		}
+		if (!empty($date_sql))
+		{
+			$datetime = "AND $date_sql";
+		}
+		
 		// query
 		return $this->db->query("
 				SELECT aa.id, aa.name, SUM(partial_balance) AS balance
-				FROM account_attributes aa
-				JOIN
-					(SELECT q2.account_attribute_id, (inbound - outbound) AS partial_balance FROM
-						(SELECT q1.*, IFNULL(SUM(amount), 0) AS inbound FROM
-							(SELECT q0.*, IFNULL(SUM(amount), 0) AS outbound FROM
-								(SELECT a.id, a.account_attribute_id
-								FROM accounts a
-								) q0
-							LEFT JOIN transfers t1 ON q0.id = t1.origin_id $datetime_from_t1 $datetime_to_t1
+                FROM account_attributes aa
+                JOIN
+				(
+					SELECT q2.account_attribute_id, (inbound - outbound) AS partial_balance
+					FROM
+					(
+						SELECT q1.*, IFNULL(SUM(amount), 0) AS inbound
+						FROM
+						(
+							SELECT q0.*, IFNULL(SUM(amount), 0) AS outbound
+							FROM
+							(
+								SELECT a.id, a.account_attribute_id
+								FROM accounts a	
+							) q0
+							LEFT JOIN transfers t1 ON q0.id = t1.origin_id $datetime
 							GROUP BY q0.id
-							) q1
-						LEFT JOIN transfers t2 ON q1.id = t2.destination_id $datetime_from_t2 $datetime_to_t2
+						) q1
+						LEFT JOIN transfers t2 ON q1.id = t2.destination_id $datetime
 						GROUP BY q1.id
-						) q2
-					) q3 ON aa.id = q3.account_attribute_id
+					) q2
+				) q3 ON aa.id = q3.account_attribute_id
 				$where
 				GROUP BY q3.account_attribute_id
 				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
@@ -123,14 +116,13 @@ class Account_attribute_Model extends ORM
 	 * @param integer $filter_values
 	 * @return integer 
 	 */
-	public function get_accounting_system_count($filter_values = array())
+	public function get_accounting_system_count($filter_sql = '')
 	{
 		$where = '';
 		// filter
-		if (is_array($filter_values) && array_key_exists('name', $filter_values))
+		if (!empty($filter_sql))
 		{
-			$where = "AND aa.name LIKE " . $this->db->escape("%".$filter_values['name']."%")
-				. " COLLATE utf8_general_ci";
+			$where = "AND $filter_sql";
 		}
 		// query
 		return $this->db->query("

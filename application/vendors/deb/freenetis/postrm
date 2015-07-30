@@ -1,5 +1,5 @@
 #!/bin/sh
-# FreenetIS DEB: actions before uninstalling of package
+# FreenetIS DEB: actions after uninstalling of package
 
 set -e
 
@@ -18,7 +18,7 @@ if [ "$1" = purge ]; then
 	# remove config files
 	rm -rf $CONFIGFILE
 	# remove all files
-	rm -rf /var/www/freenetis
+	rm -rf /usr/share/freenetis
 	# remove dir if empty
 	[ "$(ls -A /etc/freenetis)" ] || rm -rf /etc/freenetis
 # restart apache

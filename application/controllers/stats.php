@@ -37,29 +37,63 @@ class Stats_Controller extends Controller
 	{
 		parent::__construct();
 		
-		$array[] = html::anchor(
-				'stats/members_increase_decrease',
-				__('Increase and decrease of members')
-		);
+		$array = array();
 		
-		$array[] = html::anchor('stats/members_growth', __('Growth of members'));
+		if ($this->acl_check_view('Stats_Controller', 'members_increase_decrease'))
+		{
+			$array[] = html::anchor(
+					'stats/members_increase_decrease',
+					__('Increase and decrease of members')
+			);
+		}
+		
+		if ($this->acl_check_view('Stats_Controller', 'members_growth'))
+		{
+			$array[] = html::anchor('stats/members_growth', __('Growth of members'));
+		}
 	
-		$array[] = html::anchor(
-				'stats/incoming_member_payment', __('Incoming member payment')
-		);
+		if (Settings::get('finance_enabled'))
+		{
+			if ($this->acl_check_view('Stats_Controller', 'incoming_member_payment'))
+			{
+				$array[] = html::anchor(
+						'stats/incoming_member_payment', __('Incoming member payment')
+				);
+			}
+
+			if ($this->acl_check_view('Stats_Controller', 'members_fees'))
+			{
+				$array[] = html::anchor('stats/members_fees', __('Member fees'));
+			}
+		}
 		
 		$this->links = implode(' | ', $array);
 	}
 
 	/**
 	 * Index function
-	 * Redirects to function with increase of members
+	 * Redirects to function by acl
 	 * 
 	 * @author Michal Kliment
 	 */
 	public function index()
 	{
-		url::redirect('stats/members_increase_decrease');
+		if ($this->acl_check_view('Stats_Controller', 'members_increase_decrease'))
+		{
+			url::redirect('stats/members_increase_decrease');
+		}
+		
+		if ($this->acl_check_view('Stats_Controller', 'members_growth'))
+		{
+			url::redirect('stats/members_growth');
+		}
+		
+		if ($this->acl_check_view('Stats_Controller', 'incoming_member_payment'))
+		{
+			url::redirect('stats/incoming_member_payment');
+		}
+		
+		url::redirect('stats/members_fees');
 	}
 
 	/**
@@ -70,7 +104,7 @@ class Stats_Controller extends Controller
 	public function members_increase_decrease()
 	{
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Stats_Controller', 'members_increase_decrease'))
 			Controller::error(ACCESS);
 
 		// creates instance of member ID=1 (Association)
@@ -198,7 +232,7 @@ class Stats_Controller extends Controller
 	public function members_growth()
 	{
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Stats_Controller', 'members_growth'))
 			Controller::error(ACCESS);
 
 		// creates new member model
@@ -303,7 +337,7 @@ class Stats_Controller extends Controller
 	}
 
 	/**
-	 * Function to show graph of imcoming member payment
+	 * Function to show graph of incoming member payment
 	 * 
 	 * @author Michal Kliment
 	 * @param integer $start_year
@@ -311,10 +345,12 @@ class Stats_Controller extends Controller
 	 */
 	public function incoming_member_payment($start_year = NULL, $end_year = NULL)
 	{
-
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!Settings::get('finance_enabled') ||
+			!$this->acl_check_view('Stats_Controller', 'incoming_member_payment'))
+		{
 			Controller::error(ACCESS);
+		}
 
 		// form is posted
 		if (isset($_POST) && $_POST)
@@ -339,7 +375,7 @@ class Stats_Controller extends Controller
 		$max = 0;
 
 		// creates instance of member ID=1 (Association)
-		$association = new Member_Model(1);
+		$association = new Member_Model(Member_Model::ASSOCIATION);
 		$association_entrance_date = date_parse($association->entrance_date);
 
 		// start year is not set, use date of creation of association
@@ -349,6 +385,10 @@ class Stats_Controller extends Controller
 		// end year is not set, use current year
 		if (!$end_year)
 			$end_year = date("Y");
+		
+		// check end year
+		if ($end_year < $start_year)
+			$end_year = $start_year;
 
 		$years = array();
 
@@ -357,6 +397,145 @@ class Stats_Controller extends Controller
 
 		$transfer_model = new Transfer_Model();
 		$amounts = $transfer_model->get_all_monthly_amounts_of_incoming_member_payment();
+
+		// gets all amount of member payment by months
+		$arr_amounts = array();
+		foreach ($amounts as $amount)
+			$arr_amounts[$amount->year][(int) $amount->month] = $amount->amount;
+
+		// we draw graph 
+		for ($i = $start_year; $i <= $end_year; $i++)
+		{
+			for ($j = 1; $j <= 12; $j++)
+			{
+				// draw label only 12 times
+				if ($x % ($end_year - $start_year + 1) == 0)
+				// we draw label only for first month of year
+					$labels[$x] = $j . ' / ' . substr($i, 2, 2);
+				else
+					$labels[$x] = ' ';
+
+				$values[$x] = (isset($arr_amounts[$i][$j])) ? $arr_amounts[$i][$j] : 0;
+
+				// finding max, important for drawing graph
+				if ($values[$x] > $max)
+					$max = $values[$x];
+
+				if ((
+						$i > $association_entrance_date['year'] &&
+						$i < date("Y")
+					) || (
+						$i == date("Y") &&
+						$j <= date("m")
+					) || (
+						$i == $association_entrance_date['year'] &&
+						$j >= $association_entrance_date['month']
+					))
+				{
+					$months[$x] = __('' . date::$months[$j]) . ' ' . $i;
+				}
+
+				$x++;
+			}
+		}
+		
+		// round max
+		$max = ceil($max);
+		$max = (substr($max, 0, 2) + 1) . num::null_fill(0, strlen($max) - 2);
+		
+		// calculation of correct rates of axes
+		$y_count = substr($max, 0, 2);
+
+		while ($y_count > 25)
+			$y_count /= 2;
+
+		$x_rate = num::decimal_point(round(100 / (($end_year - $start_year + 1) * 12 - 1), 5));
+		$y_rate = num::decimal_point(round(100 / $y_count, 5));
+		
+		$breadcrumbs = breadcrumbs::add()
+				->text('Stats')
+				->text('Incoming member payment in the period')
+				->disable_translation()
+				->text($start_year . '-' . $end_year);
+
+		$view = new View('main');
+		$view->title = __('Incoming member payment');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->content = new View('stats/members_monthly_payments_and_fees');
+		$view->content->headline = __('Incoming member payment');
+		$view->content->x_rate = $x_rate;
+		$view->content->y_rate = $y_rate;
+		$view->content->link_back = $this->links;
+		$view->content->labels = $labels;
+		$view->content->values = $values;
+		$view->content->months = $months;
+		$view->content->max = $max;
+		$view->content->start_year = $start_year;
+		$view->content->end_year = $end_year;
+		$view->content->years = $years;
+		$view->render(TRUE);
+	}
+
+	/**
+	 * Function to show graph of member member fees by month
+	 * 
+	 * @author Michal Kliment, Ondřej Fibich
+	 * @param integer $start_year
+	 * @param integer $end_year
+	 */
+	public function members_fees($start_year = NULL, $end_year = NULL)
+	{
+		// access control
+		if (!Settings::get('finance_enabled') ||
+			!$this->acl_check_view('Stats_Controller', 'members_fees'))
+		{
+			Controller::error(ACCESS);
+		}
+
+		// form is posted
+		if (isset($_POST) && $_POST)
+		{
+			$start_year = $_POST['start_year'];
+			$end_year = $_POST['end_year'];
+
+			if ($end_year < $start_year)
+				$end_year = $start_year;
+
+			// redirect to this method with correct parameters
+			url::redirect(
+					'stats/members_fees/' . $start_year . '/' . $end_year
+			);
+		}
+
+		$values = array();
+		$labels = array();
+		$months = array();
+		$x = 0;
+		$max = 0;
+
+		// creates instance of member ID=1 (Association)
+		$association = new Member_Model(Member_Model::ASSOCIATION);
+		$association_entrance_date = date_parse($association->entrance_date);
+
+		// start year is not set, use date of creation of association
+		if (!$start_year)
+			$start_year = $association_entrance_date['year'];
+
+		// end year is not set, use current year
+		if (!$end_year)
+			$end_year = date('Y');
+		
+		// check end year
+		if ($end_year < $start_year)
+			$end_year = $start_year;
+
+		$years = array();
+
+		for ($i = $association_entrance_date['year']; $i <= date('Y'); $i++)
+			$years[$i] = $i;
+
+		$transfer_model = new Transfer_Model();
+		$amounts = $transfer_model->get_grouped_monthly_member_fees();
 
 		// gets all amount of member payment by months
 		$arr_amounts = array();
@@ -413,14 +592,15 @@ class Stats_Controller extends Controller
 		
 		$breadcrumbs = breadcrumbs::add()
 				->text('Stats')
-				->text('Incoming member payment in the period')
+				->text('Member fees')
 				->disable_translation()
 				->text($start_year . '-' . $end_year);
 
 		$view = new View('main');
-		$view->title = __('Incoming member payment');
+		$view->title = __('Member fees');
 		$view->breadcrumbs = $breadcrumbs->html();
-		$view->content = new View('stats/incoming_member_payment');
+		$view->content = new View('stats/members_monthly_payments_and_fees');
+		$view->content->headline = __('Member fees');
 		$view->content->x_rate = $x_rate;
 		$view->content->y_rate = $y_rate;
 		$view->content->link_back = $this->links;

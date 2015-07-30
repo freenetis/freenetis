@@ -116,7 +116,11 @@ class Order_Field extends Field
 		}
 
 		$pre_url = $url_array[1] . '/' . $url_array[2] . '/' . $variables;
-		$pre_url .= ( $this->use_selector) ? $url_array[3 + $url_array_ofset] . '/' : '';
+		
+		if ($this->use_paginator)
+		{
+			$pre_url .= $url_array[3 + $url_array_ofset] . '/';
+		}
 		
 		if ($new_order_by == $order_by)
 		{

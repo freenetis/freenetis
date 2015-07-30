@@ -30,10 +30,9 @@
  * @property string $password
  * @property string $password_request
  * @property integer $type
- * @property integer $web_messages_types
- * @property integer $email_messages_types
  * @property string $comment
  * @property string $application_password
+ * @property string $settings
  * @property ORM_Iterator $jobs
  * @property ORM_Iterator $devices
  * @property ORM_Iterator $logs
@@ -45,6 +44,7 @@
  * @property ORM_Iterator $device_engineers
  * @property ORM_Iterator $users_contacts
  * @property ORM_Iterator $clouds
+ * @property ORM_Iterator $connection_requests
  */
 class User_Model extends ORM
 {
@@ -62,7 +62,7 @@ class User_Model extends ORM
 	(
 		'jobs', 'devices', 'logs', 'phone_invoices_users', 'sms_messages',
 		'users' => 'private_phone_contacts', 'users_keys', 'device_admins',
-		'device_engineers'
+		'device_engineers', 'connection_requests'
 	);
 	
 	protected $has_and_belongs_to_many = array
@@ -85,6 +85,9 @@ class User_Model extends ORM
 		'member_name' => 'm.name',
 		'email' => 'c.value'
 	);
+	
+	/** User settings constants */
+	const SETTINGS_MONITORING_GROUP_BY = 'monitoring_group_by';
 
 	/**
 	 * Returns all users
@@ -108,14 +111,14 @@ class User_Model extends ORM
 			$order_by = 'id', $order_by_direction = 'ASC',
 			$filter_sql='', $member_id=NULL)
 	{
+		$having = '';
 		$where = '';
 
 		if ($filter_sql != '')
-			$where .= 'WHERE '.$filter_sql;
+			$having .= 'HAVING '.$filter_sql;
 
 		if ($member_id)
-			$where .= ($where != '') ? ' AND member_id = '.intval($member_id) :
-										'WHERE member_id = '.intval($member_id);
+			$where = 'WHERE member_id = '.intval($member_id);
 		
 		// order by direction check
 		if (strtolower($order_by_direction) != 'desc')
@@ -133,52 +136,39 @@ class User_Model extends ORM
 		}
 		
 		// optimalization
-		if (empty($where))
+		if (empty($having))
 		{
 			return $this->db->query("
 				SELECT u.*, m.name AS member_name
 				FROM users u
 				LEFT JOIN members m ON m.id = u.member_id
+				$where
 				ORDER BY $order_by $order_by_direction
 				LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
 			", $member_id);
 		}
 
 		return $this->db->query("
-			SELECT * FROM
-			(
-				SELECT
-					u.*,
-					m.name AS member_name,
-					IFNULL(email,'') AS email,
-					IFNULL(phone,'') AS phone,
-					IFNULL(jabber,'') AS jabber,
-					IFNULL(icq,'') AS icq
-				FROM users u
-				JOIN members m ON u.member_id = m.id
-				LEFT JOIN
-				(
-					SELECT uc.user_id, c.value AS email FROM users_contacts uc
-					JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
-				) e ON e.user_id = u.id
-				LEFT JOIN
-				(
-					SELECT uc.user_id, c.value AS phone FROM users_contacts uc
-					JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
-				) p ON p.user_id = u.id
-				LEFT JOIN
-				(
-					SELECT uc.user_id, c.value AS jabber FROM users_contacts uc
-					JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
-				) j ON j.user_id = u.id
-				LEFT JOIN
-				(
-					SELECT uc.user_id, c.value AS icq FROM users_contacts uc
-					JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
-				) i ON i.user_id = u.id
-			) AS u
+			SELECT
+				u.*,
+				m.name AS member_name,
+				IFNULL(email.value,'') AS email,
+				IFNULL(phone.value,'') AS phone,
+				IFNULL(jabber.value,'') AS jabber,
+				IFNULL(icq.value,'') AS icq
+			FROM users u
+			JOIN members m ON u.member_id = m.id
+			LEFT JOIN users_contacts uc_e ON uc_e.user_id = u.id
+			LEFT JOIN contacts email ON uc_e.contact_id = email.id AND email.type = ?
+			LEFT JOIN users_contacts uc_p ON uc_p.user_id = u.id
+			LEFT JOIN contacts phone ON uc_p.contact_id = phone.id AND phone.type = ?
+			LEFT JOIN users_contacts uc_j ON uc_j.user_id = u.id
+			LEFT JOIN contacts jabber ON uc_j.contact_id = jabber.id AND jabber.type = ?
+			LEFT JOIN users_contacts uc_i ON uc_i.user_id = u.id
+			LEFT JOIN contacts icq ON uc_i.contact_id = icq.id AND icq.type = ?
 			$where
 			GROUP BY u.id
+			$having
 			ORDER BY $order_by $order_by_direction
 			LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
 		", array
@@ -206,64 +196,58 @@ class User_Model extends ORM
 	 */
 	public function count_all_users($filter_sql = '', $member_id = NULL)
 	{
+		$having = '';
 		$where = '';
 
 		if ($filter_sql != '')
-			$where .= 'WHERE '.$filter_sql;
+			$having .= 'HAVING '.$filter_sql;
 
 		if ($member_id)
-			$where .= ($where != '') ? ' AND member_id = '.intval($member_id) :
-										'WHERE member_id = '.intval($member_id);
+			$where = 'WHERE member_id = '.intval($member_id);
 		
 		// optimalization
-		if (empty($where))
-			return $this->count_all();
+		if (empty($having))
+		{
+			if (empty($where))
+			{
+				return $this->count_all();
+			}
+			
+			return $this->db->query("
+				SELECT *
+				FROM users
+				$where
+			")->count();
+		}
 
 		return $this->db->query("
-			SELECT COUNT(*) AS total FROM
-			(
-				SELECT * FROM
-				(
-					SELECT
-						u.*,
-						m.name AS member_name,
-						IFNULL(email,'') AS email,
-						IFNULL(phone,'') AS phone,
-						IFNULL(jabber,'') AS jabber,
-						IFNULL(icq,'') AS icq
-					FROM users u
-					JOIN members m ON u.member_id = m.id
-					LEFT JOIN
-					(
-						SELECT uc.user_id, c.value AS email FROM users_contacts uc
-						JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
-					) e ON e.user_id = u.id
-					LEFT JOIN
-					(
-						SELECT uc.user_id, c.value AS phone FROM users_contacts uc
-						JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
-					) p ON p.user_id = u.id
-					LEFT JOIN
-					(
-						SELECT uc.user_id, c.value AS jabber FROM users_contacts uc
-						JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
-					) j ON j.user_id = u.id
-					LEFT JOIN
-					(
-						SELECT uc.user_id, c.value AS icq FROM users_contacts uc
-						JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
-					) i ON i.user_id = u.id
-				) AS u
-				$where
-				GROUP BY u.id
-			) q
+			SELECT
+				u.*,
+				m.name AS member_name,
+				IFNULL(email.value,'') AS email,
+				IFNULL(phone.value,'') AS phone,
+				IFNULL(jabber.value,'') AS jabber,
+				IFNULL(icq.value,'') AS icq
+			FROM users u
+			JOIN members m ON u.member_id = m.id
+			LEFT JOIN users_contacts uc_e ON uc_e.user_id = u.id
+			LEFT JOIN contacts email ON uc_e.contact_id = email.id AND email.type = ?
+			LEFT JOIN users_contacts uc_p ON uc_p.user_id = u.id
+			LEFT JOIN contacts phone ON uc_p.contact_id = phone.id AND phone.type = ?
+			LEFT JOIN users_contacts uc_j ON uc_j.user_id = u.id
+			LEFT JOIN contacts jabber ON uc_j.contact_id = jabber.id AND jabber.type = ?
+			LEFT JOIN users_contacts uc_i ON uc_i.user_id = u.id
+			LEFT JOIN contacts icq ON uc_i.contact_id = icq.id AND icq.type = ?
+			$where
+			GROUP BY u.id
+			$having
 		", array
 		(
 			Contact_Model::TYPE_EMAIL,
 			Contact_Model::TYPE_PHONE,
 			Contact_Model::TYPE_JABBER,
 			Contact_Model::TYPE_ICQ
-		))->current()->total;
+		))->count();
 	}
 	
 	/**
@@ -299,6 +283,140 @@ class User_Model extends ORM
 			LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
 		", $member_id);
 	}
+	
+	/**
+	 * Gets all users of members
+	 *
+	 * @author David Raska
+	 * @param array $member_ids
+	 * @param integer $limit_from
+	 * @param integer $limit_results
+	 * @param string $order_by
+	 * @param string $order_by_direction
+	 * @return unknown_type
+	 */
+	public function get_all_users_of_members(
+			$member_ids = NULL, $limit_from = 0, $limit_results = 50,
+			$order_by = 'id', $order_by_direction = 'ASC')
+	{
+		// order by direction check
+		if (strtolower($order_by_direction) != 'desc')
+		{
+			$order_by_direction = 'asc';
+		}
+		
+		if (!$this->has_column($order_by))
+		{
+			$order_by = 'id';
+		}
+		
+		if (!is_array($member_ids) || !count($member_ids))
+		{
+			return NULL;
+		}
+		
+		$list = implode(', ', array_map('intval', $member_ids));
+
+		return $this->db->query("
+			SELECT u.*
+			FROM users u
+			WHERE member_id IN ($list)
+			ORDER BY $order_by $order_by_direction
+			LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
+		");
+	}
+	
+	/**
+	 * Counts all users of members
+	 * 
+	 * @author David Raska
+	 * @param array $member_ids
+	 * @return integer
+	 */
+	public function count_all_users_of_members($member_ids = NULL)
+	{
+		if (!is_array($member_ids) || !count($member_ids))
+		{
+			return 0;
+		}
+		
+		$list = implode(', ', array_map('intval', $member_ids));
+
+		return $this->db->query("
+			SELECT u.*
+			FROM users u
+			WHERE member_id IN ($list)
+		")->count();
+	}
+	
+	/**
+	 * Function gets selected users.
+	 * 
+	 * @param array $ids
+	 * @param boolean $in_set
+	 * 
+	 * @author Jan Dubina
+	 * @return Mysql_Result
+	 */
+	public function get_users_to_sync_vtiger($ids, $in_set)
+	{
+		$filter_sql = '';
+		// where condition
+		if (!empty($ids) || $in_set === false)
+		{
+			if (!empty($ids))
+				if ($in_set === true)
+					$filter_sql = "WHERE u.id IN (" . implode(',', $ids) . ")";
+				else
+					$filter_sql = "WHERE u.id NOT IN (" . implode(',', $ids) . ")";
+		
+			// query
+			return $this->db->query("
+				SELECT u.id, member_id, comment, type, birthday, post_title, 
+					pre_title, surname, middle_name, name, email, phone, street,
+					street_number, town, zip_code, country_name
+					FROM users u
+					LEFT JOIN
+					(
+						SELECT m.id, country_name, town, zip_code,
+							street, street_number
+						FROM members m
+						LEFT JOIN
+						(
+							SELECT ap.id, country_name, town, zip_code,
+							street, street_number
+							FROM address_points ap
+							LEFT JOIN countries c
+								ON c.id = ap.country_id
+							LEFT JOIN towns t
+								ON t.id = ap.town_id
+							LEFT JOIN streets s
+								ON s.id = ap.street_id
+						) ap ON ap.id = m.address_point_id
+					) m ON m.id = u.member_id
+					LEFT JOIN 
+					(
+						SELECT user_id, GROUP_CONCAT(value SEPARATOR ';') AS email
+						FROM users_contacts uc 
+						LEFT JOIN contacts c ON uc.contact_id = c.id
+						WHERE c.type = ?
+						GROUP BY user_id
+					) ce ON u.id = ce.user_id 
+					LEFT JOIN 
+					(
+						SELECT user_id, GROUP_CONCAT(value SEPARATOR ';') AS phone
+						FROM users_contacts uc 
+						LEFT JOIN contacts c ON uc.contact_id = c.id
+						WHERE c.type = ?
+						GROUP BY user_id
+					) cp ON u.id = cp.user_id 
+					$filter_sql
+			", array(
+						Contact_Model::TYPE_EMAIL,
+						Contact_Model::TYPE_PHONE
+			));
+		}
+	}
 
 	/**
 	 * Login test function
@@ -315,7 +433,27 @@ class User_Model extends ORM
 			'password' => sha1($password)
 		))->get();
 		
-		return ($query->count()) ? $query->current()->id : 0;
+		if ($query->count())
+		{
+			return $query->current()->id;
+		}
+		
+		// see Settings for exclamation
+		if (Settings::get('pasword_check_for_md5')) 
+		{
+			$query = $this->db->from('users')->select('id')->where(array
+			(
+				'login' => $username,
+				'password' => md5($password)
+			))->get();
+			
+			if ($query->count())
+			{
+				return $query->current()->id;
+			}
+		}
+		
+		return 0;
 	}
 
 	/**
@@ -609,6 +747,24 @@ class User_Model extends ORM
 	}
 	
 	/**
+	 * Checks if user is in ARO group
+	 * 
+	 * @param int $user_id	User ID
+	 * @param int $aro_group	ARO Group
+	 * @return int
+	 */
+	public function is_user_in_aro_group($user_id, $aro_group)
+	{
+		return $this->db->query("
+				SELECT ag.id
+				FROM aro_groups ag
+				JOIN groups_aro_map gam ON ag.id = gam.group_id
+				WHERE ag.id = ? AND
+					gam.aro_id = ?
+		", $aro_group, $user_id)->count();
+	}
+	
+	/**
 	 * Gets array of users for selectbox
 	 * 
 	 * @return array[string]
@@ -891,4 +1047,64 @@ class User_Model extends ORM
 		$this->get_full_name();
 	}
 
+	/**
+	 * Get user settings
+	 * 
+	 * @param string $key	Key
+	 * @return mixed		Value
+	 */
+	public function get_user_setting($key, $default = NULL)
+	{
+		$json_settings = $this->settings;
+		
+		// return empty value on no settings
+		if (empty($json_settings))
+		{
+			return $default;
+		}
+		
+		// decode json
+		$settings = json_decode($json_settings, TRUE);
+		
+		// return empty value on no settings
+		if (empty($settings))
+		{
+			return $default;
+		}
+		// return value
+		else if (isset($settings[$key]))
+		{
+			return $settings[$key];
+		}
+		// no value found
+		else
+		{
+			return $defaut;
+		}
+	}
+	
+	/**
+	 * Sets user settings
+	 * 
+	 * @param string $key	Key
+	 * @param mixed $value	Value
+	 */
+	public function set_user_setting($key, $value)
+	{
+		$json_settings = $this->settings;
+
+		// decode json
+		$settings = json_decode($json_settings, TRUE);
+
+		// add new settings
+		$settings[$key] = $value;
+
+		// encode settings to json
+		$json_settings = json_encode($settings);
+
+		$this->settings = $json_settings;
+
+		// save
+		$this->save_throwable();	
+	}
 }

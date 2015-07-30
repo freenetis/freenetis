@@ -22,6 +22,20 @@
 class VoIP_Controller extends Controller
 {
 	/**
+	 * Only check whether is VoIP enabled
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function __construct()
+	{
+	    parent::__construct();
+	    
+	    // voip is not enabled, quit
+	    if (!Settings::get('voip_enabled'))
+			Controller::error(ACCESS);
+	}
+    
+	/**
 	 * Redirects to show all
 	 */
 	public function index()
@@ -46,8 +60,8 @@ class VoIP_Controller extends Controller
 			Controller::error(ACCESS);
 		
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array('id', 'name', 'user_id');
@@ -107,8 +121,8 @@ class VoIP_Controller extends Controller
 				->label('User');
 		
 		$grid->order_link_field('member_id')
-				->link('members/show', 'mname')
-				->label('Member');
+				->link('users/show', 'mname')
+				->label('User');
 		
 		$grid->callback_field('regseconds')
 				->label('')
@@ -577,7 +591,7 @@ class VoIP_Controller extends Controller
 			$view->title = __('Change member limit');
 			$view->breadcrumbs = $breadcrumbs->html();
 			$view->content = new View('form');
-			$view->content->headline = 'VoIP ' . __('Limit of member');
+			$view->content->headline = 'VoIP' . __('Limit of member');
 			$view->content->form = $form->html();
 			$view->render(TRUE);
 		}

@@ -36,7 +36,7 @@ class Comments_threads_Controller extends Controller
 
 		// creates model name
 		$model = ucfirst($type) . '_Model';
-
+		
 		// this model doesn't exist
 		if (!class_exists($model))
 			Controller::error(RECORD);
@@ -57,8 +57,8 @@ class Comments_threads_Controller extends Controller
 			$object->comments_thread_id = $comments_thread->id;
 			$object->save();
 		}
-
-		url::redirect('comments/add/' . $object->comments_thread_id);
+		
+		Comments_Controller::add($object->comments_thread_id);
 	}
 
 }

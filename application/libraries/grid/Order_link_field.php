@@ -37,6 +37,13 @@ class Order_Link_Field extends Order_Field
 	public $data_name = 'id';
 	
 	/**
+	 * Title of data column
+	 * 
+	 * @var string
+	 */
+	public $data_title = '';
+	
+	/**
 	 * URL to action
 	 *
 	 * @var string

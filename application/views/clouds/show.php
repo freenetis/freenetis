@@ -3,8 +3,11 @@
 
 if ($this->acl_check_edit('Clouds_Controller', 'clouds'))
 {
-	echo html::anchor('clouds/edit/' . $cloud->id, __('Edit cloud')) . ' | ';
-	echo html::anchor('notifications/cloud/' . $cloud->id, __('Notifications'));
+	echo html::anchor('clouds/edit/' . $cloud->id, __('Edit cloud'));
+	
+	if (module::e('notification') &&
+		$this->acl_check_new('Notifications_Controller', 'cloud'))
+		echo ' | ' . html::anchor('notifications/cloud/' . $cloud->id, __('Notifications'));
 }
 ?>
 

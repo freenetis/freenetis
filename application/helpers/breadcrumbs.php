@@ -108,7 +108,12 @@ class breadcrumbs
 		// access
 		if ($access)
 		{
-			$html = html::anchor(url_lang::base() . $url, $html);
+			if (!text::starts_with($url, url_lang::base()))
+			{
+				$url = url_lang::base() . $url;
+			}
+			
+			$html = html::anchor($url, $html);
 		}
 		// add item
 		$this->items[] = $html;

@@ -3,13 +3,14 @@
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 		<title><?php echo __('Registration has been sended') ?> | <?php echo $this->settings->get('title') ?></title>
+		<?php echo html::link('media/images/favicon.ico', 'shorcut icon', 'image/x-icon', FALSE); ?>
 		<?php echo html::stylesheet('media/css/installation.css') ?>
 	</head>
 
 	<body>
 
 		<div id="main">
-			<h1><a href="<?php echo url_lang::base() ?>"><span>FreenetIS</span></a></h1>
+			<h1><a href="<?php echo url_lang::base() ?>"><span>FreenetIS</span><i><?php echo Version::get_version() ?></i></a></h1>
 			<div class="flags">
 				<?php echo special::create_language_flags(array('cs' => 'Česky', 'en' => 'English')) ?>
 			</div>

@@ -110,4 +110,28 @@ class Form_Dropdown extends Form_Input {
 		$this->data['selected'] = $this->input_value($this->name);
 	}
 
+	/**
+	 * Runs validation and returns the element HTML.
+	 *
+	 * @return  string
+	 */
+	public function html()
+	{
+		// sets selected value to a value of GET parameter with same name (request #614)
+		$value = Input::instance()->get($this->name());
+		
+		if(!empty($value))
+		{
+			$key = array_search(urldecode($value), $this->data['options']);
+			
+			if ($key !== false)
+				$this->selected ($key);
+		}
+		
+		// Make sure validation runs
+		$this->validate();
+
+		return $this->html_element();
+	}
+	
 } // End Form Dropdown

@@ -43,7 +43,7 @@ class Allowed_subnets_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_view('Devices_Controller', 'allowed_subnet', $member->id))
+		if (!$this->acl_check_view('Allowed_subnets_Controller', 'allowed_subnet', $member->id))
 			Controller::error(ACCESS);
 
 		// finds all allowed subnets of member
@@ -138,7 +138,7 @@ class Allowed_subnets_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_new('Devices_Controller', 'allowed_subnet', $member->id))
+		if (!$this->acl_check_new('Allowed_subnets_Controller', 'allowed_subnet', $member->id))
 			Controller::error(ACCESS);
 
 		$subnet_model = new Subnet_Model();
@@ -235,7 +235,7 @@ class Allowed_subnets_Controller extends Controller
 		$member_id = $allowed_subnet->member_id;
 
 		// access control
-		if (!$this->acl_check_delete('Devices_Controller', 'allowed_subnet', $member_id))
+		if (!$this->acl_check_delete('Allowed_subnets_Controller', 'allowed_subnet', $member_id))
 			Controller::error(ACCESS);
 
 		// success
@@ -267,7 +267,7 @@ class Allowed_subnets_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_edit('Devices_Controller', 'allowed_subnet', $allowed_subnet->member->id))
+		if (!$this->acl_check_edit('Allowed_subnets_Controller', 'allowed_subnet', $allowed_subnet->member->id))
 			Controller::error(ACCESS);
 
 		$allowed_subnet->enabled = !$allowed_subnet->enabled;
@@ -391,13 +391,13 @@ class Allowed_subnets_Controller extends Controller
 				}
 
 				$allowed_subnet_model->transaction_commit();
-
+				
 				return TRUE; // all OK
 			}
 			catch (Exception $e) // failed => rollback and wait 100ms before next attempt
 			{
 				$allowed_subnet_model->transaction_rollback();
-
+				
 				if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
 				{
 					Log::add_exception($e);
@@ -411,7 +411,7 @@ class Allowed_subnets_Controller extends Controller
 						return FALSE;
 					}
 				}
-
+				
 				usleep($timeout);
 			}
 		}

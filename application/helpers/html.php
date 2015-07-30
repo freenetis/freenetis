@@ -68,9 +68,11 @@ class html {
 	 * @param   string  link text
 	 * @param   array   HTML anchor attributes
 	 * @param   string  non-default protocol, eg: https
+	 * @param   $id_as_title if title is empty and link ends with ID, use ID or full uri as title?
 	 * @return  string
 	 */
-	public static function anchor($uri, $title = FALSE, $attributes = FALSE, $protocol = FALSE)
+	public static function anchor($uri, $title = FALSE, $attributes = FALSE, 
+			$protocol = FALSE, $id_as_title = TRUE)
 	{
 		if ($uri === '')
 		{
@@ -111,7 +113,7 @@ class html {
 		// Title empty? Use the parsed URL or ID
 		if (empty($title))
 		{
-			if (mb_eregi('/([0-9]+)$', $site_url, $r))
+			if ($id_as_title && mb_eregi('/([0-9]+)$', $site_url, $r))
 			{
 				$title = "<span style=\"color: red\">[$r[1]]</span>";
 			}

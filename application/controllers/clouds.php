@@ -22,6 +22,18 @@
 class Clouds_Controller extends Controller
 {
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Index redirects to show all
 	 */
 	public function index()
@@ -235,7 +247,7 @@ class Clouds_Controller extends Controller
 				'use_selector'	=> false
 		));
 
-		if ($this->acl_check_new('Devices_Controller', 'subnet'))
+		if ($this->acl_check_new('Subnets_Controller', 'subnet'))
 		{
 			$grid_subnets->add_new_button(
 					'subnets/add/' . $cloud_id, __('Add new subnet')
@@ -268,7 +280,7 @@ class Clouds_Controller extends Controller
 		
 		$actions = $grid_subnets->grouped_action_field();
 		
-		if ($this->acl_check_view('Devices_Controller', 'subnet'))
+		if ($this->acl_check_view('Subnets_Controller', 'subnet'))
 		{
 			$actions->add_action()
 					->icon_action('show')
@@ -421,7 +433,7 @@ class Clouds_Controller extends Controller
 				$cloud_model->transaction_rollback();
 				Log::add_exception($e);
 				// message
-				status::error('Error - cannot add cloud');
+				status::error('Error - cannot add cloud', $e);
 			}
 		}
 		
@@ -459,7 +471,7 @@ class Clouds_Controller extends Controller
 		}
 		
 		// check access
-		if (!$this->acl_check_delete('Clouds_Controller', 'clouds'))
+		if (!$this->acl_check_new('Clouds_Controller', 'clouds'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -535,7 +547,7 @@ class Clouds_Controller extends Controller
 				$cloud_model->transaction_rollback();
 				Log::add_exception($e);
 				// message
-				status::error('Error - cannot add admin to cloud');
+				status::error('Error - cannot add admin to cloud', $e);
 			}
 		}
 		
@@ -576,7 +588,7 @@ class Clouds_Controller extends Controller
 		}
 		
 		// check access
-		if (!$this->acl_check_delete('Clouds_Controller', 'clouds'))
+		if (!$this->acl_check_new('Clouds_Controller', 'clouds'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -651,7 +663,7 @@ class Clouds_Controller extends Controller
 				$cloud_model->transaction_rollback();
 				Log::add_exception($e);
 				// message
-				status::error('Error - cannot add subnet to cloud');
+				status::error('Error - cannot add subnet to cloud', $e);
 			}
 		}
 		
@@ -693,7 +705,7 @@ class Clouds_Controller extends Controller
 		}
 		
 		// check access
-		if (!$this->acl_check_delete('Clouds_Controller', 'clouds'))
+		if (!$this->acl_check_edit('Clouds_Controller', 'clouds'))
 		{
 			Controller::error(ACCESS);
 		}

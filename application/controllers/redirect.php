@@ -20,6 +20,26 @@
 class Redirect_Controller extends Controller
 {
 	/**
+	 * Constructor, only test if redirection is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('redirection_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
+	 * Function redirects to show_all function.
+	 */
+	public function index()
+	{
+		url::redirect('redirect/show_all');
+	}
+	
+	/**
 	 * Shows all activated redirections.
 	 * 
 	 * @author Jiri Svitak
@@ -34,11 +54,11 @@ class Redirect_Controller extends Controller
 			$order_by_direction = 'desc', $page_word = null, $page = 1)
 	{
 		// access rights
-		if (!$this->acl_check_view('Messages_Controller', 'message'))
+		if (!$this->acl_check_view('Redirect_Controller', 'redirect'))
 			Controller::error(ACCESS);
 			
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		$allowed_order_type = array('ip_address', 'name', 'datetime', 'member_id');
 		
@@ -70,11 +90,12 @@ class Redirect_Controller extends Controller
 			->type('select')
 			->values(array
 			(
-				Message_Model::USER_MESSAGE	=> __('User message'),
-				Message_Model::UNKNOWN_DEVICE_MESSAGE => __('Unknown device'),
 				Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE => __('Membership interrupt'),
 				Message_Model::DEBTOR_MESSAGE => __('Debtor'),
-				Message_Model::PAYMENT_NOTICE_MESSAGE => __('Payment notice')
+				Message_Model::PAYMENT_NOTICE_MESSAGE => __('Payment notice'),
+				Message_Model::UNALLOWED_CONNECTING_PLACE_MESSAGE => __('Unallowed connecting place'),
+				Message_Model::CONNECTION_TEST_EXPIRED => __('Connection test expired'),
+				Message_Model::USER_MESSAGE => __('User message')
 			));
 		
 		$filter_form->add('datetime')
@@ -157,7 +178,7 @@ class Redirect_Controller extends Controller
 	public function activate_to_ip_address($ip_address_id = null)
 	{
 		// access rights 
-		if (!$this->acl_check_edit('Messages_Controller', 'ip_address'))
+		if (!$this->acl_check_edit('Redirect_Controller', 'redirect'))
 			Controller::error(ACCESS);
 		
 		if (!isset($ip_address_id))
@@ -177,10 +198,8 @@ class Redirect_Controller extends Controller
 		{
 			// IP address can be manually redirected only to user message, 
 			// interrupted membership message, debtor message, payment notice message
-			if ($message->type == Message_Model::USER_MESSAGE ||
-				$message->type == Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE ||
-				$message->type == Message_Model::DEBTOR_MESSAGE ||
-				$message->type == Message_Model::PAYMENT_NOTICE_MESSAGE)
+			if (Message_Model::can_be_activate_directly($message->type) &&
+				trim($message->text) != '')
 			{
 				$message_array[$message->id] = __(''.$message->name);
 			}	
@@ -295,7 +314,7 @@ class Redirect_Controller extends Controller
 					'devices/show_iface/'.$iface->id,
 					$iface_name,
 					$this->acl_check_view(
-						'Devices_Controller',
+						'Ifaces_Controller',
 						'iface',
 						$iface->device->user->member_id
 					)
@@ -305,8 +324,8 @@ class Redirect_Controller extends Controller
 					'devices/show_ip_address/'.$ip->id,
 					$ip->ip_address,
 					$this->acl_check_view(
-						'Devices_Controller',
-						'vlan_iface',
+						'Ip_addresses_Controller',
+						'ip_address',
 						$iface->device->user->member_id
 					)
 				);
@@ -316,11 +335,11 @@ class Redirect_Controller extends Controller
 		
 			$breadcrumbs = breadcrumbs::add()
 				->link('ip_addresses/show_all', 'IP addresses',
-						$this->acl_check_view('Devices_Controller', 'ip_address')
+						$this->acl_check_view('Ip_addresses_Controller', 'ip_address')
 				)->disable_translation()
 				->link('ip_addresses/show/' . $ip->id,
 						$ip->ip_address . ' (' . $ip->id . ')',
-						$this->acl_check_view('Devices_Controller', 'ip_address')
+						$this->acl_check_view('Ip_addresses_Controller', 'ip_address')
 				);
 		}
 			
@@ -348,7 +367,7 @@ class Redirect_Controller extends Controller
 	public function delete(
 			$ip_address_id = null, $message_id = null, $from = 'ip_address')
 	{
-		if (!$this->acl_check_delete('Messages_Controller', 'ip_address'))
+		if (!$this->acl_check_delete('Redirect_Controller', 'redirect'))
 			Controller::error(ACCESS);
 		
 		if (!isset($ip_address_id) || !isset($message_id))
@@ -395,7 +414,7 @@ class Redirect_Controller extends Controller
 	public function activate_to_member($member_id = null)
 	{
 		// access rights 
-		if (!$this->acl_check_edit('Messages_Controller', 'member'))
+		if (!$this->acl_check_edit('Redirect_Controller', 'redirect'))
 			Controller::error(ACCESS);
 		
 		if (!isset($member_id))
@@ -417,16 +436,10 @@ class Redirect_Controller extends Controller
 		{
 			foreach($messages as $message)
 			{
-				// whitelisted IP addresses can be redirected only by 
-				// redirections which ignore whitelist
-				//if ($ip->whitelisted && !$message->ignore_whitelist)
-				//	continue;
 				// IP address can be manually redirected only to user message, 
 				// interrupted membership message, debtor message, payment notice message
-				if ($message->type == Message_Model::USER_MESSAGE ||
-					$message->type == Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE ||
-					$message->type == Message_Model::DEBTOR_MESSAGE ||
-					$message->type == Message_Model::PAYMENT_NOTICE_MESSAGE)
+				if (Message_Model::can_be_activate_directly($message->type) &&
+					trim($message->text) != '')
 				{
 					$message_array[$message->id] = __(''.$message->name);
 				}	
@@ -516,7 +529,7 @@ class Redirect_Controller extends Controller
 	public function delete_from_member($member_id = null, $message_id = null)
 	{
 		// access rights
-		if (!$this->acl_check_delete('Messages_Controller', 'member'))
+		if (!$this->acl_check_delete('Redirect_Controller', 'redirect'))
 			Controller::error(ACCESS);
 		
 		if (!isset($member_id) || !isset($message_id))
@@ -539,7 +552,7 @@ class Redirect_Controller extends Controller
 		url::redirect('members/show/'.$member_id);
 	}
 	
-	/*
+	/**
 	 * Function returns redirection logo
 	 * 
 	 * @author David Raska

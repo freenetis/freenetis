@@ -1,4 +1,4 @@
-<h2><?php echo __('Device template') ?> - <?php echo $device_template->name ?></h2>
+<h2><?php echo __('Device template') ?> - <?php echo $device_template->name ?></h2><br />
 <?php
 
 $arr_links = array();
@@ -27,6 +27,10 @@ echo implode(' | ', $arr_links);
 	<tr>
 		<th><?php echo __('Default') ?></th>
 		<td><?php echo $device_template->default ? __('Yes') : __('No') ?></td>
+	</tr>
+	<tr>
+		<th><?php echo __('Default interface') ?> <?php echo help::hint(__('Default iface is used as filled iface in permitting of the connection request')) ?></th>
+		<td><?php echo (preg_match('/^(\d+):(\d+)$/', @$ivals['default_iface'], $r) !== FALSE) ? @$ivals[$r[1]]['items'][$r[2]]['name'] : '<span class="red">' . __('Not set') . '</span>' ?></td>
 	</tr>
 </table>
 
@@ -111,3 +115,8 @@ echo implode(' | ', $arr_links);
 		<td><?php foreach ($ivals[Iface_Model::TYPE_INTERNAL]['items'] as $item) echo ($item['name']) ? $item['name'] . ', ' : '' ?></td>
 	</tr>
 </table>
+
+<?php if ($this->acl_check_view('Device_active_links_Controller', 'active_links')): ?> 
+<br /><h3><?php echo __('Device active links') ?></h3>
+<?php echo $active_links_grid; ?>
+<?php endif; ?>

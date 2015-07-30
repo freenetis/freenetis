@@ -20,15 +20,18 @@
 class Phone_invoices_Controller extends Controller
 {
 	/**
-	 * List of parsers
-	 *
-	 * @var array
+	 * Only check whether are phone invoices enabled
+	 * 
+	 * @author Ondrej Fibich
 	 */
-	private static $PARSERS = array
-	(
-		2 => 'Vodafone, 09.2011 >=',
-		1 => 'Vodafone, 08.2011 <=',
-	);
+	public function __construct()
+	{
+		parent::__construct();
+		
+	    // phone invoices are not enabled, quit
+	    if (!Settings::get('phone_invoices_enabled'))
+			Controller::error(ACCESS);
+	}
 	
 	/**
 	 * Index of controller
@@ -54,67 +57,147 @@ class Phone_invoices_Controller extends Controller
 		
 		$form->dropdown('parser')
 				->label('Parser:')
-				->options(self::$PARSERS)
+				->options(Parser_Phone_Invoice::get_parsers_for_dropdown())
 				->rules('required');
 		
 		$form->textarea('parse')
-				->label(__('Text to parse') . ':')
-				->rules('required');
+				->label('Text to parse');
+		
+		// directory is writable
+		if (is_writable('upload'))
+		{
+			$form->upload('file1')
+					->label('Phone invoice file')
+					->rules('allow[xml,csv]')
+					->new_name('phone_invoice_file_1')
+					->class('files');
+			
+			$form->upload('file2')
+					->label('Detailed listing file')
+					->rules('allow[csv]')
+					->new_name('phone_invoice_file_2')
+					->class('files');
+			
+			$form->upload('file3')
+					->label('Phone invoice details file')
+					->rules('allow[csv]')
+					->new_name('phone_invoice_file_3')
+					->class('files');
+		}
 		
 		$form->checkbox('test_number_count_enabled')
 				->checked(TRUE)
 				->value('1')
-				->label(__('Enable integrity test (all numbers in invoice has ' .
-						'to be in extended statement)'
-				));
+				->label('Enable integrity test (all numbers in invoice has ' .
+						'to be in extended statement)');
 		
 		$form->submit('Parse')->id('phone_invoices_sumit');
 
 		if ($form->validate())
 		{
-			try
+			$types = Parser_Phone_Invoice::get_parser_input_types();
+			$files = Parser_Phone_Invoice::get_parser_upload_files();
+			
+			if ($types[$form->parser->value] == Parser_Phone_Invoice::TYPE_UPLOAD &&
+				$files[$form->parser->value] >= 1 &&
+				!($form->file1->value))
 			{
-				$phone_invoice = new Phone_invoice_Model();
-				$phone_invoice->transaction_start();
-				
-				$integrity_test = ($form->test_number_count_enabled->value == '1');
-				
-				if ($form->parser->value == 1)
-				{
-					$data = Parser_Phone_Invoice_Vodafone::parse($form->parse->value, $integrity_test);
-				}
-				else
-				{
-					$data = Parser_Phone_Invoice_Vodafone2::parse($form->parse->value, $integrity_test);
-				}
-
-				$phone_invoice->set_logger(FALSE);
-				$phone_invoice->date_of_issuance = $data->date_of_issuance->format('Y-m-d');
-				$phone_invoice->billing_period_from = $data->billing_period_from->format('Y-m-d');
-				$phone_invoice->billing_period_to = $data->billing_period_to->format('Y-m-d');
-				$phone_invoice->variable_symbol = $data->variable_symbol;
-				$phone_invoice->specific_symbol = $data->specific_symbol;
-				$phone_invoice->total_price = $data->total_price;
-				$phone_invoice->tax = $data->dph;
-				$phone_invoice->tax_rate = $data->dph_rate;
-
-				// search if invoice is already in database
-				if (!$phone_invoice->is_unique())
-				{
-					throw new Exception(__('Invoice is already in database'));
-				}
-
-				self::_set_invoice_data($data, $phone_invoice);
-
-				// redirect to edit
-				$phone_invoice->transaction_commit();
-				url::redirect('/phone_invoices/show/' . $phone_invoice->id . '/');
+				$form->file1->add_error('requied', __('This information is required'));
 			}
-			catch (Exception $e)
+			else if ($types[$form->parser->value] == Parser_Phone_Invoice::TYPE_UPLOAD &&
+				$files[$form->parser->value] >= 2 &&
+				!($form->file2->value))
 			{
-				$phone_invoice->transaction_rollback();
-				Log::add_exception($e);
-				$form->parse->add_error('requied', nl2br($e->getMessage()));
+				$form->file2->add_error('requied', __('This information is required'));
+			}
+			else if ($types[$form->parser->value] == Parser_Phone_Invoice::TYPE_UPLOAD &&
+				$files[$form->parser->value] >= 3 &&
+				!($form->file3->value))
+			{
+				$form->file3->add_error('requied', __('This information is required'));
+			}
+			else if ($types[$form->parser->value] == Parser_Phone_Invoice::TYPE_TEXTAREA &&
+				!($form->parse->value))
+			{
+				$form->parse->add_error('requied', __('This information is required'));
+			}
+			else
+			{
+				try
+				{
+					$phone_invoice = new Phone_invoice_Model();
+					$phone_invoice->transaction_start();
+
+					$integrity_test = ($form->test_number_count_enabled->value == '1');
+
+					$parser = Parser_Phone_Invoice::factory($form->parser->value);
+
+					if ($types[$form->parser->value] == Parser_Phone_Invoice::TYPE_UPLOAD)
+					{
+						$file_data = file_get_contents($form->file1->value);
+						unlink($form->file1->value);
+						
+						if ($files[$form->parser->value] >= 3)
+						{
+							$file_data .= file_get_contents($form->file3->value);
+							unlink($form->file3->value);
+						}
+						if ($files[$form->parser->value] >= 2)
+						{
+							$file_data .= file_get_contents($form->file2->value);
+							unlink($form->file2->value);
+						}
+						
+						$data = $parser->parse($file_data, $integrity_test);
+					}
+					else
+					{
+						$data = $parser->parse($form->parse->value, $integrity_test);
+					}
+
+					$phone_invoice->set_logger(FALSE);
+					$phone_invoice->date_of_issuance = $data->date_of_issuance->format('Y-m-d');
+					$phone_invoice->billing_period_from = $data->billing_period_from->format('Y-m-d');
+					$phone_invoice->billing_period_to = $data->billing_period_to->format('Y-m-d');
+					$phone_invoice->variable_symbol = $data->variable_symbol;
+					$phone_invoice->specific_symbol = $data->specific_symbol;
+					$phone_invoice->total_price = $data->total_price;
+					$phone_invoice->tax = $data->dph;
+					$phone_invoice->tax_rate = $data->dph_rate;
+					
+					// search if invoice is already in database
+					if (!$phone_invoice->is_unique())
+					{
+						throw new Exception(__('Invoice is already in database'));
+					}
+
+					self::_set_invoice_data($data, $phone_invoice);
+
+					// redirect to edit
+					$phone_invoice->transaction_commit();
+					url::redirect('/phone_invoices/show/' . $phone_invoice->id . '/');
+				}
+				catch (Exception $e)
+				{
+					$phone_invoice->transaction_rollback();
+					
+					Log::add_exception($e);
+
+					status::error(nl2br($e->getMessage()), $e, FALSE);
+				}
+			}
+			
+			if (file_exists($form->file1->value))
+			{
+				unlink($form->file1->value);
+			}
+			if (file_exists($form->file2->value))
+			{
+				unlink($form->file2->value);
+			}
+			if (file_exists($form->file3->value))
+			{
+				unlink($form->file3->value);
 			}
 		}
 		
@@ -151,9 +234,9 @@ class Phone_invoices_Controller extends Controller
 		}
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
+		if (is_numeric($this->input->post('record_per_page')))
 		{
-			$limit_results = (int) $this->input->get('record_per_page');
+			$limit_results = (int) $this->input->post('record_per_page');
 		}
 		
 		// parameters control
@@ -343,7 +426,7 @@ class Phone_invoices_Controller extends Controller
 				->label(__('Company') . '&nbsp;' . help::hint('price_tax'))
 				->callback('callback::money');
 		
-		if ($is_payed)
+		if (Settings::get('finance_enabled') && $is_payed)
 		{
 			$grid->callback_field('transfer_id')
 					->label('Transfer')
@@ -535,40 +618,48 @@ class Phone_invoices_Controller extends Controller
 		);
 
 		$mail_messsage_model = new Mail_message_Model();
-
-		foreach ($phone_invoice_users as $phone_invoice_user)
+		
+		try
 		{
-			if ($phone_invoice_user->user_id == 0)
+			$mail_messsage_model->transaction_start();
+
+			foreach ($phone_invoice_users as $phone_invoice_user)
 			{
-				continue;
+				if ($phone_invoice_user->user_id == 0)
+				{
+					continue;
+				}
+
+				Mail_message_Model::create(
+						$this->user_id, $phone_invoice_user->user_id, 
+						mail_message::format(
+							'phone_invoice_warning_subject', array
+							(
+								$phone_invoice_user->phone_number,
+								$phone_invoice_model->billing_period_from,
+								$phone_invoice_model->billing_period_to
+							)
+						), mail_message::format(
+							'phone_invoice_warning', array
+							(
+								$phone_invoice_user->phone_number,
+								url_lang::base() . 'phone_invoices/show_by_user/' .
+								$phone_invoice_user->user_id
+							)
+						), 1
+				);
 			}
-
-			$mail_messsage_model->from_id = $this->session->get('user_id');
-			$mail_messsage_model->to_id = $phone_invoice_user->user_id;
-			$mail_messsage_model->time = date('Y-m-d H:i:s');
-			$mail_messsage_model->from_deleted = 1; // user to can delete it
-			$mail_messsage_model->subject = mail_message::format(
-					'phone_invoice_warning_subject', array
-					(
-						$phone_invoice_user->phone_number,
-						$phone_invoice_model->billing_period_from,
-						$phone_invoice_model->billing_period_to
-					)
-			);
-			$mail_messsage_model->body = mail_message::format(
-					'phone_invoice_warning', array
-					(
-						$phone_invoice_user->phone_number,
-						url_lang::base() . 'phone_invoices/show_by_user/' .
-						$phone_invoice_user->user_id
-					)
-			);
-			$mail_messsage_model->save();
-			$mail_messsage_model->clear();
+			
+			$mail_messsage_model->transaction_commit();
+			status::success('Users has been warned about invoice.');
+			url::redirect('phone_invoices/show/' . $phone_invoice_id);
 		}
-
-		status::success('Users has been warned about invoice.');
-		url::redirect('phone_invoices/show/' . $phone_invoice_id);
+		catch (Exception $e)
+		{
+			$mail_messsage_model->transaction_rollback();
+			log::add_exception($e);
+			url::redirect('phone_invoices/show/' . $phone_invoice_id);
+		}
 	}
 
 	/**
@@ -578,7 +669,7 @@ class Phone_invoices_Controller extends Controller
 	 */
 	public function pay($phone_invoice_id = 0)
 	{
-		if (!$this->acl_check_new('Phone_invoices_Controller', 'pay'))
+		if (!Settings::get('finance_enabled') || !$this->acl_check_new('Phone_invoices_Controller', 'pay'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -671,8 +762,8 @@ class Phone_invoices_Controller extends Controller
 		catch (Kohana_Database_Exception $e)
 		{
 			$phone_invoice->transaction_rollback();
-			status::error('Error - cannot discount private services');
-			die($e->__toString());
+			Log::add_exception($e);
+			status::error('Error - cannot discount private services', $e);
 		}
 		
 		url::redirect('phone_invoices/show/' . $phone_invoice_id);
@@ -728,9 +819,12 @@ class Phone_invoices_Controller extends Controller
 				->label(__('Company'))
 				->callback('callback::money');
 		
-		$grid->callback_field('transfer_id')
+		if (Settings::get('finance_enabled'))
+		{
+			$grid->callback_field('transfer_id')
 					->label('Transfer')
 					->callback('callback::transfer_link');
+		}
 
 		$action = $grid->grouped_action_field();
 		

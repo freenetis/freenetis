@@ -161,7 +161,7 @@ class Mail_messages_Controller extends Controller
 				->rules('required')
 				->value($body_value);
 
-		$form->submit('Save');
+		$form->submit('Sent');
 
 		if ($form->validate())
 		{
@@ -170,17 +170,27 @@ class Mail_messages_Controller extends Controller
 			$recipients = explode(',', trim($form_data['to']));
 
 			$user_model = new User_Model();
-			foreach ($recipients as $recipient)
+			
+			try
 			{
-				$user = $user_model->where('login', trim($recipient))->find();
+				$user_model->transaction_start();
+				
+				foreach ($recipients as $recipient)
+				{
+					$user = $user_model->where('login', trim($recipient))->find();
 
-				$mail_message = new Mail_message_Model();
-				$mail_message->from_id = $this->session->get('user_id');
-				$mail_message->to_id = $user->id;
-				$mail_message->subject = htmlspecialchars($form_data['subject']);
-				$mail_message->body = $form_data['body'];
-				$mail_message->time = date('Y-m-d H:i:s');
-				$mail_message->save();
+					Mail_message_Model::create(
+							$this->user_id, $user->id,
+							htmlspecialchars($form_data['subject']),
+							$form_data['body']
+					);
+				}
+				
+				$user_model->transaction_commit();
+			}
+			catch (Exception $e)
+			{
+				$user_model->transaction_rollback();
 			}
 
 			url::redirect('mail/sent');
@@ -213,7 +223,7 @@ class Mail_messages_Controller extends Controller
 		
 		if (!preg_match($pattern, $input->value))
 		{
-			$input->add_error('required', __('Invalid value.'));
+			$input->add_error('required', __('Invalid value, correct format: login, login'));
 		}
 		else
 		{

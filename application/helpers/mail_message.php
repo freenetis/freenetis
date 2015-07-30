@@ -70,7 +70,7 @@ class mail_message
 	/**
 	 * Get internationalised message from formated message
 	 * @param string $formated_message  Formated message
-	 * @return string			Inteernationalised message
+	 * @return string			Internationalised message
 	 */
 	public static function printf($formated_message)
 	{

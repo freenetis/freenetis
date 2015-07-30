@@ -55,8 +55,23 @@ class download {
 		}
 
 		$mime = 'application/octet-stream';
+		
+		if (text::ends_with(mb_strtolower($filename), '.jpg') ||
+			text::ends_with(mb_strtolower($filename), '.jpeg'))
+		{
+			$mine = 'image/jpeg';
+		}
+		else if (text::ends_with(mb_strtolower($filename), '.png'))
+		{
+			$mine = 'image/png';
+		}
+		else if (text::ends_with(mb_strtolower($filename), '.gif'))
+		{
+			$mine = 'image/gif';
+		}
 
 		// Generate the server headers
+		@header('Content-Description: File Transfer');
 		@header('Content-Type: '.$mime);
 		@header('Content-Disposition: attachment; filename="'.$filename.'"');
 		@header('Content-Transfer-Encoding: binary');

@@ -34,6 +34,7 @@ require_once dirname(__FILE__) . '/grid/Order_form_field.php';
  * @method Order_callback_Field order_callback_field(string $column)
  * @method Callback_Field callback_field(string $column)
  * @method Grouped_Action_Field grouped_action_field(string $column)
+ * @method Order_Form_Field order_form_field(string $column)
  */
 class Grid
 {
@@ -73,6 +74,7 @@ class Grid
 	protected $form_extra_buttons = array();
 	protected $buttons = array();
 	protected $id = NULL;
+	protected $method = 'post';
 	private $first_add_button;
 
 	/**
@@ -285,6 +287,7 @@ class Grid
 		$this->template->paginator = ($this->use_paginator) ? $this->pagination->create_links('digg') : '';
 		$this->template->selector = ($this->use_selector) ? $this->selector->create() : '';
 		$this->template->separator = $this->separator;
+		$this->template->method = $this->method;
 		$this->template->form = $this->form;
 		$this->template->form_extra_buttons = $this->form_extra_buttons;
 		$this->template->form_submit_value = ($this->form_submit_value != '') ? $this->form_submit_value : __('Update');

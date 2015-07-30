@@ -20,6 +20,20 @@
 class Approval_templates_Controller extends Controller
 {
 	/**
+	 * Only checks whether approval are enabled
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function __construct()
+	{
+	    parent::__construct();
+	    
+	    // approval are not enabled
+	    if (!Settings::get('approval_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Index redirects to show all
 	 */
 	public function index()
@@ -46,8 +60,8 @@ class Approval_templates_Controller extends Controller
 			Controller::error(ACCESS);
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$approval_template_model = new Approval_template_Model();
 		$total_approval_templates = $approval_template_model->count_all();
@@ -159,18 +173,23 @@ class Approval_templates_Controller extends Controller
 				->link('approval_types/show', 'name');
 		
 		$items_grid->callback_field('group_id')
-				->label(__('Group'))
+				->label('Group')
 				->callback('Approval_types_Controller::group_field');
 		
 		$items_grid->callback_field('type')
 				->callback('Approval_types_Controller::type_field');
 		
+		/* TODO: #815
 		$items_grid->callback_field('interval')
-				->callback('Approval_types_Controller::interval_field');
+				->callback('Approval_types_Controller::interval_field');*/
 		
 		$items_grid->callback_field('min_suggest_amount')
-				->label(__('Minimal suggest amount'))
+				->label('Minimal suggest amount')
 				->callback('Approval_types_Controller::min_suggest_amount_field');
+		
+		$items_grid->callback_field('one_vote')
+				->label('Single vote is enough?')
+				->callback('callback::boolean');
 		
 		$items_grid->callback_field('priority')
 				->callback('Approval_templates_Controller::priority_field')

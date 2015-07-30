@@ -11,6 +11,8 @@
  * 
  */
 
+require_once APPPATH."libraries/vtwsclib/Vtiger/WSClient.php";
+
 /**
  * Controller performs members actions such as viewing, editing profile,
  * registration export, applicants approval, etc.
@@ -54,14 +56,14 @@ class Members_Controller extends Controller
 		$filter_form = Members_Controller::create_filter_form();
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array
 		(
 			'id', 'registration', 'name', 'street','redirect',  'street_number',
-			'town', 'quarter', 'ZIP_code', 'qos_ceil', 'qos_rate', 'entrance_fee',
+			'town', 'quarter', 'ZIP_code', 'entrance_fee',
 			'debt_payment_rate', 'current_credit', 'entrance_date', 'comment',
 			'balance', 'type_name', 'redirect', 'whitelisted'
 		);
@@ -76,20 +78,43 @@ class Members_Controller extends Controller
 		
 		// load members
 		$model_members = new Member_Model();
-		$total_members = $model_members->count_all_members($filter_form->as_sql());
+		
+		// hide grid on its first load (#442)
+		$hide_grid = Settings::get('grid_hide_on_first_load') && $filter_form->is_first_load();
+		
+		if (!$hide_grid)
+		{
+			try
+			{
+				$total_members = $model_members->count_all_members($filter_form->as_sql());
 
-		// limit check
-		if (($sql_offset = ($page - 1) * $limit_results) > $total_members)
-			$sql_offset = 0;
+				// limit check
+				if (($sql_offset = ($page - 1) * $limit_results) > $total_members)
+					$sql_offset = 0;
 
-		// query data
-		$query = $model_members->get_all_members(
-				$sql_offset, $limit_results, $order_by, $order_by_direction,
-				$filter_form->as_sql()
-		);
+				// query data
+				$query = $model_members->get_all_members(
+						$sql_offset, $limit_results, $order_by, $order_by_direction,
+						$filter_form->as_sql()
+				);
+			}
+			catch (Exception $e)
+			{
+				if ($filter_form->is_loaded_from_saved_query())
+				{
+					status::error('Invalid saved query', $e);
+					// disable default query (loop protection)
+					if ($filter_form->is_loaded_from_default_saved_query())
+					{
+						ORM::factory('filter_query')->remove_default($filter_form->get_base_url());
+					}
+					$this->redirect(url_lang::current());
+				}
+				throw $e;
+			}
+			
+		}
 
-		// headline
-		$headline = __('List of all members');
 		// path to form
 		$path = Config::get('lang') . '/members/show_all/' . $limit_results . '/'
 				. $order_by . '/' . $order_by_direction.'/'.$page_word.'/'
@@ -104,7 +129,7 @@ class Members_Controller extends Controller
 			'selector_max_multiplier'   => 25,
 			'base_url'					=> $path,
 			'uri_segment'				=> 'page',
-			'total_items'				=> $total_members,
+			'total_items'				=> isset($total_members) ? $total_members : 0,
 			'items_per_page' 			=> $limit_results,
 			'style'		  				=> 'classic',
 			'order_by'					=> $order_by,
@@ -122,7 +147,7 @@ class Members_Controller extends Controller
 			));
 		}
 
-		if ($this->acl_check_edit('Members_Controller', 'registration'))
+		if (!$hide_grid && $this->acl_check_edit('Members_Controller', 'registration'))
 		{
 			if (!$regs)
 			{
@@ -144,8 +169,18 @@ class Members_Controller extends Controller
 			}
 		}
 
-		if ($this->acl_check_view(get_class($this), 'members'))
+		if (!$hide_grid && $this->acl_check_view(get_class($this), 'members'))
 		{
+			// export contacts
+			$grid->add_new_button(
+					'export/vcard/members' . server::query_string(),
+					'Export contacts', array
+						(
+							'title' => __('Export contacts'),
+							'class' => 'popup_link'
+						)
+			);
+
 			// csv export of members
 			$grid->add_new_button(
 					'export/csv/members' . server::query_string(),
@@ -156,10 +191,14 @@ class Members_Controller extends Controller
 					)
 			);
 
-			$grid->add_new_button(
-					'notifications/members/' . server::query_string(),
-					'Notifications'
-			);
+			if (module::e('notification') && 
+				$this->acl_check_new('Notifications_Controller', 'members'))
+			{
+				$grid->add_new_button(
+						'notifications/members/' . server::query_string(),
+						'Notifications'
+				);
+			}
 		}
 		// database columns - some are commented out because of lack of space
 
@@ -188,7 +227,8 @@ class Members_Controller extends Controller
 				->callback('callback::registration_field');
 		}
 
-		$grid->order_field('type');
+		$grid->order_callback_field('type')
+				->callback('callback::member_type_field');
 
 		$grid->order_field('name');
 
@@ -198,16 +238,25 @@ class Members_Controller extends Controller
 
 		$grid->order_field('town');
 
-		$grid->order_callback_field('balance')
-				->callback('callback::balance_field');
+		if (Settings::get('finance_enabled'))
+		{
+			$grid->order_callback_field('balance')
+					->callback('callback::balance_field');
+		}
 
-		$grid->order_callback_field('redirect')
-				->label('Redirection')
-				->callback('callback::redirect_field');
+		if (Settings::get('redirection_enabled'))
+		{
+			$grid->order_callback_field('redirect')
+					->label('Redirection')
+					->callback('callback::redirect_field');
+		}
 
-		$grid->order_callback_field('whitelisted')
-				->label('Whitelist')
-				->callback('callback::whitelisted_field');
+		if (module::e('notification'))
+		{
+			$grid->order_callback_field('whitelisted')
+					->label('Whitelist')
+					->callback('callback::whitelisted_field');
+		}
 
 		$actions = $grid->grouped_action_field();
 
@@ -219,29 +268,34 @@ class Members_Controller extends Controller
 					->url('members/show')
 					->label('Show member');
 		}
-
-		if ($this->acl_check_edit(get_class($this), 'members'))
+		
+		if (Settings::get('finance_enabled') && $this->acl_check_edit(get_class($this), 'members'))
 		{
 			$actions->add_action('aid')
 					->icon_action('money')
 					->url('transfers/show_by_account')
 					->label('Show transfers');
 		}
-
-		// load data
-		$grid->datasource($query);
 		
-		if (isset($_POST) && count ($_POST))
+		if (!$hide_grid)
+		{
+			// load data
+			$grid->datasource($query);
+		}
+
+		if (isset($_POST) && count($_POST) > 1)
 		{
 			$ids = $_POST["ids"];
 			$regs = $_POST["registrations"];
-			
+
 			ORM::factory('member')->update_member_registrations($ids, $regs);
-			
+
 			status::success('Registrations has been successfully updated.');
-			
+
 			url::redirect($_POST['url']);
 		}
+
+		$headline = __('List of all members');
 		
 		// view
 		$view = new View('main');
@@ -257,40 +311,148 @@ class Members_Controller extends Controller
 	 * Function shows list of all registered applicants.
 	 * 
 	 * @author Ondřej Fibich
+	 * @param integer $limit_results
+	 * @param string $order_by
+	 * @param string $order_by_direction
+	 * @param integer $page_word
+	 * @param integer $page
 	 */
-	public function applicants()
+	public function applicants(
+			$limit_results = 40, $order_by = 'id',
+			$order_by_direction = 'ASC', $page_word = 'page', $page = 1,
+			$regs = 0)
 	{
 		// access rights
 		if (!$this->acl_check_view(get_class($this),'members'))
 			Controller::error(ACCESS);
 
-		// query
-		$model_members = new Member_Model();
-		$query = $model_members->get_registered_members();		
-
-		// grid
-		$grid = new Grid(url::base(TRUE) . url::current(true), null, array
-		(
-			'use_paginator' => false,
-			'use_selector' => false
-		));
+		$town_model = new Town_Model();
+		$street_model = new Street_Model();
 		
-		// database columns - some are commented out because of lack of space
-		$grid->field('id')
-				->label('ID');
+		// filter form
+		$filter_form = new Filter_form('m');
 		
-		$grid->field('name');
+		$filter_form->add('name')
+				->callback('json/member_name');
 		
-		$grid->field('street');
+		$filter_form->add('id')
+				->type('number');
 		
-		$grid->field('street_number');
+		$filter_form->add('applicant_connected_from')
+				->type('date')
+				->label('Connected from');
 		
-		$grid->field('town');
-		
-		$grid->field('applicant_registration_datetime')
+		$filter_form->add('applicant_registration_datetime')
+				->type('date')
 				->label('Registration time');
 		
-		$grid->field('comment');
+		$filter_form->add('comment');
+		
+		$filter_form->add('registration')
+				->type('select')
+				->values(arr::bool());
+		
+		$filter_form->add('town')
+				->type('select')
+				->values(array_unique($town_model->select_list('town', 'town')));
+		
+		$filter_form->add('street')
+				->type('select')
+				->values(array_unique($street_model->select_list('street', 'street')));
+		
+		$filter_form->add('street_number')
+				->type('number');
+
+		// gets new selector
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
+		
+		// parameters control
+		$allowed_order_type = array
+		(
+			'id', 'registration', 'name', 'street', 'street_number', 'town',
+			'applicant_connected_from', 'applicant_registration_datetime',
+			'comment'
+		);
+		
+		// order by check
+		if (!in_array(strtolower($order_by), $allowed_order_type))
+			$order_by = 'id';
+		
+		// order by direction check
+		if (strtolower($order_by_direction) != 'desc')
+			$order_by_direction = 'asc';
+		
+		// load members
+		$model_members = new Member_Model();
+		$total_members = $model_members->count_all_registered_applicants($filter_form->as_sql());
+
+		// limit check
+		if (($sql_offset = ($page - 1) * $limit_results) > $total_members)
+			$sql_offset = 0;
+
+		// query data
+		$query = $model_members->get_registered_applicants(
+				$sql_offset, $limit_results, $order_by, $order_by_direction,
+				$filter_form->as_sql()
+		);
+		
+		// path to form
+		$path = Config::get('lang') . '/members/applicants/' . $limit_results . '/'
+				. $order_by . '/' . $order_by_direction.'/'.$page_word.'/'
+				. $page.'/'.$regs;
+
+		// grid
+		$grid = new Grid(null, null, array
+		(
+			'current'					=> $limit_results,
+			'selector_increace'			=> 40,
+			'selector_min' 				=> 40,
+			'selector_max_multiplier'   => 25,
+			'base_url'					=> $path,
+			'uri_segment'				=> 'page',
+			'total_items'				=> $total_members,
+			'items_per_page' 			=> $limit_results,
+			'style'		  				=> 'classic',
+			'order_by'					=> $order_by,
+			'order_by_direction'		=> $order_by_direction,
+			'limit_results'				=> $limit_results,
+			'filter'					=> $filter_form,
+			'method'					=> 'get'
+		));
+		
+		// approve applicant checkbox
+		$grid->order_form_field('toapprove')
+				->callback('callback::member_approve_avaiable')
+				->type('checkbox')
+				->class('center')
+				->label(' ');
+		
+		$grid->form_submit_value = __('Approve selected applicants');
+		
+		// database columns - some are commented out because of lack of space
+		$grid->order_field('id')
+				->label('ID');
+		
+		$grid->order_field('name');
+		
+		$grid->order_field('street');
+		
+		$grid->order_field('street_number');
+		
+		$grid->order_field('town');
+		
+		$grid->order_field('applicant_registration_datetime')
+				->label('Registration time');
+		
+		$grid->order_field('applicant_connected_from')
+				->label('Connected from');
+		
+		$grid->order_callback_field('registration')
+				->callback('callback::registration_field');
+		
+		$grid->order_callback_field('comment')
+				->callback('callback::limited_text');
 		
 		$actions = $grid->grouped_action_field();
 		
@@ -304,9 +466,12 @@ class Members_Controller extends Controller
 		
 		if ($this->acl_check_edit(get_class($this), 'members'))
 		{
-			$actions->add_action('id')
-					->icon_action('edit')
-					->url('members/edit');
+			$actions->add_conditional_action('id')
+					->condition('is_applicant_registration')
+					->icon_action('member')
+					->url('members/approve_applicant')
+					->label('Approve application for membership')
+					->class('popup_link');
 		}
 		
 		if ($this->acl_check_delete(get_class($this), 'members'))
@@ -332,21 +497,583 @@ class Members_Controller extends Controller
 
 		// description
 		$desc = '<br>' . __(
-				'Registered applicants can be approved in edit form by changing their type'
+				'Registered applicants can be approved using action button (placed in each line)'
 		) . '.<br>'. __(
 				'Delete applicants for refusing of their request'
-		) . '.';		
+		) . '.';
+		
+		if (isset($_GET) && count(@$_GET) && isset($_GET['toapprove']))
+		{
+			$this->multiple_applicants_details(@$_GET['toapprove']);
+		}
+		else
+		{
+			// view
+			$view = new View('main');
+			$view->title = $headline;
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('show_all');
+			$view->content->description = $desc;
+			$view->content->table = $grid;
+			$view->content->headline = $headline;
+			$view->render(TRUE);
+		}
+	} // end of registered function
+
+	/**
+	 * Form for approving multiple members
+	 * 
+	 * @param array $selected
+	 */
+	private function multiple_applicants_details($selected)
+	{
+		if (!$this->acl_check_edit('Variable_Symbols_Controller', 'variable_symbols') ||
+			!$this->acl_check_edit(get_class($this), 'qos_ceil') ||
+			!$this->acl_check_edit(get_class($this), 'qos_rate'))
+		{
+			Controller::error(ACCESS);
+		}
+		
+		if (!Settings::get('finance_enabled'))
+		{
+			status::warning('Enable financial module before approving applicants.');
+			$this->redirect('members/applicants');
+		}
+		
+		if (!Variable_Key_Generator::get_active_driver())
+		{
+			status::warning('Set variable key generator before approving applicants.');
+			$this->redirect('members/applicants');
+		}
+		
+		//form
+		$form = new Forge('members/approve_multiple_applicants');
+		
+		$member = new Member_Model();
+		$association = new Member_Model(Member_Model::ASSOCIATION);
+		
+		$items = array();
+		
+		// prepare data
+		foreach ($selected AS $id)
+		{
+			$item = new stdClass();
+			$item->id = $id;
+			$item->name = $member->find($id)->name;
+			$item->registration = $member->find($id)->registration;
+			
+			$items[] = $item;
+			
+			$form->hidden('toapprove['.$item->id.']')
+					->value($item->id);
+		}
+		
+		// create form items
+		$form->group('Basic information');
+		
+		$form->date('entrance_date')
+				->label('Entrance date')
+				->years(date('Y', strtotime($association->entrance_date)), date('Y'))
+				->rules('required')
+				->value(time());
+		
+		$speed_class = new Speed_class_Model();
+		$speed_classes = array(NULL => '') + $speed_class->select_list();
+		$def_speed_class = $speed_class->get_members_default_class();
+
+		$form->dropdown('speed_class')
+				->options($speed_classes)
+				->selected($def_speed_class ? $def_speed_class->id : NULL)
+				->add_button('speed_classes')
+				->style('width:200px');
+		
+		$form->submit('Approve');
+		
+		//description
+		$desc = __('Variable symbol will be automaticaly generated for every applicant.');
+		
+		//grid
+		$grid = new Grid('members', __('Selected applicants'), array
+		(
+			'use_paginator' => false,
+			'use_selector' => false
+		));
+		
+		$grid->order_field('name');
+		
+		$grid->order_callback_field('registration')
+				->callback('callback::registration_field');
+		
+		$grid->datasource($items);
+		
+		// headline
+		$headline = __('Approve selected applicants');
+		
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view(get_class($this),'members'))
+				->link('members/applicants', 'Registered applicants',
+						$this->acl_check_view(get_class($this),'members'))
+				->text($headline);
 		
 		// view
 		$view = new View('main');
 		$view->title = $headline;
 		$view->breadcrumbs = $breadcrumbs->html();
 		$view->content = new View('show_all');
-		$view->content->description = $desc;
 		$view->content->table = $grid;
+		$view->content->form = $form;
+		$view->content->description = $desc;
 		$view->content->headline = $headline;
 		$view->render(TRUE);
-	} // end of registered function
+	}
+	
+	/**
+	 * Approves multiple applicants
+	 * 
+	 * @throws Exception
+	 */
+	public function approve_multiple_applicants()
+	{
+		if (!$this->acl_check_edit('Variable_Symbols_Controller', 'variable_symbols') ||
+			!$this->acl_check_edit(get_class($this), 'qos_ceil') ||
+			!$this->acl_check_edit(get_class($this), 'qos_rate'))
+		{
+			Controller::error(ACCESS);
+		}
+		
+		if (!isset($_POST) || !isset($_POST['toapprove']) || !isset($_POST['entrance_date']) ||
+				!isset($_POST['speed_class']))
+		{
+			Controller::error(PARAMETER);
+		}
+		
+		$approved_count = 0;
+		$selected = @$_POST['toapprove'];
+		$date = @$_POST['entrance_date'];
+		$speed_class = @$_POST['speed_class'];
+		
+		// approve selected applicants
+		foreach ($selected AS $applicant_id)
+		{
+			$member = new Member_Model($applicant_id);
+			
+			try
+			{
+				$member->transaction_start();
+				
+				// change member
+				$member->entrance_date = $date;
+				
+				// get members account
+				$account = ORM::factory('account')->where(array
+				(
+					'member_id' => $member->id,
+					'account_attribute_id' => Account_attribute_Model::CREDIT
+				))->find();
+				
+				// generate variable symbol
+				$var_sym = Variable_Key_Generator::factory()->generate($member->id);
+				
+				$vs = new Variable_Symbol_Model();
+
+				$vs_not_unique = $vs->get_variable_symbol_id($var_sym);
+
+				if ($vs_not_unique && $vs_not_unique->id)
+				{
+					if ($vs_not_unique->account_id != $account->id)
+					{
+						throw new Exception(__('Variable symbol already exists in database.'));
+					}
+				}
+				else
+				{
+					$vs->account_id = $account->id;
+					$vs->variable_symbol = $var_sym;
+					$vs->save_throwable();
+				}
+				
+				// set speed class
+				$member->speed_class_id = $speed_class;
+				
+				// unlock and set to Regular member
+				$member->type = Member_Model::TYPE_REGULAR;
+				$member->locked = 0;
+				
+				$member->save_throwable();
+				
+				// access rights
+				$group_aro_map = new Groups_aro_map_Model();
+				
+				// get main user
+				$main_user_id = NULL;
+				
+				foreach ($member->users as $user)
+				{
+					if ($user->type == User_Model::MAIN_USER)
+					{
+						$main_user_id = $user->id;
+						break;
+					}
+				}
+				
+				if (!$main_user_id)
+					throw new Exception('Main user of applicant is missing');
+				
+				// if is not member yet
+				if (!$group_aro_map->exist_row(
+						Aro_group_Model::REGULAR_MEMBERS, $main_user_id
+					))
+				{
+					// delete rights of applicant
+					$group_aro_map->detete_row(
+							Aro_group_Model::REGISTERED_APPLICANTS, $main_user_id
+					);							
+
+					// insert regular member access rights
+					$groups_aro_map = new Groups_aro_map_Model();
+					$groups_aro_map->aro_id = $main_user_id;
+					$groups_aro_map->group_id = Aro_group_Model::REGULAR_MEMBERS;
+					$groups_aro_map->save_throwable();
+					
+					// reload messages
+					ORM::factory('member')->reactivate_messages($applicant_id);
+
+					// inform new member
+					if (module::e('notification'))
+					{
+						Message_Model::activate_special_notice(
+								Message_Model::APPLICANT_APPROVE_MEMBERSHIP,
+								$member->id, $this->session->get('user_id'),
+								Notifications_Controller::ACTIVATE,
+								Notifications_Controller::KEEP
+						);
+					}
+					
+					$member->transaction_commit();
+				}
+				
+				$approved_count++;
+			}
+			catch (Exception $e)
+			{
+				Log::add_exception($e);
+				$member->transaction_rollback();
+				// error
+				status::error('Applicant for membership cannot be approved', $e);
+			}
+		}
+		
+		status::info('Applicants for membership accepted (%d / %d)', TRUE, array($approved_count, count($selected)));
+		
+		$this->redirect('members/applicants');
+	}
+	
+	/**
+	 * Form for approving of member
+	 * 
+	 * @author Ondřej Fibich
+	 * @see #369
+	 * @param integer $member_id
+	 */
+	public function approve_applicant($member_id = NULL)
+	{
+		// parameter is wrong
+		if (!$member_id || !is_numeric($member_id))
+			Controller::warning(PARAMETER);
+
+		$association = new Member_Model(Member_Model::ASSOCIATION);
+		$member = new Member_Model($member_id);
+		
+		if (!condition::is_applicant_registration($member))
+		{
+			self::error(RECORD);
+		}
+		
+		if (Settings::get('finance_enabled'))
+		{
+			$member_fee = new Members_fee_Model();
+
+			$additional_payment_amount = $member_fee->calculate_additional_payment_of_applicant(
+					$member->applicant_connected_from, date('Y-m-d')
+			);
+		}
+
+		// member doesn't exist
+		if (!$member->id)
+			Controller::error(RECORD);
+
+		// access control
+		if (!$this->acl_check_new(get_class($this), 'members') ||
+			!$this->acl_check_edit(get_class($this), 'entrance_date') ||
+			!$this->acl_check_new('Accounts_Controller', 'transfers'))
+			Controller::error(ACCESS);
+		
+		// delete is enabled only on applicants
+		if ($member->type != Member_Model::TYPE_APPLICANT)
+			Controller::warning(PARAMETER);
+		
+		// form
+		$form = new Forge();
+		
+		$form->group('Basic information');
+		
+		$form->date('entrance_date')
+				->label('Entrance date')
+				->years(date('Y', strtotime($association->entrance_date)), date('Y'))
+				->rules('required')
+				->value(time());
+		
+		if ($this->acl_check_edit(get_class($this), 'registration'))
+		{
+			$form->dropdown('registration')
+					->options(arr::rbool())
+					->selected($member->registration);
+		}
+		
+		if (Settings::get('finance_enabled') &&
+			$this->acl_check_edit('Variable_Symbols_Controller', 'variable_symbols'))
+		{
+			$form->input('variable_symbol')
+					->rules('length[1,10]')
+					->class('join1')
+					->callback('Variable_Symbols_Controller::valid_var_sym')
+					->style('width:120px');
+			
+			if (Variable_Key_Generator::get_active_driver())
+			{
+				$form->checkbox('variable_symbol_generate')
+						->label('Generate automatically')
+						->checked(TRUE)
+						->class('join2')
+						->style('width:auto;margin-left:5px');
+			}
+		}
+		
+		if ($this->acl_check_edit(get_class($this), 'qos_ceil') &&
+			$this->acl_check_edit(get_class($this), 'qos_rate'))
+		{
+			$speed_class = new Speed_class_Model();
+			$speed_classes = array(NULL => '') + $speed_class->select_list();
+			$def_speed_class = $speed_class->get_members_default_class();
+			
+			$form->dropdown('speed_class')
+					->options($speed_classes)
+					->selected($def_speed_class ? $def_speed_class->id : $member->id)
+					->add_button('speed_classes')
+					->style('width:200px');
+		}
+		
+		if ($this->acl_check_edit(get_class($this), 'comment'))
+		{
+			$form->textarea('comment')
+					->rules('length[0,250]')
+					->value($member->comment);
+		}
+		
+		if (Settings::get('finance_enabled') &&
+			Settings::get('self_registration_enable_additional_payment'))
+		{
+			$form->group(__('Additional demolition of membership fees') . ' ' . help::hint('applicant_additional_payment'));
+
+			$form->checkbox('allow_additional_payment')
+					->label('Allow additional payment')
+					->value(1);
+
+			$form->input('connection_payment_amount')
+					->label('Amount')
+					->value($additional_payment_amount)
+					->style('width: 70px');
+		}
+		
+		$form->submit('Approve');
+		
+		// sended
+		if ($form->validate())
+		{			
+			try
+			{
+				$member->transaction_start();
+				
+				$form_data = $form->as_array();
+			
+				// change member
+				$member->entrance_date = date('Y-m-d', $form_data['entrance_date']);
+				
+				if ($this->acl_check_edit('Members_Controller', 'registration'))
+				{
+					$member->registration = $form_data['registration'];
+				}
+				
+				if ($this->acl_check_edit(get_class($this), 'comment'))
+				{
+					$member->comment = $form_data['comment'];
+				}
+				
+				if ($this->acl_check_edit('Variable_Symbols_Controller', 'variable_symbols') &&
+					(!empty($form_data['variable_symbol']) || (
+							isset($form_data['variable_symbol_generate']) &&
+							$form_data['variable_symbol_generate']
+					)))
+				{
+					$account = ORM::factory('account')->where(array
+					(
+						'member_id' => $member->id,
+						'account_attribute_id' => Account_attribute_Model::CREDIT
+					))->find();
+					
+					if (!isset($form_data['variable_symbol_generate']) ||
+						!$form_data['variable_symbol_generate'])
+					{
+						$var_sym = $form_data['variable_symbol'];
+					}
+					else
+					{
+						$var_sym = Variable_Key_Generator::factory()->generate($member->id);
+					}
+					
+					$vs = new Variable_Symbol_Model();
+					
+					$vs_not_unique = $vs->get_variable_symbol_id($var_sym);
+					
+					if ($vs_not_unique && $vs_not_unique->id)
+					{
+						if ($vs_not_unique->account_id != $account->id)
+						{
+							throw new Exception(__('Variable symbol already exists in database.'));
+						}
+					}
+					else
+					{
+						$vs->account_id = $account->id;
+						$vs->variable_symbol = $var_sym;
+						$vs->save_throwable();
+					}
+				}
+				
+				if ($this->acl_check_edit(get_class($this), 'qos_ceil') &&
+					$this->acl_check_edit(get_class($this), 'qos_rate'))
+				{
+					$member->speed_class_id = $form_data['speed_class'];
+				}
+				
+				$member->type = Member_Model::TYPE_REGULAR;
+				$member->locked = 0;
+				
+				$member->save_throwable();
+				
+				// access rights
+				$group_aro_map = new Groups_aro_map_Model();
+				
+				// get main user
+				$main_user_id = NULL;
+				
+				foreach ($member->users as $user)
+				{
+					if ($user->type == User_Model::MAIN_USER)
+					{
+						$main_user_id = $user->id;
+						break;
+					}
+				}
+				
+				if (!$main_user_id)
+					throw new Exception('Main user of applicant is missing');
+
+				// if is not member yet
+				if (!$group_aro_map->exist_row(
+						Aro_group_Model::REGULAR_MEMBERS, $main_user_id
+					))
+				{
+					// delete rights of applicant
+					$group_aro_map->detete_row(
+							Aro_group_Model::REGISTERED_APPLICANTS, $main_user_id
+					);							
+
+					// insert regular member access rights
+					$groups_aro_map = new Groups_aro_map_Model();
+					$groups_aro_map->aro_id = $main_user_id;
+					$groups_aro_map->group_id = Aro_group_Model::REGULAR_MEMBERS;
+					$groups_aro_map->save_throwable();
+				}
+				
+				// make transfer for connection
+				if (isset($form_data['allow_additional_payment']) &&
+					$form_data['allow_additional_payment'] &&
+					($form_data['connection_payment_amount'] > 0))
+				{
+					$operating_account = ORM::factory('account')
+							->where('account_attribute_id', Account_attribute_Model::OPERATING)
+							->find();
+					
+					$credit_account = ORM::factory('account')->where(array
+					(
+						'member_id'				=> $member->id,
+						'account_attribute_id'	=> Account_attribute_Model::CREDIT
+					))->find();
+					
+					Transfer_Model::insert_transfer(
+							$credit_account->id, $operating_account->id, null,
+							null, $this->session->get('user_id'),
+							null, $member->entrance_date,
+							date('Y-m-d H:i:s'),
+							__('Additional payment for member fees before membership'),
+							$form_data['connection_payment_amount']
+					);
+				}
+				
+				// reload messages of worker
+				ORM::factory('member')->reactivate_messages($member_id);
+				
+				// inform new member
+				if (module::e('notification'))
+				{
+					Message_Model::activate_special_notice(
+							Message_Model::APPLICANT_APPROVE_MEMBERSHIP,
+							$member->id, $this->session->get('user_id'),
+							Notifications_Controller::ACTIVATE,
+							Notifications_Controller::KEEP
+					);
+				}
+				
+				unset($form_data);
+				
+				$member->transaction_commit();
+			
+				$this->redirect('members/show', $member_id);
+			}
+			catch (Exception $e)
+			{
+				Log::add_exception($e);
+				$member->transaction_rollback();
+				// error
+				status::error('Applicant for membership cannot be approved', $e);
+			}
+		}
+		
+		$headline = __('Approve application for membership');
+
+		// breadcrumbs navigation		
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view(get_class($this), 'members'))
+				->disable_translation()
+				->link('members/show/'.$member->id,
+						"ID $member->id - $member->name",
+						$this->acl_check_view(get_class($this), 'members', $member->id)
+				)->text($headline);
+
+		// view
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $headline;
+		$view->content = new View('form');
+		$view->content->headline = $headline;
+		$view->content->form = $form->html();
+		$view->content->link_back = '';
+		$view->render(TRUE);
+	}
 	
 	/**
 	 * Deletes registered applicants
@@ -374,31 +1101,17 @@ class Members_Controller extends Controller
 		if ($member->type != Member_Model::TYPE_APPLICANT)
 			Controller::warning(PARAMETER);
 		
-		// send email with details
-		$contact = new Contact_Model();
-		$emails = $contact->find_all_users_contacts($member->user->id, Contact_Model::TYPE_EMAIL);
-
-		if ($emails && $emails->count())
+		// send notice with details
+		if (module::e('notification'))
 		{
-			$to = $emails->current()->value;
-			$from = Settings::get('email_default_email');
-			$subject = 'Registration deny';
-			$message = 'Your registration to FreenetIS has been denied';
-
-			try
-			{
-				email::send($to, $from, $subject, $message);
-			}
-			catch (Exception $e)
-			{
-				status::error(
-						__('Error - cannot send email to applicant about deny of membership')
-						. '<br>' . __('Error') . ': ' . $e->getMessage(),
-						FALSE
-				);
-			}
+			Message_Model::activate_special_notice(
+					Message_Model::APPLICANT_REFUSE_MEMBERSHIP,
+					$member->id, $this->session->get('user_id'),
+					Notifications_Controller::ACTIVATE,
+					Notifications_Controller::KEEP
+			);
 		}
-		
+				
 		// delete user
 		foreach ($member->users as $user)
 		{
@@ -426,7 +1139,7 @@ class Members_Controller extends Controller
 	public function show(
 			$member_id = NULL, $limit_results = 20, $order_by = 'ip_address',
 			$order_by_direction = 'ASC', $page_word = null, $page = 1)
-	{
+	{	
 		// parameter is wrong
 		if (!$member_id || !is_numeric($member_id))
 			Controller::warning(PARAMETER);
@@ -436,6 +1149,29 @@ class Members_Controller extends Controller
 		// member doesn't exist
 		if (!$member->id)
 			Controller::error(RECORD);
+		
+		$membership_transfer_model = new Membership_transfer_Model();
+		
+		// test if member is association itself
+		$is_association = ($member->id == Member_Model::ASSOCIATION);
+		
+		// test if member is former member
+		$is_former = ($member->type == Member_Model::TYPE_FORMER);
+		
+		// test if member is applicant
+		$is_applicant = ($member->type == Member_Model::TYPE_APPLICANT);
+		
+		// member is former member
+		if ($is_former)
+		{
+			// find possible membership transfer from member
+			$membership_transfer_from_member = $membership_transfer_model
+				->get_transfer_from_member($member->id);
+		}
+		
+		// find possible membership transfer to member
+		$membership_transfer_to_member = $membership_transfer_model
+				->get_transfer_to_member($member->id);
 
 		// access control
 		if (!$this->acl_check_view(get_class($this), 'members', $member->id))
@@ -474,18 +1210,56 @@ class Members_Controller extends Controller
 		// has member active membership interrupt?
 		$active_interrupt = ORM::factory('membership_interrupt')
 				->has_member_interrupt_in_date($member->id, date('Y-m-d'));
+		
+		$end_membership = ORM::factory('membership_interrupt')
+				->has_member_end_after_interrupt_end_in_date($member->id, date('Y-m-d'));
+		
+		$flags = array();
+		
+		if ($active_interrupt)
+		{
+			$flags[] = __('I');
+		}
+		
+		if ($end_membership)
+		{
+			$flags[] = __('E');
+		}
 
-		$title = ($active_interrupt) ? $type . ' '.$member->name
-				. ' ('. __('I') .')' : $type . ' '.$member->name;
+		$title = ($flags) ? $type . ' '.$member->name
+				. ' ('. implode(' + ', $flags) .')' : $type . ' '.$member->name;
+		
+		if ($is_applicant &&
+			condition::is_applicant_registration($member) &&
+			$this->acl_check_edit(get_class($this), 'members', $member->id))
+		{
+			$title .= ' <small style="font-size: 60%; font-weight: normal">(' . html::anchor(
+					'members/approve_applicant/' . $member_id, 
+					__('Approve application for membership'),
+					array('class' => 'popup_link')
+			) . ')</small>';
+		}
 
 		// finds credit account of member
-		if ($member->id != 1)
+		if (Settings::get('finance_enabled') && !$is_association)
 		{
 			$account = ORM::factory('account')->where(array
 			(
 				'member_id' => $member_id,
 				'account_attribute_id' => Account_attribute_Model::CREDIT
 			))->find();
+			
+			if (!$is_former)
+			{
+				// find current regular member fee of member
+				$fee = ORM::factory('fee')->get_regular_member_fee_by_member_date(
+					$member->id,
+					date('Y-m-d')
+				);
+			}
+			
+			$entrance_fee_paid = ORM::factory('transfer')->count_entrance_fee_transfers_of_account($account->id);
+			$entrance_fee_left = $member->entrance_fee - $entrance_fee_paid;
 		}
 		
 		// gps coordinates
@@ -613,66 +1387,86 @@ class Members_Controller extends Controller
 		}
 		
 		/********              VoIP         ***********/
-
-		// VoIP SIP model
-		$voip_sip = new Voip_sip_Model();
-		// Gets sips
-		$voip = $voip_sip->get_all_record_by_member_limited($member->id);
-		// Has driver?
-		$has_driver = Billing::instance()->has_driver();
-		// Account
-		$b_account = null;
-		// Check account only if have SIP
-		if ($voip->count())
+             
+		if (Settings::get('voip_enabled'))
 		{
-			$b_account = Billing::instance()->get_account($member->id);
-		}
-
-		$voip_grid = new Grid('members', null, array
-		(
-			'separator'		   		=> '<br /><br />',
-			'use_paginator'	   		=> false,
-			'use_selector'	   		=> false
-		));
-
-		$voip_grid->field('id')
-				->label('ID');
-		
-		$voip_grid->field('callerid')
-				->label(__('Number'));
-		
-		$actions = $voip_grid->grouped_action_field();
-		
-		$actions->add_action('user_id')
-				->icon_action('phone')
-				->url('voip/show')
-				->label('Show VoIP account');
-		
-		$actions->add_action('user_id')
-				->icon_action('member')
-				->url('users/show')
-				->label('Show user who own this VoIP account');
-		
-		$voip_grid->datasource($voip);
-
-		if ($has_driver && $b_account)
-		{
-			$voip_grid->add_new_button(
-					'voip_calls/show_by_member/'.$member->id,
-					__('List of all calls')
-			);
-			
-			if ($member->id != 1)
+			// VoIP SIP model
+			$voip_sip = new Voip_sip_Model();
+			// Gets sips
+			$voip = $voip_sip->get_all_record_by_member_limited($member->id);
+			// Has driver?
+			$has_driver = Billing::instance()->has_driver();
+			// Account
+			$b_account = null;
+			// Check account only if have SIP
+			if ($voip->count())
 			{
-				$voip_grid->add_new_button(
-						'transfers/add_voip/'.$account->id,
-						__('Recharge VoIP credit')
-				);
+				$b_account = Billing::instance()->get_account($member->id);
+			}
+
+			$voip_grid = new Grid('members', null, array
+			(
+				'separator'		   		=> '<br /><br />',
+				'use_paginator'	   		=> false,
+				'use_selector'	   		=> false
+			));
+
+			$voip_grid->field('id')
+					->label('ID');
+
+			$voip_grid->field('callerid')
+					->label(__('Number'));
+
+			$actions = $voip_grid->grouped_action_field();
+
+			if ($this->acl_check_view('VoIP_Controller', 'voip', $member->id))
+			{
+				$actions->add_action('user_id')
+						->icon_action('phone')
+						->url('voip/show')
+						->label('Show VoIP account');
+			}
+
+			if ($this->acl_check_view('Users_Controller', 'users', $member->id))
+			{
+				$actions->add_action('user_id')
+						->icon_action('member')
+						->url('users/show')
+						->label('Show user who own this VoIP account');
+			}
+			
+			$voip_grid->datasource($voip);
+
+			if ($has_driver && $b_account)
+			{
+				if ($this->acl_check_view('VoIP_Controller', 'voip', $member->id))
+				{
+					$voip_grid->add_new_button(
+							'voip_calls/show_by_member/'.$member->id,
+							__('List of all calls')
+					);
+				}
+
+				if (Settings::get('finance_enabled') &&
+					$this->acl_check_new('Accounts_Controller', 'transfers', $member->id) &&
+					!$is_association)
+				{
+					$voip_grid->add_new_button(
+							'transfers/add_voip/'.$account->id,
+							__('Recharge VoIP credit')
+					);
+				}
 			}
 		}
 		
 		// finds date of expiration of member fee
-		$expiration_date = (isset($account)) ? self::get_expiration_date($account) : '';
+		$expiration_date = '';
+		
+		if (Settings::get('finance_enabled') &&
+			isset($account) && !$is_applicant && !$is_former)
+		{
+			$expiration_date = self::get_expiration_date($account);
+		}
 
 		// finds total traffic of member
 		if (Settings::get('ulogd_enabled'))
@@ -687,15 +1481,18 @@ class Members_Controller extends Controller
 		$contact_model = new Contact_Model();
 		$enum_type_model = new Enum_type_Model();
 
-		$variable_symbol_model = new Variable_Symbol_Model();
-
 		// contacts of main user of member
 		$contacts = $contact_model->find_all_users_contacts($user->id);
 		
-		$variable_symbols = 0;
-		if ($member_id != 1)
+		if (Settings::get('finance_enabled'))
 		{
-		    $variable_symbols = $variable_symbol_model->find_account_variable_symbols($account->id);
+			$variable_symbol_model = new Variable_Symbol_Model();
+
+			$variable_symbols = 0;
+			if ($member_id != 1)
+			{
+				$variable_symbols = $variable_symbol_model->find_account_variable_symbols($account->id);
+			}
 		}
 
 		$contact_types = array();
@@ -732,7 +1529,7 @@ class Members_Controller extends Controller
 
 		$actions = $users_grid->grouped_action_field();
 		
-		if($this->acl_check_view('Users_Controller', 'users', $member_id))
+		if ($this->acl_check_view('Users_Controller', 'users', $member_id))
 		{
 			$actions->add_action('id')
 					->icon_action('show')
@@ -764,7 +1561,8 @@ class Members_Controller extends Controller
 					->label('Show devices');
 		}
 
-		if ($this->acl_check_edit('Users_Controller', 'work', $member_id))
+		if (Settings::get('works_enabled') &&
+			$this->acl_check_edit('Works_Controller', 'work', $member_id))
 		{
 			$actions->add_action('id')
 					->icon_action('work')
@@ -775,142 +1573,149 @@ class Members_Controller extends Controller
 		$users_grid->datasource($users);
 
 		// membership interrupts
-		$membership_interrupts = ORM::factory('membership_interrupt')->get_all_by_member($member_id);
-		
-		$membership_interrupts_grid = new Grid('members', null, array
-		(
-			'separator'		   		=> '<br /><br />',
-			'use_paginator'	   		=> false,
-			'use_selector'	   		=> false,
-		));
-
-		if ($this->acl_check_new(get_class($this), 'membership_interrupts', $member_id))
+		if (Settings::get('membership_interrupt_enabled'))
 		{
-			$membership_interrupts_grid->add_new_button(
-					'membership_interrupts/add/'.$member_id,
-					__('Add new interrupt of membership'),
-					array
-					(
-						'title' => __('Add new interrupt of membership'),
-						'class' => 'popup_link'
-					)
-			);
-		}
+			$membership_interrupts = ORM::factory('membership_interrupt')->get_all_by_member($member_id);
 
-		$membership_interrupts_grid->field('id')
-				->label('ID');
-		
-		$membership_interrupts_grid->field('from')
-				->label(__('Date from'));
-		
-		$membership_interrupts_grid->field('to')
-				->label(__('Date to'));
-		
-		$membership_interrupts_grid->field('comment');
-		
-		$actions = $membership_interrupts_grid->grouped_action_field();
+			$membership_interrupts_grid = new Grid('members', null, array
+			(
+				'separator'		   		=> '<br /><br />',
+				'use_paginator'	   		=> false,
+				'use_selector'	   		=> false,
+			));
 
-		if ($this->acl_check_edit(get_class($this), 'membership_interrupts', $member_id))
-		{
-			$actions->add_action('id')
-					->icon_action('edit')
-					->url('membership_interrupts/edit')
-					->class('popup_link');
-		}
+			if ($this->acl_check_new(get_class($this), 'membership_interrupts', $member_id))
+			{
+				$membership_interrupts_grid->add_new_button(
+						'membership_interrupts/add/'.$member_id,
+						__('Add new interrupt of membership'),
+						array
+						(
+							'title' => __('Add new interrupt of membership'),
+							'class' => 'popup_link'
+						)
+				);
+			}
 
-		if ($this->acl_check_delete(get_class($this), 'membership_interrupts'))
-		{
-			$actions->add_action('id')
-					->icon_action('delete')
-					->url('membership_interrupts/delete')
-					->class('delete_link');
-		}
-		
-		$membership_interrupts_grid->datasource($membership_interrupts);
+			$membership_interrupts_grid->field('id')
+					->label('ID');
 
-		// activated redirections of member, including short statistic of whitelisted IP addresses
-		
-		$ip_model = new Ip_address_Model();
+			$membership_interrupts_grid->field('from')
+					->label(__('Date from'));
+
+			$membership_interrupts_grid->field('to')
+					->label(__('Date to'));
 			
-		$total_ips = $ip_model->count_ips_and_redirections_of_member($member_id);
+			$membership_interrupts_grid->callback_field('end_after_interrupt_end')
+					->callback('callback::boolean')
+					->class('center')
+					->label('End membership after end');
+
+			$membership_interrupts_grid->field('comment');
+
+			$actions = $membership_interrupts_grid->grouped_action_field();
+
+			if ($this->acl_check_edit(get_class($this), 'membership_interrupts', $member_id))
+			{
+				$actions->add_action('id')
+						->icon_action('edit')
+						->url('membership_interrupts/edit')
+						->class('popup_link');
+			}
+
+			if ($this->acl_check_delete(get_class($this), 'membership_interrupts'))
+			{
+				$actions->add_action('id')
+						->icon_action('delete')
+						->url('membership_interrupts/delete')
+						->class('delete_link');
+			}
+
+			$membership_interrupts_grid->datasource($membership_interrupts);
+		}
 		
-		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
-		
-		// limit check
-		if (($sql_offset = ($page - 1) * $limit_results) > $total_ips)
-			$sql_offset = 0;
-		
-		$ip_addresses = $ip_model->get_ips_and_redirections_of_member(
-				$member_id, $sql_offset, $limit_results,
-				$order_by, $order_by_direction
-		);
-		
-		$redir_grid = new Grid('members', null, array
-		(
-			'selector_increace'			=> 20,
-			'selector_min'				=> 20,
-			'selector_max_multiplier'	=> 10,
-			'current'					=> $limit_results,
-			'base_url'					=> Config::get('lang'). '/members/show/' . $member_id . '/'
-										. $limit_results.'/'.$order_by.'/'.$order_by_direction,
-			'uri_segment'				=> 'page',
-			'total_items'				=> $total_ips,
-			'items_per_page' 			=> $limit_results,
-			'style'						=> 'classic',
-			'order_by'					=> $order_by,
-			'order_by_direction'		=> $order_by_direction,
-			'limit_results'				=> $limit_results,
-			'variables'					=> $member_id . '/',
-			'url_array_ofset'			=> 1,
-			'query_string'				=> $this->input->get(),
-		));
-		
-		if ($this->acl_check_new('Messages_Controller', 'member') &&
-			$total_ips < 1000) // limited count
+		if (Settings::get('redirection_enabled'))
 		{
-			$redir_grid->add_new_button(
-					'redirect/activate_to_member/'.$member_id,
-					__('Activate redirection to member'), array(),
-					help::hint('activate_redirection_to_member')
+			// activated redirections of member, including short statistic of whitelisted IP addresses
+
+			$ip_model = new Ip_address_Model();
+
+			$total_ips = $ip_model->count_ips_and_redirections_of_member($member_id);
+
+			// limit check
+			if (($sql_offset = ($page - 1) * $limit_results) > $total_ips)
+				$sql_offset = 0;
+
+			$ip_addresses = $ip_model->get_ips_and_redirections_of_member(
+					$member_id, $sql_offset, $limit_results,
+					$order_by, $order_by_direction
 			);
+
+			$redir_grid = new Grid('members', null, array
+			(
+				'use_selector'				=> false,
+				'selector_min'				=> 20,
+				'current'					=> $limit_results,
+				'base_url'					=> Config::get('lang'). '/members/show/' . $member_id . '/'
+											. $limit_results.'/'.$order_by.'/'.$order_by_direction,
+				'uri_segment'				=> 'page',
+				'total_items'				=> $total_ips,
+				'items_per_page' 			=> $limit_results,
+				'style'						=> 'classic',
+				'order_by'					=> $order_by,
+				'order_by_direction'		=> $order_by_direction,
+				'limit_results'				=> $limit_results,
+				'variables'					=> $member_id . '/',
+				'url_array_ofset'			=> 1
+			));
+
+			if ($this->acl_check_new('Redirect_Controller', 'redirect') &&
+				$total_ips < 1000) // limited count
+			{
+				$redir_grid->add_new_button(
+						'redirect/activate_to_member/'.$member_id,
+						__('Activate redirection to member'), array(),
+						help::hint('activate_redirection_to_member')
+				);
+			}
+
+			$redir_grid->order_callback_field('ip_address')
+					->label(__('IP address'))
+					->callback('callback::ip_address_field');
+
+			$redir_grid->order_callback_field('whitelisted')
+					->label(__('Whitelist').'&nbsp;'.help::hint('whitelist'))
+					->callback('callback::whitelisted_field');
+
+			$redir_grid->order_callback_field('message')
+					->label(__('Activated redirection').'&nbsp;'.help::hint('activated_redirection'))
+					->callback('callback::message_field');
+
+			if ($this->acl_check_view('Messages_Controller', 'member'))
+			{
+				$redir_grid->callback_field('ip_address')
+						->label(__('Preview').'&nbsp;'.help::hint('redirection_preview'))
+						->callback('callback::redirection_preview_field');
+			}
+			
+			if ($this->acl_check_delete('Redirect_Controller', 'redirect'))
+			{
+				$redir_grid->callback_field('redirection')
+						->label(__('Canceling of message for redirection'))
+						->callback('callback::cancel_redirection_of_member');
+			}
+
+			$redir_grid->datasource($ip_addresses);
+		
 		}
-		
-		$redir_grid->order_callback_field('ip_address')
-				->label(__('IP address'))
-				->callback('callback::ip_address_field');
-		
-		$redir_grid->order_callback_field('whitelisted')
-				->label(__('Whitelist').'&nbsp;'.help::hint('whitelist'))
-				->callback('callback::whitelisted_field');
-		
-		$redir_grid->order_callback_field('message')
-				->label(__('Activated redirection').'&nbsp;'.help::hint('activated_redirection'))
-				->callback('callback::message_field');
-		
-		$redir_grid->callback_field('ip_address')
-				->label(__('Preview').'&nbsp;'.help::hint('redirection_preview'))
-				->callback('callback::redirection_preview_field');
-		
-		if ($this->acl_check_delete('Messages_Controller', 'ip_address'))
-		{
-			$redir_grid->callback_field('redirection')
-					->label(__('Canceling of message for redirection'))
-					->callback('callback::cancel_redirection_of_member');
-		}
-		
-		$redir_grid->datasource($ip_addresses);
 		
 		/********** BUILDING OF LINKS   *************/
 
 		$member_links = array();
 		$user_links = array();
 
-		$former_type_id = ORM::factory('enum_type')->get_type_id('Former member');
-
 		// member edit link
-		if ($member->type != $former_type_id &&
+		if (!$is_former &&
 			$this->acl_check_edit(get_class($this), 'members', $member->id))
 		{
 			$member_links[] = html::anchor(
@@ -923,30 +1728,34 @@ class Members_Controller extends Controller
 					)
 			);
 		}
-
-		// members's transfers link
-		if ($member->id != 1 && $this->acl_check_view('Accounts_Controller', 'transfers', $member->id))
+		
+		if (Settings::get('finance_enabled'))
 		{
-			$member_links[] = html::anchor(
-					'transfers/show_by_account/'.$account->id, __('Show transfers')
-			);
-		}
+			// members's transfers link
+			if (!$is_association &&
+				$this->acl_check_view('Accounts_Controller', 'transfers', $member->id))
+			{
+				$member_links[] = html::anchor(
+						'transfers/show_by_account/'.$account->id, __('Show transfers')
+				);
+			}
 
-		// member's tariffs link
-		if ($this->acl_check_view(get_class($this), 'fees', $member->id))
-		{
-			$member_links[] = html::anchor(
-					'members_fees/show_by_member/'.$member->id, __('Show tariffs')
-			);
+			// member's tariffs link
+			if ($this->acl_check_view(get_class($this), 'fees', $member->id))
+			{
+				$member_links[] = html::anchor(
+						'members_fees/show_by_member/'.$member->id, __('Show tariffs')
+				);
+			}
 		}
 	
-		if ($member->id != 1)
+		if (!$is_association)
 		{
-			if ($member->type != $former_type_id)
+			if (!$is_former)
 			{
 				// allowed subnets are enabled
 				if (Settings::get('allowed_subnets_enabled') &&
-					$this->acl_check_view('Devices_Controller', 'allowed_subnet', $member->id))
+					$this->acl_check_view('Allowed_subnets_Controller', 'allowed_subnet', $member->id))
 				{
 					$member_links[] = html::anchor(
 							'allowed_subnets/show_by_member/'.$member->id,
@@ -960,74 +1769,141 @@ class Members_Controller extends Controller
 				}
 
 			}
-		}
-		
-		if ($this->acl_check_new('Messages_Controller', 'member'))
-		{
-			$member_links[] = html::anchor(
-					'notifications/member/'.$member->id, __('Notifications'),
-					array
-					(
-						'title' => __('Set notification to member'),
-						'class' => 'popup_link'
-					)
-			);
-		
-			$member_links[] = html::anchor(
-					'notifications/set_whitelist/'.$member->id, __('Whitelist'),
-					array
-					(
-						'title' => __('Set whitelist to member'),
-						'class' => 'popup_link'
-					)
-			);
-		}
 
-		// export of registration link
-		$member_links[] = html::anchor(
-				'members/registration_export/'.$member->id,
-				__('Export of registration'),
-				array
-				(
-					'title' => __('Export of registration'),
-					'class' => 'popup_link'
-				)
-		);
-		
-		if ($member->id != 1)
-		{
-			if ($member->type != $former_type_id)
+			if (module::e('notification'))
 			{
-				// end membership link
-				if ($this->acl_check_edit(get_class($this), 'members'))
+				if ($this->acl_check_new('Notifications_Controller', 'member'))
 				{
 					$member_links[] = html::anchor(
-							'members/end_membership/'.$member->id,
-							__('End membership'),
-							array
-							(
-								'title' => __('End membership'),
-								'class' => 'popup_link'
-							)
+							'notifications/member/'.$member->id, __('Notifications'),
+							array('title' => __('Set notification to member'))
+					);
+				}
+
+				if ($this->acl_check_view('Members_whitelists_Controller', 'whitelist'))
+				{
+					$member_links[] = html::anchor(
+							'members_whitelists/show_by_member/'.$member->id, __('Whitelists')
 					);
 				}
 			}
-			else
+			
+			// export contacts
+			if ($this->acl_check_view('Members_Controller', 'members'))
 			{
-				// restore membership link
-				if ($this->acl_check_edit(get_class($this), 'members'))
+				$member_links[] = html::anchor(
+						'export/vcard/' . $member_id . server::query_string(),
+						__('Export contacts'),
+						array
+						(
+							'title' => __('Export contacts'),
+							'class' => 'popup_link'
+						)
+				);
+			}
+
+			// access control
+			if ($this->acl_check_view(get_class($this), 'registration_export', $member->id))
+			{
+				$member_links[] = html::anchor(
+						'members/registration_export/'.$member->id,
+						__('Export of registration'),
+						array
+						(
+							'title' => __('Export of registration'),
+							'class' => 'popup_link'
+						)
+				);
+			}
+			
+			if ($this->acl_check_edit('Members_Controller', 'notification_settings', $member->id))
+			{
+				$member_links[] = html::anchor(
+						'members/settings/'.$member->id,
+						__('Edit member settings'),
+						array
+						(
+							'class' => 'popup_link'
+						)
+				);
+			}
+			
+			if (!$is_applicant)
+			{
+				if (!$is_former)
 				{
-					$m = __('Do you want to restore membership of this member');
-					$member_links[] = html::anchor(
-							'members/restore_membership/'.$member->id,
-							__('Restore membership'), array
-							(
-								'onclick' => 'return window.confirm(\''.$m.'?\')'
-							)
-					);
+					// end membership link
+					if ($this->acl_check_edit(get_class($this), 'members') &&
+						!$end_membership)
+					{
+						$member_links[] = html::anchor(
+								'members/end_membership/'.$member->id,
+								__('End membership'),
+								array
+								(
+									'title' => __('End membership'),
+									'class' => 'popup_link'
+								)
+						);
+					}
+				}
+				else
+				{
+					// restore membership link
+					if ($this->acl_check_edit(get_class($this), 'members'))
+					{
+						$m = __('Do you want to restore membership of this member');
+						$member_links[] = html::anchor(
+								'members/restore_membership/'.$member->id,
+								__('Restore membership'), array
+								(
+									'onclick' => 'return window.confirm(\''.$m.'?\')'
+								)
+						);
+					}
+
+					// only former member without debt can transfer his membership
+					if ($member->get_balance() >= 0)
+					{
+						// add new membership transfer
+						if (!$membership_transfer_from_member)
+						{
+							if ($this->acl_check_new('Membership_transfers_Controller', 'membership_transfer', $member->id))
+							{
+								$member_links[] = html::anchor(
+										'membership_transfers/add/'.$member_id,
+										__('Add membership transfer'),
+										array('class' => 'popup_link')
+								);
+							}
+						}
+						// edit membership transfer
+						else
+						{
+							if ($this->acl_check_edit('Membership_transfers_Controller', 'membership_transfer', $member->id))
+							{
+								$member_links[] = html::anchor(
+										'membership_transfers/edit/'.$membership_transfer_from_member->id,
+										__('Edit membership transfer'),
+										array('class' => 'popup_link')
+								);
+							}
+
+							if ($this->acl_check_delete('Membership_transfers_Controller', 'membership_transfer', $member->id))
+							{
+								$member_links[] = html::anchor(
+										'membership_transfers/delete/'.$membership_transfer_from_member->id,
+										__('Delete membership transfer'),
+										array('class' => 'delete_link')
+								);
+							}
+						}
+					}
 				}
 			}
 		}
+		
+		
 		
 		// user show link
 		if ($this->acl_check_view('Users_Controller', 'users', $member->id))
@@ -1036,7 +1912,7 @@ class Members_Controller extends Controller
 		}
 
 		// user edit link
-		if ($member->type != $former_type_id &&
+		if (!$is_former &&
 			$this->acl_check_edit('Users_Controller','users', $member->id))
 		{
 			$user_links[] = html::anchor(
@@ -1048,40 +1924,74 @@ class Members_Controller extends Controller
 				)
 			);
 		}
+		
+		if ($this->user_id == $user->id)
+		{
+			$user_links[] = html::anchor(
+					'user_favourite_pages/show_all', __('Favourites')
+			);
+		}
 
 		// user's devices link
-		if ($this->acl_check_view('Devices_Controller', 'devices', $member->id))
+		if (Settings::get('networks_enabled') &&
+			$this->acl_check_view('Devices_Controller', 'devices', $member->id))
 		{
 			$user_links[] = html::anchor(
 					'devices/show_by_user/'.$user->id,
 					__('Show devices')
 			);
 		}
-
-		// user's works link
-		if ($member->id != 1  &&
-			$this->acl_check_view('Users_Controller', 'work', $member->id))
+		
+		// connection requests
+		if (Settings::get('connection_request_enable') &&
+			$this->acl_check_view('Connection_Requests_Controller', 'request', $member->id))
 		{
 			$user_links[] = html::anchor(
-					'works/show_by_user/'.$user->id,
-					__('Show works')
+					'connection_requests/show_by_member/'.$member->id,
+					__('Show connection requests')
 			);
 		}
 		
-		// user's work reports link
-		if ($member->id != 1  &&
-			$this->acl_check_view('Users_Controller', 'work', $member->id))
+		if (!$is_association && module::e('approval'))
 		{
-			$user_links[] = html::anchor(
-					'work_reports/show_by_user/'.$user->id,
-					__('Show work reports')
-			);
+			// user's works link
+			if (Settings::get('works_enabled') &&
+				$this->acl_check_view('Works_Controller', 'work', $member->id))
+			{
+				$user_links[] = html::anchor(
+						'works/show_by_user/'.$user->id,
+						__('Show works')
+				);
+			}
+
+			// user's work reports link
+			if (Settings::get('works_enabled') &&
+				$this->acl_check_view('Works_Controller', 'work', $member->id))
+			{
+				$user_links[] = html::anchor(
+						'work_reports/show_by_user/'.$user->id,
+						__('Show work reports')
+				);
+			}
+
+			// user's requests link
+			if ($this->acl_check_view('Requests_Controller', 'request', $member->id))
+			{
+				$user_links[] = html::anchor(
+						'requests/show_by_user/'.$user->id,
+						__('Show requests')
+				);
+			}
 		}
 
-		if ($member->type != $former_type_id)
+		// member is not former
+		if (!$is_former)
 		{
 			// change password link
-			if ($this->acl_check_edit('Users_Controller', 'password', $member->id))
+			if ($this->acl_check_edit('Users_Controller', 'password', $member->id) &&
+				!($user->is_user_in_aro_group($user->id, Aro_group_Model::ADMINS) &&
+					$user->id != $this->user_id
+				))
 			{
 				$user_links[] = html::anchor(
 						'users/change_password/'.$user->id, __('Change password'),
@@ -1120,20 +2030,25 @@ class Members_Controller extends Controller
 		$view = new View('main');
 		$view->title = $title;
 		$view->breadcrumbs = $breadcrumbs->html();
+		$view->action_logs = action_logs::object_last_modif($member, $member_id);
 		$view->content = new View('members/show');
 		$view->content->title = $title;
 		$view->content->member = $member;
 		$view->content->user = $user;
 		$view->content->user_name = $user_name;
 		$view->content->users_grid = $users_grid;
-		$view->content->redir_grid = $redir_grid;
-		$view->content->voip_grid = $voip_grid;
-		$view->content->membership_interrupts_grid = $membership_interrupts_grid;
+		$view->content->redir_grid = Settings::get('redirection_enabled') ? $redir_grid : '';
+		$view->content->voip_grid = (Settings::get('voip_enabled')) ? $voip_grid : '';
+		$view->content->membership_interrupts_grid = Settings::get('membership_interrupt_enabled') ?
+																	$membership_interrupts_grid : '';
 		$view->content->contacts = $contacts;
 		$view->content->contact_types = $contact_types;
-		$view->content->variable_symbols = $variable_symbols;
+		$view->content->variable_symbols = (isset($variable_symbols)) ? $variable_symbols : NULL;
 		$view->content->expiration_date = $expiration_date;
+		$view->content->entrance_fee_paid = (isset($entrance_fee_paid)) ? $entrance_fee_paid : NULL;
+		$view->content->entrance_fee_left = (isset($entrance_fee_left)) ? $entrance_fee_left : NULL;
 		$view->content->account = (isset($account)) ? $account : NULL;
+		$view->content->fee = (isset($fee)) ? $fee : NULL;
 		$view->content->comments = (isset($account)) ? $account->get_comments() : '';
 		$view->content->address = (isset($address)) ? $address : '';
 		$view->content->map_query = $map_query;
@@ -1146,14 +2061,17 @@ class Members_Controller extends Controller
 		$view->content->domicile_gps = $domicile_gps;
 		$view->content->town = (isset($town)) ? $town : '';
 		$view->content->country = (isset($country)) ? $country : '';
-		$view->content->billing_has_driver = $has_driver;
-		$view->content->billing_account = $b_account;
-		$view->content->count_voip = count($voip);
+		$view->content->billing_has_driver = (Settings::get('voip_enabled')) ? $has_driver : FALSE;
+		$view->content->billing_account = (Settings::get('voip_enabled')) ? $b_account : NULL;
+		$view->content->count_voip = (Settings::get('voip_enabled')) ? count($voip) : 0;
 		$view->content->total_traffic = @$total_traffic;
 		$view->content->today_traffic = @$today_traffic;
 		$view->content->month_traffic = @$month_traffic;
-		$view->content->member_links = implode(' | ',$member_links);
-		$view->content->user_links = implode(' | ',$user_links);
+		$view->content->membership_transfer_from_member = isset($membership_transfer_from_member) ? $membership_transfer_from_member : NULL;
+		$view->content->membership_transfer_to_member = $membership_transfer_to_member;
+		$view->content->member_links = implode(' | ', $member_links);
+		$view->content->user_links = implode(' | ', $user_links);
+		$view->content->is_association = $is_association;
 		$view->render(TRUE);
 	} // end of show function
 
@@ -1162,22 +2080,27 @@ class Members_Controller extends Controller
 	/**
 	 * Gets expiration date of member's payments.
 	 * 
-	 * @author Michal Kliment
+	 * @author Michal Kliment, Ondrej Fibich
 	 * @param object $account
-	 * @return unknown_type
+	 * @return string
 	 */
 	public static function get_expiration_date($account)
 	{
 		// member's actual balance
 		$balance = $account->balance;
-
-		// current date
-		$day = date('j');
-		$month = date('n');
-		$year = date('Y');
-
-		// rounds date down
-		date::round_up($day, $month, $year);
+		
+		$transfer_model = new Transfer_Model();
+		
+		$close_date = date_parse(
+			date::get_closses_deduct_date_to(
+				$transfer_model->get_last_transfer_datetime_of_account($account->id)
+			)
+		);
+		
+		// date
+		$day = $close_date['day'];
+		$month = $close_date['month'];
+		$year = $close_date['year'];
 
 		// balance is in positive, we will go to the future
 		if ($balance > 0)
@@ -1201,7 +2124,8 @@ class Members_Controller extends Controller
 		$payments = array();
 
 		// finds entrance date of member
-		$entrance_date = date_parse(date::get_middle_of_month($account->member->entrance_date));
+		$entrance_date_str = date::get_closses_deduct_date_to($account->member->entrance_date);
+		$entrance_date = date_parse($entrance_date_str);
 
 		// finds debt payment rate of entrance fee
 		$debt_payment_rate = ($account->member->debt_payment_rate > 0)
@@ -1212,8 +2136,6 @@ class Members_Controller extends Controller
 				$payments, $entrance_date['month'], $entrance_date['year'],
 				$account->member->entrance_fee, $debt_payment_rate
 		);
-		
-		$entrance_date = date::get_middle_of_month($account->member->entrance_date);
 
 		// finds all member's devices with debt payments
 		$devices = ORM::factory('device')->get_member_devices_with_debt_payments($account->member_id);
@@ -1221,7 +2143,7 @@ class Members_Controller extends Controller
 		foreach ($devices as $device)
 		{
 			// finds buy date of this device
-			$buy_date = date_parse(date::get_middle_of_month($device->buy_date));
+			$buy_date = date_parse(date::get_closses_deduct_date_to($device->buy_date));
 
 			// finds all debt payments of this device
 			self::find_debt_payments(
@@ -1231,6 +2153,9 @@ class Members_Controller extends Controller
 		}
 
 		$fee_model = new Fee_Model();
+		
+		// protection from unending loop
+		$too_long = FALSE;
 
 		// finds min and max date = due to prevent before unending loop
 		$min_fee_date = $fee_model->get_min_fromdate_fee_by_type ('regular member fee');
@@ -1238,7 +2163,7 @@ class Members_Controller extends Controller
 
 		while (true)
 		{
-			$date = date::create(15, $month, $year);
+			$date = date::create(date::get_deduct_day_to($month, $year), $month, $year);
 
 			// date is bigger/smaller than max/min fee date, ends it (prevent before unending loop)
 			if (($sign == 1 && $date > $max_fee_date) || ($sign == -1 && $date < $min_fee_date))
@@ -1270,6 +2195,13 @@ class Members_Controller extends Controller
 				$month = ($month == 13) ? 1 : 12;
 				$year += $sign;
 			}
+			
+			// if we are 5 years in future, there is no point of counting more
+			if (date('Y') + 10 < $year)
+			{
+				$too_long = TRUE;
+				break;
+			}
 		}
 
 		$month--;
@@ -1279,12 +2211,14 @@ class Members_Controller extends Controller
 			$year--;
 		}
 		
-		$date = date::create (date::days_of_month($month), $month, $year);
+		$date = date::create(date::days_of_month($month), $month, $year);
 		
-		if ($date < $entrance_date)
-			$date = $entrance_date;
+		if (strtotime($date) < strtotime($entrance_date_str))
+			$date = $entrance_date_str;
 
-		return  '<span style="color: '.$color.'">'.$date. '</span>';
+		return  '<span style="color: '.$color.'">'
+				. ($too_long ? '&gt; ' : '')
+				. $date. '</span>';
 	}
 
 	/**
@@ -1336,8 +2270,13 @@ class Members_Controller extends Controller
 		$types = $enum_types->get_values(Enum_type_Model::MEMBER_TYPE_ID);
 		asort($types);
 		
+		// start entrance date
+		$association = new Member_Model(Member_Model::ASSOCIATION);
+		$entrace_start_year = date('Y', strtotime($association->entrance_date));
+		
 		// cannot add former member
-		unset($types[$enum_types->get_type_id('Former member')]);
+		unset($types[Member_Model::TYPE_FORMER]);
+		unset($types[Member_Model::TYPE_APPLICANT]);
 		
 		// regular member by default
 		$type_id = $enum_types->get_type_id('Regular member');
@@ -1352,7 +2291,7 @@ class Members_Controller extends Controller
 			$entrance_fee = 0;
 		
 		// countries
-		$arr_countries = ORM::factory('country')->select_list('id', 'country_name');
+		$arr_countries = ORM::factory('country')->where('enabled', 1)->select_list('id', 'country_name');
 		
 		// streets
 		$arr_streets = array
@@ -1368,7 +2307,7 @@ class Members_Controller extends Controller
 
 		// phone prefixes
 		$country_model = new Country_Model();
-		$phone_prefixes = $country_model->select_country_list();
+		$phone_prefixes = $country_model->select_country_code_list();
 
 		// form
 		$form = new Forge();
@@ -1399,11 +2338,23 @@ class Members_Controller extends Controller
 				->style('width:200px');
 		
 		$form->input('membername')
-				->label(__('Name of organization').':&nbsp;'.help::hint('member_name'))
+				->label('Name of organization')
+				->help(help::hint('member_name'))
 				->rules('length[1,60]');
 		
-		$form->input('organization_identifier')
-				->rules('length[3,20]');
+		// access control
+		if ($this->acl_check_new('Members_Controller', 'organization_id'))
+		{
+			$form->input('organization_identifier')
+					->rules('length[3,20]');
+		}
+		
+		// access control
+		if ($this->acl_check_new('Members_Controller', 'vat_organization_identifier'))
+		{
+			$form->input('vat_organization_identifier')
+					->rules('length[3,30]');
+		}
 
 		$form->group('Login data');
 		
@@ -1412,40 +2363,74 @@ class Members_Controller extends Controller
 				->rules('required|length[5,20]')
 				->callback(array($this, 'valid_username'));
 		
+		$pass_min_len = Settings::get('security_password_length');
+		
 		$form->password('password')
-				->label(__('Password').':&nbsp;'.help::hint('password'))
-				->rules('required|length[3,50]')
-				->class('password');
+				->label('Password')
+				->help(help::hint('password'))
+				->rules('required|length['.$pass_min_len.',50]')
+				->class('main_password');
 		
 		$form->password('confirm_password')
-				->rules('required|length[3,50]')
+				->rules('required|length['.$pass_min_len.',50]')
 				->matches($form->password);
 
 		$form->group('Address of connecting place');
 		
-		$form->dropdown('town_id')
-				->label('Town')
-				->rules('required')
-				->options($arr_towns)
-				->style('width:200px')
-				->add_button('towns');
+		$address_point_server_active = Address_points_Controller::is_address_point_server_active();
 		
-		$form->dropdown('street_id')
+		// If address database application is set show new form
+		if ($address_point_server_active)
+		{	
+			$form->dropdown('country_id')
+					->label('Country')
+					->rules('required')
+					->options($arr_countries)
+					->style('width:200px')
+					->selected(Settings::get('default_country'));
+			
+			$form->input('town')
+				->label(__('Town').' - '.__('District'))
+				->rules('required')
+				->class('join1');
+			
+			$form->input('district')
+				->class('join2');
+
+			$form->input('street')
 				->label('Street')
-				->options($arr_streets)
-				->style('width:200px')
-				->style('width:200px')
-				->add_button('streets');
-		
-		$form->input('street_number')
-				->rules('length[1,50]');
-		
-		$form->dropdown('country_id')
-				->label('Country')
-				->rules('required')
-				->options($arr_countries)
-				->style('width:200px')
-				->selected(Settings::get('default_country'));
+				->rules('required');
+						
+			$form->input('zip')
+				->label('Zip code')
+				->rules('required');
+		}
+		else
+		{
+			$form->dropdown('town_id')
+					->label('Town')
+					->rules('required')
+					->options($arr_towns)
+					->style('width:200px')
+					->add_button('towns');
+
+			$form->dropdown('street_id')
+					->label('Street')
+					->options($arr_streets)
+					->style('width:200px')
+					->style('width:200px')
+					->add_button('streets');
+
+			$form->input('street_number')
+					->rules('length[1,50]');
+
+			$form->dropdown('country_id')
+					->label('Country')
+					->rules('required')
+					->options($arr_countries)
+					->style('width:200px')
+					->selected(Settings::get('default_country'));
+		}
 		
 		$form->input('gpsx')
 				->label(__('GPS').'&nbsp;X:&nbsp;'.help::hint('gps_coordinates'))
@@ -1462,29 +2447,54 @@ class Members_Controller extends Controller
 						'Address of connecting place is different than address of domicile'
 				));
 		
-		$form->dropdown('domicile_town_id')
-				->label('Town')
-				->options($arr_towns)
-				->style('width:200px')
-				->add_button('towns');
-		
-		$form->dropdown('domicile_street_id')
-				->label('Street')
-				->options($arr_streets)
-				->style('width:200px')
-				->add_button('streets');
-		
-		$form->input('domicile_street_number')
-				->label('Street number')
-				->rules('length[1,50]')
-				->callback(array($this, 'valid_docimile_street_number'))
-				->style('width:200px');
-		
-		$form->dropdown('domicile_country_id')
-				->label('Country')
-				->options($arr_countries)
-				->selected(Settings::get('default_country'))
-				->style('width:200px');
+		// If address database application is set show new form
+		if ($address_point_server_active)
+		{	
+			$form->dropdown('domicile_country_id')
+					->label('Country')
+					->options($arr_countries)
+					->style('width:200px')
+					->selected(Settings::get('default_country'));
+			
+			$form->input('domicile_town')
+				->label(__('Town').' - '.__('District'))
+				->class('join1');
+			
+			$form->input('domicile_district')
+				->class('join2');
+
+			$form->input('domicile_street')
+				->label('Street');
+						
+			$form->input('domicile_zip')
+				->label('Zip code');
+		}
+		else
+		{
+			$form->dropdown('domicile_town_id')
+					->label('Town')
+					->options($arr_towns)
+					->style('width:200px')
+					->add_button('towns');
+
+			$form->dropdown('domicile_street_id')
+					->label('Street')
+					->options($arr_streets)
+					->style('width:200px')
+					->add_button('streets');
+
+			$form->input('domicile_street_number')
+					->label('Street number')
+					->rules('length[1,50]')
+					->callback(array($this, 'valid_docimile_street_number'))
+					->style('width:200px');
+
+			$form->dropdown('domicile_country_id')
+					->label('Country')
+					->options($arr_countries)
+					->selected(Settings::get('default_country'))
+					->style('width:200px');
+		}
 		
 		$form->input('domicile_gpsx')
 				->label(__('GPS').'&nbsp;X:&nbsp;'.help::hint('gps_coordinates'))
@@ -1497,48 +2507,71 @@ class Members_Controller extends Controller
 		$form->group('Contact information');
 		
 		$form->dropdown('phone_prefix')
-				->label('Telephone prefix')
+				->label('Phone')
 				->rules('required')
 				->options($phone_prefixes)
 				->selected(Settings::get('default_country'))
-				->style('width:200px');
+				->class('join1')
+				->style('width:70px');
 		
 		$form->input('phone')
 				->rules('required|length[9,40]')
-				->callback(array($this, 'valid_phone'));
+				->callback(array($this, 'valid_phone'))
+				->class('join2')
+				->style('width:180px');
 		
 		$form->input('email')
-				->rules('length[3,50]|valid_email');
+				->rules('valid_email')
+				->style('width:250px');
+		
+		if (Settings::get('finance_enabled'))
+		{
+			$form->group('Account information');
 
-		$form->group('Account information');
-		
-		$form->input('variable_symbol')
-				->label(__('Variable symbol').':&nbsp;'.help::hint('variable_symbol'))
-				->rules('required|length[1,10]')
-				->callback(array($this, 'valid_var_sym'));
-		
-		$form->input('entrance_fee')
-				->label(__('Entrance fee').':&nbsp;'.help::hint('entrance_fee'))
-				->rules('valid_numeric')
-				->value($entrance_fee);
-		
-		$form->input('debt_payment_rate')
-				->label(
-						__('Monthly instalment of entrance').
-						':&nbsp;'.help::hint('entrance_fee_instalment')
-				)
-				->rules('valid_numeric')
-				->value($entrance_fee);
+			$form->input('variable_symbol')
+					->label('Variable symbol')
+					->help(help::hint('variable_symbol'))
+					->rules('length[1,10]')
+					->class('join1')
+					->callback('Variable_Symbols_Controller::valid_var_sym');
+
+			if (Variable_Key_Generator::get_active_driver())
+			{
+				$form->checkbox('variable_symbol_generate')
+						->label('Generate automatically')
+						->checked(TRUE)
+						->class('join2')
+						->style('width:auto;margin-left:5px');
+			}
+			else
+			{
+				$form->variable_symbol->rules('required|length[1,10]');
+			}
+
+			$form->input('entrance_fee')
+					->label('Entrance fee')
+					->help(help::hint('entrance_fee'))
+					->rules('valid_numeric')
+					->value($entrance_fee);
+
+			$form->input('debt_payment_rate')
+					->label('Monthly instalment of entrance')
+					->help(help::hint('entrance_fee_instalment'))
+					->rules('valid_numeric')
+					->value($entrance_fee);
+		}
 		
 		$form->group('Additional information');
 		
-		$form->input('qos_ceil')
-				->label(__('QoS ceil') . ':&nbsp;' . help::hint('qos_ceil'))
-				->rules('valid_speed_size');
-		
-		$form->input('qos_rate')
-				->label(__('QoS rate') . ':&nbsp;' . help::hint('qos_rate'))
-				->rules('valid_speed_size');
+		$speed_class = new Speed_class_Model();
+		$speed_classes = array(NULL => '') + $speed_class->select_list();
+		$default_speed_class = $speed_class->get_members_default_class();
+			
+		$form->dropdown('speed_class')
+				->options($speed_classes)
+				->selected($default_speed_class ? $default_speed_class->id : NULL)
+				->add_button('speed_classes')
+				->style('width:200px');
 		
 		$form->date('birthday')
 				->label('Birthday')
@@ -1547,7 +2580,7 @@ class Members_Controller extends Controller
 		
 		$form->date('entrance_date')
 				->label('Entrance date')
-				->years(date('Y')-100, date('Y'))
+				->years($entrace_start_year)
 				->rules('required')
 				->callback(array($this, 'valid_entrance_date'));
 		
@@ -1561,298 +2594,413 @@ class Members_Controller extends Controller
 		{
 			$form_data = $form->as_array();
 			
-			// gps
-			$gpsx = NULL;
-			$gpsy = NULL;
+			$match = array();
+			$match2 = array();
 			
-			if (!empty($form_data['gpsx']) && !empty($form_data['gpsy']))
+			// validate address
+			if ($address_point_server_active &&
+				(
+					!Address_points_Controller::is_address_point_valid(
+						$form_data['country_id'],
+						$form_data['town'],
+						$form_data['district'],
+						$form_data['street'],
+						$form_data['zip']
+					) ||
+					!preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $form_data['street'], $match)
+				))
 			{
-				$gpsx = doubleval($form_data['gpsx']);
-				$gpsy = doubleval($form_data['gpsy']);
-
-				if (gps::is_valid_degrees_coordinate($form_data['gpsx']))
-				{
-					$gpsx = gps::degrees2real($form_data['gpsx']);
-				}
-
-				if (gps::is_valid_degrees_coordinate($form_data['gpsy']))
-				{
-					$gpsy = gps::degrees2real($form_data['gpsy']);
-				}
+				$form->street->add_error('required', __('Invalid address point.'));
 			}
-			
-			// gps domicicle
-			$domicile_gpsx = NULL;
-			$domicile_gpsy = NULL;
-			
-			if (!empty($form_data['domicile_gpsx']) && !empty($form_data['domicile_gpsy']))
+			else if ($form_data['use_domicile'] &&
+					$address_point_server_active &&
+					(
+					!Address_points_Controller::is_address_point_valid(
+						$form_data['domicile_country_id'],
+						$form_data['domicile_town'],
+						$form_data['domicile_district'],
+						$form_data['domicile_street'],
+						$form_data['domicile_zip']
+					) ||
+					!preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $form_data['domicile_street'], $match2)
+					))
 			{
-				$domicile_gpsx = doubleval($form_data['domicile_gpsx']);
-				$domicile_gpsy = doubleval($form_data['domicile_gpsy']);
-
-				if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsx']))
-				{
-					$domicile_gpsx = gps::degrees2real($form_data['domicile_gpsx']);
-				}
-
-				if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsy']))
-				{
-					$domicile_gpsy = gps::degrees2real($form_data['domicile_gpsy']);
-				}
+				$form->domicile_street->add_error('required', __('Invalid address point.'));
 			}
-
-			$member = new Member_Model();
-			
-			try
+			else
 			{
-				//$profiler = new Profiler();
-				// let's start safe transaction processing
-				$member->transaction_start();
-				
-				$user = new User_Model();
-				$account = new Account_Model();
-				$address_point_model = new Address_point_Model();
-				
-				$address_point = $address_point_model->get_address_point(
-						$form_data['country_id'], $form_data['town_id'],
-						$form_data['street_id'], $form_data['street_number'],
-						$gpsx, $gpsy
-				);
+				// street
+				if ($address_point_server_active)
+				{
+					$street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $form_data['street']));
 
-				// add address point if there is no such
-				if (!$address_point->id)
+					$number = $match[0];
+				}
+				if ($form_data['use_domicile'] &&
+					$address_point_server_active)
 				{
-					$address_point->save_throwable();
+					$domicile_street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $form_data['domicile_street']));
+
+					$domicile_number = $match2[0];
+				}
+				
+				// gps
+				$gpsx = NULL;
+				$gpsy = NULL;
+
+				if (!empty($form_data['gpsx']) && !empty($form_data['gpsy']))
+				{
+					$gpsx = doubleval($form_data['gpsx']);
+					$gpsy = doubleval($form_data['gpsy']);
+
+					if (gps::is_valid_degrees_coordinate($form_data['gpsx']))
+					{
+						$gpsx = gps::degrees2real($form_data['gpsx']);
+					}
+
+					if (gps::is_valid_degrees_coordinate($form_data['gpsy']))
+					{
+						$gpsy = gps::degrees2real($form_data['gpsy']);
+					}
 				}
 
-				// add GPS
-				if (!empty($gpsx) && !empty($gpsy))
-				{ // save
-					$address_point->update_gps_coordinates(
-							$address_point->id, $gpsx, $gpsy
-					);
-				}
-				else
-				{ // delete gps
-					$address_point->gps = '';
-					$address_point->save_throwable();
-				}
-				
-				$member->address_point_id = $address_point->id;
+				// gps domicicle
+				$domicile_gpsx = NULL;
+				$domicile_gpsy = NULL;
 
-				$account->account_attribute_id = Account_attribute_Model::CREDIT;
-				
-				if ($form_data['membername'] == '')
+				if (!empty($form_data['domicile_gpsx']) && !empty($form_data['domicile_gpsy']))
 				{
-					$account->name = $form_data['surname'].' '.$form_data['name'];
-				}
-				else
-				{
-					$account->name = $form_data['membername'];
-				}
-				
-				$user->name = $form_data['name'];
-				$user->middle_name = $form_data['middle_name'];
-				$user->login = $form_data['login'];
-				$user->surname = $form_data['surname'];
-				$user->pre_title = $form_data['title1'];
-				$user->post_title = $form_data['title2'];
-				$user->birthday	= date("Y-m-d",$form_data['birthday']);
-				$user->password	= sha1($form_data['password']);
-				$user->type = User_Model::MAIN_USER;
-				$user->application_password = security::generate_password();
-				
-				// id of user who added member
-				$member->user_id = $this->session->get('user_id');
-				$member->comment = $form_data['comment'];
-				
-				if ($form_data['membername'] == '')
-				{
-					$member->name = $form_data['name'].' '.$form_data['surname'];
-				}
-				else
-				{
-					$member->name = $form_data['membername'];
-				}
-				
-				$member->type = $form_data['type'];
-				$member->organization_identifier = $form_data['organization_identifier'];
-				$member->qos_ceil = $form_data['qos_ceil'];
-				$member->qos_rate = $form_data['qos_rate'];
-				$member->entrance_fee = $form_data['entrance_fee'];
-				$member->debt_payment_rate = $form_data['debt_payment_rate'];
-				
-				if ($member->type == Member_Model::TYPE_APPLICANT)
-				{
-					$member->entrance_date = NULL;
-				}
-				else
-				{
-					$member->entrance_date = date("Y-m-d",$form_data['entrance_date']);
-				}
-				
-				// saving member
-				$member->save_throwable();
-				
-				// saving user
-				$user->member_id = $member->id;
-				$user->save_throwable();
-				
-				// telephone
-				$contact_model = new Contact_Model();
-				
-				// search for contacts
-				$contact_id = $contact_model->find_contact_id(
-						Contact_Model::TYPE_PHONE, $form_data['phone']
-				);
-				
-				if ($contact_id)
-				{
-					$contact_model = ORM::factory('contact', $contact_id);
-					$contact_model->add($user);
-					$contact_model->save_throwable();
-				}
-				else
-				{ // add whole contact
-					$contact_model->type = Contact_Model::TYPE_PHONE;
-					$contact_model->value = $form_data['phone'];
-					$contact_model->save_throwable();
+					$domicile_gpsx = doubleval($form_data['domicile_gpsx']);
+					$domicile_gpsy = doubleval($form_data['domicile_gpsy']);
 
-					$contact_model->add($user);
-							
-					$phone_country = new Country_Model($form_data['phone_prefix']);
-					$contact_model->add($phone_country);
+					if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsx']))
+					{
+						$domicile_gpsx = gps::degrees2real($form_data['domicile_gpsx']);
+					}
 
-					$contact_model->save_throwable();
+					if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsy']))
+					{
+						$domicile_gpsy = gps::degrees2real($form_data['domicile_gpsy']);
+					}
 				}
-				
-				$contact_model->clear();
-				
-				// email
-				if (! empty($form_data['email']))
-				{
-					$contact_model->type = Contact_Model::TYPE_EMAIL;
-					$contact_model->value = $form_data['email'];
-					$contact_model->save_throwable();
-					$contact_model->add($user);
-					$contact_model->save_throwable();
-				}
-				
-				// saving account
-				$account->member_id	= $member->id;
-				$account->save_throwable();
-				
-				// saving variable symbol
-				$variable_symbol_model = new Variable_Symbol_Model();
-				$variable_symbol_model->account_id = $account->id;
-				$variable_symbol_model->variable_symbol = $form_data['variable_symbol'];
-				$variable_symbol_model->save_throwable();
 
-				// save allowed subnets count of member
-				$allowed_subnets_count = new Allowed_subnets_count_Model();
-				$allowed_subnets_count->member_id = $member->id;
-				$allowed_subnets_count->count = Settings::get('allowed_subnets_default_count');
-				$allowed_subnets_count->save();
+				$member = new Member_Model();
 
-				// address of connecting place is different than address of domicile
-				if ($form_data['use_domicile'])
+				try
 				{
-					$address_point = $address_point_model->get_address_point(
-							$form_data['domicile_country_id'],
-							$form_data['domicile_town_id'],
-							$form_data['domicile_street_id'],
-							$form_data['domicile_street_number'],
-							$domicile_gpsx, $domicile_gpsy
-					);
+					//$profiler = new Profiler();
+					// let's start safe transaction processing
+					$member->transaction_start();
+
+					$user = new User_Model();
+					$account = new Account_Model();
+					$address_point_model = new Address_point_Model();
+
+					if ($address_point_server_active)
+					{
+						$t = new Town_Model();
+						$s = new Street_Model();
+						$t_id = $t->get_town($form_data['zip'], $form_data['town'], $form_data['district'])->id;
+						$s_id = $s->get_street($street, $t_id)->id;
+
+						$address_point = $address_point_model->get_address_point($form_data['country_id'], $t_id, $s_id, $number,
+								$gpsx, $gpsy);
+					}
+					else
+					{
+						$address_point = $address_point_model->get_address_point(
+								$form_data['country_id'], $form_data['town_id'],
+								$form_data['street_id'], $form_data['street_number'],
+								$gpsx, $gpsy
+						);
+					}
 
 					// add address point if there is no such
 					if (!$address_point->id)
 					{
 						$address_point->save_throwable();
 					}
-					
-					// test if address of connecting place is really
-					// different than address of domicile
-					if ($member->address_point_id != $address_point->id)
+
+					// add GPS
+					if (!empty($gpsx) && !empty($gpsy))
+					{ // save
+						$address_point->update_gps_coordinates(
+								$address_point->id, $gpsx, $gpsy
+						);
+					}
+					else
+					{ // delete gps
+						$address_point->gps = '';
+						$address_point->save_throwable();
+					}
+
+					$member->address_point_id = $address_point->id;
+
+					$account->account_attribute_id = Account_attribute_Model::CREDIT;
+
+					if ($form_data['membername'] == '')
 					{
-						// add GPS
-						if (!empty($domicile_gpsx) && !empty($domicile_gpsy))
-						{ // save
-							$address_point->update_gps_coordinates(
-									$address_point->id, $domicile_gpsx,
-									$domicile_gpsy
+						$account->name = $form_data['surname'].' '.$form_data['name'];
+					}
+					else
+					{
+						$account->name = $form_data['membername'];
+					}
+
+					$user->name = $form_data['name'];
+					$user->middle_name = $form_data['middle_name'];
+					$user->login = $form_data['login'];
+					$user->surname = $form_data['surname'];
+					$user->pre_title = $form_data['title1'];
+					$user->post_title = $form_data['title2'];
+					$user->birthday	= date("Y-m-d",$form_data['birthday']);
+					$user->password	= sha1($form_data['password']);
+					$user->type = User_Model::MAIN_USER;
+					$user->application_password = security::generate_password();
+
+					// id of user who added member
+					$member->user_id = $this->session->get('user_id');
+					$member->comment = $form_data['comment'];
+
+					if ($form_data['membername'] == '')
+					{
+						$member->name = $form_data['name'].' '.$form_data['surname'];
+					}
+					else
+					{
+						$member->name = $form_data['membername'];
+					}
+
+					$member->type = $form_data['type'];
+
+					// access control
+					if ($this->acl_check_new('Members_Controller', 'organization_id'))
+					{
+						$member->organization_identifier = $form_data['organization_identifier'];
+					}
+
+					// access control
+					if ($this->acl_check_new('Members_Controller', 'vat_organization_identifier'))
+					{
+						$member->vat_organization_identifier = $form_data['vat_organization_identifier'];
+					}
+
+					$member->speed_class_id = $form_data['speed_class'];
+
+					if (Settings::get('finance_enabled'))
+					{
+						$member->entrance_fee = $form_data['entrance_fee'];
+						$member->debt_payment_rate = $form_data['debt_payment_rate'];
+					}
+
+					if ($member->type == Member_Model::TYPE_APPLICANT)
+					{
+						$member->entrance_date = NULL;
+					}
+					else
+					{
+						$member->entrance_date = date('Y-m-d', $form_data['entrance_date']);
+					}
+
+					// saving member
+					$member->save_throwable();
+
+					// saving user
+					$user->member_id = $member->id;
+					$user->save_throwable();
+
+					// telephone
+					$contact_model = new Contact_Model();
+
+					// search for contacts
+					$contact_id = $contact_model->find_contact_id(
+							Contact_Model::TYPE_PHONE, $form_data['phone']
+					);
+
+					if ($contact_id)
+					{
+						$contact_model = ORM::factory('contact', $contact_id);
+						$contact_model->add($user);
+						$contact_model->save_throwable();
+					}
+					else
+					{ // add whole contact
+						$contact_model->type = Contact_Model::TYPE_PHONE;
+						$contact_model->value = $form_data['phone'];
+						$contact_model->save_throwable();
+
+						$contact_model->add($user);
+
+						$phone_country = new Country_Model($form_data['phone_prefix']);
+						$contact_model->add($phone_country);
+
+						$contact_model->save_throwable();
+					}
+
+					$contact_model->clear();
+
+					// email
+					if (!empty($form_data['email']))
+					{
+						$contact_model->type = Contact_Model::TYPE_EMAIL;
+						$contact_model->value = $form_data['email'];
+						$contact_model->save_throwable();
+						$contact_model->add($user);
+						$contact_model->save_throwable();
+					}
+
+					// saving account
+					$account->member_id	= $member->id;
+					$account->save_throwable();
+
+					if (Settings::get('finance_enabled'))
+					{
+						// saving variable symbol
+						if (!isset($form_data['variable_symbol_generate']) ||
+							!$form_data['variable_symbol_generate'])
+						{
+							$var_sym = $form_data['variable_symbol'];
+						}
+						else
+						{
+							$var_sym = Variable_Key_Generator::factory()->generate($member->id);
+						}
+
+						if (empty($var_sym))
+						{
+							throw new Exception(__('Empty variable symbol.'));
+						}
+
+						$variable_symbol_model = new Variable_Symbol_Model();
+						$variable_symbol_model->account_id = $account->id;
+						$variable_symbol_model->variable_symbol = $var_sym;
+						$variable_symbol_model->save_throwable();
+					}
+
+					// save allowed subnets count of member
+					$allowed_subnets_count = new Allowed_subnets_count_Model();
+					$allowed_subnets_count->member_id = $member->id;
+					$allowed_subnets_count->count = Settings::get('allowed_subnets_default_count');
+					$allowed_subnets_count->save();
+
+					// address of connecting place is different than address of domicile
+					if ($form_data['use_domicile'])
+					{
+						if ($address_point_server_active)
+						{
+							$t = new Town_Model();
+							$s = new Street_Model();
+							$t_id = $t->get_town($form_data['domicile_zip'],
+												$form_data['domicile_town'],
+												$form_data['domicile_district'])->id;
+							$s_id = $s->get_street($domicile_street, $t_id)->id;
+
+							$address_point = $address_point_model->get_address_point(
+								$form_data['domicile_country_id'],
+								$t_id,
+								$s_id,
+								$domicile_number,
+								$domicile_gpsx, $domicile_gpsy
 							);
 						}
 						else
-						{ // delete gps
-							$address_point->gps = '';
+						{
+							$address_point = $address_point_model->get_address_point(
+									$form_data['domicile_country_id'],
+									$form_data['domicile_town_id'],
+									$form_data['domicile_street_id'],
+									$form_data['domicile_street_number'],
+									$domicile_gpsx, $domicile_gpsy
+							);
+						}
+
+						// add address point if there is no such
+						if (!$address_point->id)
+						{
 							$address_point->save_throwable();
 						}
-						// add domicicle
-						$members_domicile = new Members_domicile_Model();
-						$members_domicile->member_id = $member->id;
-						$members_domicile->address_point_id = $address_point->id;
-						$members_domicile->save_throwable();
+
+						// test if address of connecting place is really
+						// different than address of domicile
+						if ($member->address_point_id != $address_point->id)
+						{
+							// add GPS
+							if (!empty($domicile_gpsx) && !empty($domicile_gpsy))
+							{ // save
+								$address_point->update_gps_coordinates(
+										$address_point->id, $domicile_gpsx,
+										$domicile_gpsy
+								);
+							}
+							else
+							{ // delete gps
+								$address_point->gps = '';
+								$address_point->save_throwable();
+							}
+							// add domicicle
+							$members_domicile = new Members_domicile_Model();
+							$members_domicile->member_id = $member->id;
+							$members_domicile->address_point_id = $address_point->id;
+							$members_domicile->save_throwable();
+						}
 					}
+
+					// insert regular member access rights
+					$groups_aro_map = new Groups_aro_map_Model();
+					$groups_aro_map->aro_id = $user->id;
+					$groups_aro_map->group_id = Aro_group_Model::REGULAR_MEMBERS;
+					$groups_aro_map->save_throwable();
+
+					// reset post
+					unset($form_data);
+
+					// send welcome message to member
+					Mail_message_Model::create(
+							Member_Model::ASSOCIATION, $user->id,
+							mail_message::format('welcome_subject'),
+							mail_message::format('welcome'), 1
+					);
+
+					// commit transaction
+					$member->transaction_commit();
+					status::success('Member has been successfully added.');
+					
+					// add information about last added member by logged user
+					// for selecting member in dropdown for connection request
+					$this->session->set('last_added_member_id', $member->id);
+
+					// redirect
+					url::redirect('members/show/'.$member->id);
 				}
-
-				// insert regular member access rights
-				$groups_aro_map = new Groups_aro_map_Model();
-				$groups_aro_map->aro_id = $user->id;
-				$groups_aro_map->group_id = Aro_group_Model::REGULAR_MEMBERS;
-				$groups_aro_map->save_throwable();
-				
-				// reset post
-				unset($form_data);
-				
-				// send welcome message to member
-				$mail_message = new Mail_message_Model();
-				$mail_message->from_id = 1;
-				$mail_message->to_id = $user->id;
-				$mail_message->subject = mail_message::format('welcome_subject');
-				$mail_message->body = mail_message::format('welcome');
-				$mail_message->time = date('Y-m-d H:i:s');
-				$mail_message->from_deleted = 1;
-				$mail_message->save();
-				
-				// commit transaction
-				$member->transaction_commit();
-				status::success('Member has been successfully added.');
-				
-				// redirect
-				url::redirect('members/show/'.$member->id);
-			}
-			catch (Exception $e)
-			{
-				// rollback transaction
-				$member->transaction_rollback();
-				Log::add_exception($e);
-				status::error('Error - cant add new member.');
-				$this->redirect('members/show_all');
+				catch (Exception $e)
+				{
+					// rollback transaction
+					$member->transaction_rollback();
+					Log::add_exception($e);
+					status::error('Error - cant add new member.', $e);
+					$this->redirect('members/show_all');
+				}
 			}
 		}
-		else
-		{
-			$headline = __('Add new member');
+		
+		$headline = __('Add new member');
 
-			// breadcrumbs navigation			
-			$breadcrumbs = breadcrumbs::add()
-					->link('members/show_all', 'Members',
-							$this->acl_check_view(get_class($this),'members'))
-					->disable_translation()
-					->text($headline);
+		// breadcrumbs navigation			
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view(get_class($this),'members'))
+				->disable_translation()
+				->text($headline);
 
-			// view
-			$view = new View('main');
-			$view->breadcrumbs = $breadcrumbs->html();
-			$view->title = $headline;
-			$view->content = new View('form');
-			$view->content->headline = $headline;
-			$view->content->form = $form->html();
-			$view->content->link_back = '';
-			$view->render(TRUE);
-		}
-
+		// view
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $headline;
+		$view->content = new View('form');
+		$view->content->headline = $headline;
+		$view->content->form = $form->html();
+		$view->content->link_back = '';
+		$view->render(TRUE);
 	} // end of add function
 
 	/**
@@ -1873,19 +3021,41 @@ class Members_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_edit(get_class($this), 'members', $member->id))
+		if ($member->type == Member_Model::TYPE_FORMER || 
+			!$this->acl_check_edit(get_class($this), 'members', $member->id))
 			Controller::error(ACCESS);
 
 		$this->_member_id = $member->id;
+		
+		// start entrance date
+		$entrace_start_year = date('Y') - 100;
+		$entrace_start_month = 1;
+		$entrace_start_day = 1;
+		
+		if ($member->id != Member_Model::ASSOCIATION)
+		{
+			$association = new Member_Model(Member_Model::ASSOCIATION);
+			$entrace_start_year = date('Y', strtotime($association->entrance_date));
+			$entrace_start_month = date('m', strtotime($association->entrance_date));
+			$entrace_start_day = date('d', strtotime($association->entrance_date));
+		}
 
 		// countries
-		$arr_countries = ORM::factory('country')->select_list('id', 'country_name');
+		$arr_countries = ORM::factory('country')->where('enabled', 1)->select_list('id', 'country_name');
+		$arr_countries = $arr_countries + ORM::factory('country')->where('id', $member->address_point->country_id)->select_list('id', 'country_name');
 		
 		// streets
+		// loads all streets if GET parametr with name 'street_id' exists.
+		// otherwise it loads just streets for selected town (request #614)
 		$arr_streets = array
 		(
 			NULL => '--- ' . __('Without street') . ' ---'
-		) + $member->address_point->town->streets->select_list('id', 'street');
+		);
+		
+		if (array_key_exists('street_id', $_GET))
+			$arr_streets += ORM::factory('street')->select_list('id', 'street');
+		else 
+			$arr_streets += $member->address_point->town->streets->select_list('id', 'street');
 		
 		// streets
 		$arr_domicile_streets = array
@@ -1900,8 +3070,6 @@ class Members_Controller extends Controller
 		) + ORM::factory('town')->select_list_with_quater();
 
 		// engineers
-		$member = new Member_Model($member_id);
-		
 		$concat = "CONCAT(
 				COALESCE(surname, ''), ' ',
 				COALESCE(name, ''), ' - ',
@@ -1928,11 +3096,13 @@ class Members_Controller extends Controller
 					->value($member->name);
 		}
 		
-		if ($this->acl_check_edit(get_class($this),'type',$member->id))
+		if ($this->acl_check_edit(get_class($this),'type',$member->id) &&
+			$member->type != Member_Model::TYPE_APPLICANT)
 		{
 			$enum_type_model = new Enum_type_Model();
 			$types = $enum_type_model->get_values(Enum_type_Model::MEMBER_TYPE_ID);
-			unset($types[$enum_type_model->get_type_id('Former member')]);
+			unset($types[Member_Model::TYPE_FORMER]);
+			unset($types[Member_Model::TYPE_APPLICANT]);
 			
 			$form->dropdown('type')
 					->options($types)
@@ -1941,11 +3111,20 @@ class Members_Controller extends Controller
 					->style('width:200px');
 		}
 		
-		if ($this->acl_check_edit(get_class($this), 'organization_id', $member->id))
+		// access control
+		if ($this->acl_check_edit('Members_Controller', 'organization_id', $member->id))
 		{
 			$form->input('organization_identifier')
 					->rules('length[3,20]')
 					->value($member->organization_identifier);
+		}
+		
+		// access control
+		if ($this->acl_check_edit('Members_Controller', 'vat_organization_identifier', $member->id))
+		{
+			$form->input('vat_organization_identifier')
+					->rules('length[3,20]')
+					->value($member->vat_organization_identifier);
 		}
 			
 		if ($this->acl_check_edit(get_class($this), 'address', $member->id))
@@ -1986,31 +3165,69 @@ class Members_Controller extends Controller
 			
 			$form->group('Address of connecting place');
 			
-			$form->dropdown('town_id')
-					->label('Town')
+			$address_point_server_active = Address_points_Controller::is_address_point_server_active();
+		
+			// If address database application is set show new form
+			if ($address_point_server_active)
+			{	
+				$form->dropdown('country_id')
+						->label('Country')
+						->rules('required')
+						->options($arr_countries)
+						->style('width:200px')
+						->selected($member->address_point->country_id);
+
+				$form->input('town')
+					->label(__('Town').' - '.__('District'))
 					->rules('required')
-					->options($arr_towns)
-					->selected($member->address_point->town_id)
-					->style('width:200px')
-					->add_button('towns');
-			
-			$form->dropdown('street_id')
+					->class('join1')
+					->value($member->address_point->town->town);
+
+				$form->input('district')
+					->class('join2')
+					->value(($member->address_point->town->quarter !== NULL ? $member->address_point->town->quarter : $member->address_point->town->town));
+
+				$form->input('street')
 					->label('Street')
-					->options($arr_streets)
-					->selected($member->address_point->street_id)
-					->style('width:200px')
-					->add_button('streets');
-			
-			$form->input('street_number')
-					->rules('length[1,50]')
-					->value($member->address_point->street_number);
-			
-			$form->dropdown('country_id')
-					->label('Country')
 					->rules('required')
-					->options($arr_countries)
-					->selected($member->address_point->country_id)
-					->style('width:200px');
+					->value(($member->address_point->street != NULL ?
+						$member->address_point->street->street." ".$member->address_point->street_number :
+						$member->address_point->street_number)
+					);
+
+				$form->input('zip')
+					->label('Zip code')
+					->rules('required')
+					->value($member->address_point->town->zip_code);
+			}
+			else
+			{
+				$form->dropdown('town_id')
+						->label('Town')
+						->rules('required')
+						->options($arr_towns)
+						->selected($member->address_point->town_id)
+						->style('width:200px')
+						->add_button('towns');
+
+				$form->dropdown('street_id')
+						->label('Street')
+						->options($arr_streets)
+						->selected($member->address_point->street_id)
+						->style('width:200px')
+						->add_button('streets');
+
+				$form->input('street_number')
+						->rules('length[1,50]')
+						->value($member->address_point->street_number);
+
+				$form->dropdown('country_id')
+						->label('Country')
+						->rules('required')
+						->options($arr_countries)
+						->selected($member->address_point->country_id)
+						->style('width:200px');
+			}
 		
 			$form->input('gpsx')
 					->label(__('GPS').'&nbsp;X:&nbsp;'.help::hint('gps_coordinates'))
@@ -2027,38 +3244,71 @@ class Members_Controller extends Controller
 			$form->checkbox('use_domicile')
 					->label('Address of connecting place is different than address of domicile')
 					->checked((bool) $member->members_domicile->id);
-					
-			$form->dropdown('domicile_town_id')
-					->label('Town')
-					->options($arr_towns)
-					->selected($member->members_domicile->address_point->town_id)
-					->style('width:200px')
-					->add_button('towns');
 			
-			$form->dropdown('domicile_street_id')
+			// If address database application is set show new form
+			if ($address_point_server_active)
+			{
+				$form->dropdown('domicile_country_id')
+						->label('Country')
+						->options($arr_countries)
+						->style('width:200px')
+						->selected(($member->members_domicile->id != 0 ? $member->members_domicile->address_point->country_id : Settings::get('default_country')));
+
+				$form->input('domicile_town')
+					->label(__('Town').' - '.__('District'))
+					->class('join1')
+					->value($member->members_domicile->address_point->town->town);
+
+				$form->input('domicile_district')
+					->class('join2')
+					->value(($member->members_domicile->address_point->town->quarter !== NULL ?
+						$member->members_domicile->address_point->town->quarter :
+						$member->members_domicile->address_point->town->town)
+					);
+
+				$form->input('domicile_street')
 					->label('Street')
-					->options($arr_domicile_streets)
-					->selected($member->members_domicile->address_point->street_id)
-					->style('width:200px')
-					->add_button('streets');
-			
-			$form->input('domicile_street_number')
-					->label('Street number')
-					->rules('length[1,50]')
-					->value($member->members_domicile->address_point->street_number)
-					->callback(array($this, 'valid_docimile_street_number'));
-			
-			$form->dropdown('domicile_country_id')
-					->label('Country')
-					->rules('required')
-					->options($arr_countries)
-					->selected($member->members_domicile->address_point->country_id)
-					->style('width:200px');	
-		
-			$form->dropdown('domicile_country_id')
-					->label('Street')
-					->options($arr_countries)
-					->selected(Settings::get('default_country'));
+					->value(($member->members_domicile->address_point->street != NULL ?
+							$member->members_domicile->address_point->street->street .
+								($member->members_domicile->address_point->street_number != NULL ?
+								" ".$member->members_domicile->address_point->street_number :
+								""
+								) :
+							$member->members_domicile->address_point->street_number)
+					);
+
+				$form->input('domicile_zip')
+					->label('Zip code')
+					->value($member->members_domicile->address_point->town->zip_code);
+			}
+			else
+			{
+				$form->dropdown('domicile_town_id')
+						->label('Town')
+						->options($arr_towns)
+						->selected($member->members_domicile->address_point->town_id)
+						->style('width:200px')
+						->add_button('towns');
+
+				$form->dropdown('domicile_street_id')
+						->label('Street')
+						->options($arr_domicile_streets)
+						->selected($member->members_domicile->address_point->street_id)
+						->style('width:200px')
+						->add_button('streets');
+
+				$form->input('domicile_street_number')
+						->label('Street number')
+						->rules('length[1,50]')
+						->value($member->members_domicile->address_point->street_number)
+						->callback(array($this, 'valid_docimile_street_number'));
+
+				$form->dropdown('domicile_country_id')
+						->label('Country')
+						->options($arr_countries)
+						->selected(($member->members_domicile->id != 0 ? $member->members_domicile->address_point->country_id : Settings::get('default_country')))
+						->style('width:200px');
+			}
 
 			$form->input('domicile_gpsx')
 					->label(__('GPS').'&nbsp;X:&nbsp;'.help::hint('gps_coordinates'))
@@ -2070,57 +3320,57 @@ class Members_Controller extends Controller
 					->rules('gps')
 					->value($domicile_gpsy);
 		}
-
-		$form->group('Account information');
 		
-		if ($this->acl_check_edit(get_class($this), 'en_fee', $member->id))
+		if (Settings::get('finance_enabled'))
 		{
-			$form->input('entrance_fee')
-					->label(
-							__('Entrance fee').
-							':&nbsp;'.help::hint('entrance_fee')
-					)
-					->rules('valid_numeric')
-					->value($member->entrance_fee);
-		}
-		if ($this->acl_check_edit(get_class($this),'debit', $member->id))
-		{
-			$form->input('debt_payment_rate')
-					->label(__('Monthly instalment of entrance')
-							. ':&nbsp;'.help::hint('entrance_fee_instalment'))
-					->rules('valid_numeric')
-					->value($member->debt_payment_rate);
+			$form->group('Account information');
+
+			if ($this->acl_check_edit(get_class($this), 'en_fee', $member->id))
+			{
+				$form->input('entrance_fee')
+						->label('Entrance fee')
+						->help(help::hint('entrance_fee'))
+						->rules('valid_numeric')
+						->value($member->entrance_fee);
+			}
+			if ($this->acl_check_edit(get_class($this),'debit', $member->id))
+			{
+				$form->input('debt_payment_rate')
+						->label('Monthly instalment of entrance')
+						->help(help::hint('entrance_fee_instalment'))
+						->rules('valid_numeric')
+						->value($member->debt_payment_rate);
+			}
 		}
 		// additional information
 		$form->group('Additional information');
 		
-		if ($this->acl_check_edit(get_class($this), 'qos_ceil', $member->id))
+		if ($this->acl_check_edit(get_class($this), 'qos_ceil', $member->id) &&
+			$this->acl_check_edit(get_class($this), 'qos_rate', $member->id))
 		{
-			$form->input('qos_ceil')
-					->label(__('QOS ceil') . ':&nbsp;' . help::hint('qos_ceil'))
-					->rules('valid_speed_size')
-					->value($member->qos_ceil);
-		}
-		
-		if ($this->acl_check_edit(get_class($this),'qos_rate', $member->id))
-		{
-			$form->input('qos_rate')
-					->label(__('QOS rate') . ':&nbsp;' . help::hint('qos_rate'))
-					->rules('valid_speed_size')
-					->value($member->qos_rate);
+			$speed_classes = array(NULL => '') + ORM::factory('speed_class')->select_list();
+			
+			$form->dropdown('speed_class')
+					->options($speed_classes)
+					->selected($member->speed_class_id)
+					->add_button('speed_classes')
+					->style('width:200px');
 		}
 		
 		$form->input('allowed_subnets_count')
-				->label(__('Count of allowed subnets')
-						. ': '.help::hint('allowed_subnets_count'))
+				->label('Count of allowed subnets')
+				->help(help::hint('allowed_subnets_count'))
 				->rules('valid_numeric')
 				->value($allowed_subnets_count);
 		
-		if ($this->acl_check_edit(get_class($this), 'entrance_date', $member->id))
+		if ($this->acl_check_edit(get_class($this), 'entrance_date', $member->id) &&
+			$member->type != Member_Model::TYPE_APPLICANT)
 		{
 			$form->date('entrance_date')
 					->label('Entrance date')
-					->years(date('Y')-100, date('Y'))
+					->years($entrace_start_year)
+					->months($entrace_start_month)
+					->days($entrace_start_day)
 					->rules('required')
 					->value(strtotime($member->entrance_date));
 		}
@@ -2172,314 +3422,480 @@ class Members_Controller extends Controller
 		{
 			$form_data = $form->as_array();
 			
-			// gps
-			$gpsx = NULL;
-			$gpsy = NULL;
+			$match = array();
+			$match2 = array();
 			
-			if (!empty($form_data['gpsx']) && !empty($form_data['gpsy']))
+			// validate address
+			if ($address_point_server_active &&
+				(
+					!Address_points_Controller::is_address_point_valid(
+						$form_data['country_id'],
+						$form_data['town'],
+						$form_data['district'],
+						$form_data['street'],
+						$form_data['zip']
+					) ||
+					!preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $form_data['street'], $match)
+				))
 			{
-				$gpsx = doubleval($form_data['gpsx']);
-				$gpsy = doubleval($form_data['gpsy']);
-
-				if (gps::is_valid_degrees_coordinate($form_data['gpsx']))
-				{
-					$gpsx = gps::degrees2real($form_data['gpsx']);
-				}
-
-				if (gps::is_valid_degrees_coordinate($form_data['gpsy']))
-				{
-					$gpsy = gps::degrees2real($form_data['gpsy']);
-				}
+				$form->street->add_error('required', __('Invalid address point.'));
 			}
-			
-			// gps domicicle
-			$domicile_gpsx = NULL;
-			$domicile_gpsy = NULL;
-			
-			if (!empty($form_data['domicile_gpsx']) && !empty($form_data['domicile_gpsy']))
+			else if ($form_data['use_domicile'] &&
+					$address_point_server_active &&
+					(
+					!Address_points_Controller::is_address_point_valid(
+						$form_data['domicile_country_id'],
+						$form_data['domicile_town'],
+						$form_data['domicile_district'],
+						$form_data['domicile_street'],
+						$form_data['domicile_zip']
+					) ||
+					!preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $form_data['domicile_street'], $match2)
+					))
 			{
-				$domicile_gpsx = doubleval($form_data['domicile_gpsx']);
-				$domicile_gpsy = doubleval($form_data['domicile_gpsy']);
-
-				if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsx']))
-				{
-					$domicile_gpsx = gps::degrees2real($form_data['domicile_gpsx']);
-				}
-
-				if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsy']))
-				{
-					$domicile_gpsy = gps::degrees2real($form_data['domicile_gpsy']);
-				}
-			}
-
-			// find member
-			$member = new Member_Model($member_id);
-
-			// access control
-			if ($this->acl_check_edit(get_class($this),'address',$member_id))
-			{
-				// find his address point
-				$address_point_model = new Address_point_Model();
-
-				$address_point = $address_point_model->get_address_point(
-						$form_data['country_id'], $form_data['town_id'],
-						$form_data['street_id'], $form_data['street_number'],
-						$gpsx, $gpsy
-				);
-				
-				// add address point if there is no such
-				if (!$address_point->id)
-				{
-					// save
-					$address_point->save();
-				}
-				// new address point
-				if ($address_point->id != $member->address_point_id)
-				{
-					// delete old?
-					$addr_id = $member->address_point->id;
-					// add to member
-					$member->address_point_id = $address_point->id;
-					$member->save();
-					// change just for this device?
-					if ($address_point->count_all_items_by_address_point_id($addr_id) < 1)
-					{
-						$addr = new Address_point_Model($addr_id);
-						$addr->delete();
-					}
-				}
-
-				// add GPS
-				if (!empty($gpsx) && !empty($gpsy))
-				{ // save
-					$address_point->update_gps_coordinates(
-							$address_point->id, $gpsx, $gpsy
-					);
-				}
-				else
-				{ // delete gps
-					$address_point->gps = '';
-					$address_point->save();
-				}
-
-				// address of connecting place is different than address of domicile
-				if ($form_data['use_domicile'])
-				{
-					$address_point = $address_point_model->get_address_point(
-							$form_data['domicile_country_id'],
-							$form_data['domicile_town_id'],
-							$form_data['domicile_street_id'],
-							$form_data['domicile_street_number'],
-							$domicile_gpsx, $domicile_gpsy
-					);
-					
-					// add address point if there is no such
-					if (!$address_point->id)
-					{
-						// save
-						$address_point->save();
-					}
-					// new address point
-					if ($address_point->id != $member->members_domicile->address_point_id)
-					{
-						// delete old?
-						$addr_id = $member->members_domicile->address_point->id;
-						// add to memeber
-						$member->members_domicile->member_id = $member->id;
-						$member->members_domicile->address_point_id = $address_point->id;
-						$member->members_domicile->save();
-						// change just for this device?
-						if (!empty($addr_id) &&
-							$address_point->count_all_items_by_address_point_id($addr_id) < 1)
-						{
-							ORM::factory('address_point')->delete($addr_id);
-						}
-					}
-
-					// add GPS
-					if (!empty($domicile_gpsx) && !empty($domicile_gpsy))
-					{ // save
-						$address_point->update_gps_coordinates(
-								$address_point->id, $domicile_gpsx, $domicile_gpsy
-						);
-					}
-					else
-					{ // delete gps
-						$address_point->gps = '';
-						$address_point->save();
-					}
-				}
-				// address of connecting place is same as address of domicile
-				else if ($member->members_domicile)
-				{
-					$addrp_id = $member->members_domicile->address_point_id;
-					$member->members_domicile->delete();
-					
-					// delete orphan address point
-					if ($address_point_model->count_all_items_by_address_point_id(
-							$addrp_id
-						) < 1)
-					{
-						ORM::factory('address_point')->delete($addrp_id);
-					}
-				}
-				// removes duplicity
-				if (($member->members_domicile->address_point_id == $member->address_point_id) &&
-					$member->members_domicile)
-				{
-					$member->members_domicile->delete();
-				}
-			}
-
-			if ($this->acl_check_edit(get_class($this),'type',$member->id))
-			{
-				if ($member->type != $form_data['type'])
-				{
-					// change gacl rights for applicant (registration)
-					// required after self registration
-					if ($member->type == Member_Model::TYPE_APPLICANT)
-					{
-						$group_aro_map = new Groups_aro_map_Model();
-						
-						// if is not member yet
-						if (!$group_aro_map->exist_row(
-								Aro_group_Model::REGULAR_MEMBERS, $member->user_id
-							))
-						{
-							// delete rights of applicant
-							$group_aro_map->detete_row(
-									Aro_group_Model::REGISTERED_APPLICANTS,
-									$member->user_id
-							);							
-							
-							// insert regular member access rights
-							$groups_aro_map = new Groups_aro_map_Model();
-							$groups_aro_map->aro_id = $member->user_id;
-							$groups_aro_map->group_id = Aro_group_Model::REGULAR_MEMBERS;
-							$groups_aro_map->save();
-						}
-						
-						// send email message about approval
-						$contact = new Contact_Model();
-						$emails = $contact->find_all_users_contacts(
-								$member->user->id, Contact_Model::TYPE_EMAIL
-						);
-						
-						if ($emails && $emails->count())
-						{
-							$to = $emails->current()->value;
-							$from = Settings::get('email_default_email');
-							$subject = 'Registration confirm';
-							$message = 'Your registration to FreenetIS has been confirmed';
-							
-							try
-							{
-								email::send($to, $from, $subject, $message);
-							}
-							catch (Exception $e)
-							{
-								$m = __('Error - cannot send ' .
-										'email to applicant about approval of membership'
-								) . '<br>' . __('Error') .
-								': ' . $e->getMessage();
-								
-								status::error($m, FALSE);
-							}
-						}
-						
-					}
-					$member->type = $form_data['type'];
-				}
-			}
-
-			if ($this->acl_check_edit(get_class($this), 'organization_id', $member->id))
-				$member->organization_identifier = $form_data['organization_identifier'];
-
-			if ($this->acl_check_edit(get_class($this),'locked',$member->id) && 
-				$member->id != 1)
-			{
-				$member->locked = $form_data['locked'];
-			}
-			
-			if ($member->id != Member_Model::ASSOCIATION &&
-				$this->acl_check_edit('Members_Controller', 'registration', $member->id))
-			{
-				$member->registration = $form_data['registration'];
-			}
-
-			if ($this->acl_check_edit('Members_Controller', 'user_id'))
-				$member->user_id = $form_data['user_id'];
-
-			if ($this->acl_check_edit(get_class($this),'comment',$member->id))
-				$member->comment = $form_data['comment'];
-
-			// member data
-			if ($this->acl_check_edit(get_class($this),'entrance_date',$member->id))
-			{
-				if ($member->type == Member_Model::TYPE_APPLICANT)
-					$member->entrance_date = NULL;
-				else
-					$member->entrance_date = date("Y-m-d",$form_data['entrance_date']);
-			}
-
-			if ($this->acl_check_edit(get_class($this),'name',$member->id))
-				$member->name = $form_data['membername'];
-
-			if ($this->acl_check_edit(get_class($this),'qos_ceil',$member->id))
-				$member->qos_ceil = $form_data['qos_ceil'];
-
-			if ($this->acl_check_edit(get_class($this),'qos_rate',$member->id))
-				$member->qos_rate = $form_data['qos_rate'];
-
-			if ($this->acl_check_edit(get_class($this),'en_fee',$member->id))
-				$member->entrance_fee = $form_data['entrance_fee'];
-
-			if ($this->acl_check_edit(get_class($this),'debit',$member->id))
-				$member->debt_payment_rate = $form_data['debt_payment_rate'];
-
-			$member_saved = $member->save();
-
-			unset($form_data);
-			
-			if ($member_saved)
-			{
-				status::success('Member has been successfully updated.');
+				$form->domicile_street->add_error('required', __('Invalid address point.'));
 			}
 			else
 			{
-				status::error('Error - cant update member.');
+				try
+				{
+					// street
+					if ($address_point_server_active)
+					{
+						$street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $form_data['street']));
+
+						$number = $match[0];
+					}
+					if ($form_data['use_domicile'] &&
+						$address_point_server_active)
+					{
+						$domicile_street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $form_data['domicile_street']));
+
+						$domicile_number = $match2[0];
+					}
+					
+					$member->transaction_start();
+
+					// gps
+					$gpsx = NULL;
+					$gpsy = NULL;
+
+					if (!empty($form_data['gpsx']) && !empty($form_data['gpsy']))
+					{
+						$gpsx = doubleval($form_data['gpsx']);
+						$gpsy = doubleval($form_data['gpsy']);
+
+						if (gps::is_valid_degrees_coordinate($form_data['gpsx']))
+						{
+							$gpsx = gps::degrees2real($form_data['gpsx']);
+						}
+
+						if (gps::is_valid_degrees_coordinate($form_data['gpsy']))
+						{
+							$gpsy = gps::degrees2real($form_data['gpsy']);
+						}
+					}
+
+					// gps domicicle
+					$domicile_gpsx = NULL;
+					$domicile_gpsy = NULL;
+
+					if (!empty($form_data['domicile_gpsx']) && !empty($form_data['domicile_gpsy']))
+					{
+						$domicile_gpsx = doubleval($form_data['domicile_gpsx']);
+						$domicile_gpsy = doubleval($form_data['domicile_gpsy']);
+
+						if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsx']))
+						{
+							$domicile_gpsx = gps::degrees2real($form_data['domicile_gpsx']);
+						}
+
+						if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsy']))
+						{
+							$domicile_gpsy = gps::degrees2real($form_data['domicile_gpsy']);
+						}
+					}
+
+					// access control
+					if ($this->acl_check_edit(get_class($this),'address',$member_id))
+					{
+						// find his address point
+						$address_point_model = new Address_point_Model();
+
+						if ($address_point_server_active)
+						{
+							$t = new Town_Model();
+							$s = new Street_Model();
+							$t_id = $t->get_town($form_data['zip'], $form_data['town'], $form_data['district'])->id;
+							$s_id = $s->get_street($street, $t_id)->id;
+
+							$address_point = $address_point_model->get_address_point($form_data['country_id'], $t_id, $s_id, $number,
+									$gpsx, $gpsy);
+						}
+						else
+						{
+							$address_point = $address_point_model->get_address_point(
+									$form_data['country_id'], $form_data['town_id'],
+									$form_data['street_id'], $form_data['street_number'],
+									$gpsx, $gpsy
+							);
+						}
+
+						// add address point if there is no such
+						if (!$address_point->id)
+						{
+							// save
+							$address_point->save();
+						}
+						// new address point
+						if ($address_point->id != $member->address_point_id)
+						{
+							// delete old?
+							$addr_id = $member->address_point->id;
+							// add to member
+							$member->address_point_id = $address_point->id;
+							$member->save();
+							// change just for this device?
+							if ($address_point->count_all_items_by_address_point_id($addr_id) < 1)
+							{
+								$addr = new Address_point_Model($addr_id);
+								$addr->delete();
+							}
+						}
+
+						// add GPS
+						if (!empty($gpsx) && !empty($gpsy))
+						{ // save
+							$address_point->update_gps_coordinates(
+									$address_point->id, $gpsx, $gpsy
+							);
+						}
+						else
+						{ // delete gps
+							$address_point->gps = '';
+							$address_point->save();
+						}
+
+						// address of connecting place is different than address of domicile
+						if ($form_data['use_domicile'])
+						{
+							if ($address_point_server_active)
+							{
+								$t = new Town_Model();
+								$s = new Street_Model();
+								$t_id = $t->get_town($form_data['domicile_zip'],
+													$form_data['domicile_town'],
+													$form_data['domicile_district'])->id;
+								$s_id = $s->get_street($domicile_street, $t_id)->id;
+
+								$address_point = $address_point_model->get_address_point(
+									$form_data['domicile_country_id'],
+									$t_id,
+									$s_id,
+									$domicile_number,
+									$domicile_gpsx, $domicile_gpsy
+								);
+							}
+							else
+							{
+								$address_point = $address_point_model->get_address_point(
+										$form_data['domicile_country_id'],
+										$form_data['domicile_town_id'],
+										$form_data['domicile_street_id'],
+										$form_data['domicile_street_number'],
+										$domicile_gpsx, $domicile_gpsy
+								);
+							}
+
+							// add address point if there is no such
+							if (!$address_point->id)
+							{
+								// save
+								$address_point->save();
+							}
+							// new address point
+							if ($address_point->id != $member->members_domicile->address_point_id)
+							{
+								// delete old?
+								$addr_id = $member->members_domicile->address_point->id;
+								// add to memeber
+								$member->members_domicile->member_id = $member->id;
+								$member->members_domicile->address_point_id = $address_point->id;
+								$member->members_domicile->save();
+								// change just for this device?
+								if (!empty($addr_id) &&
+									$address_point->count_all_items_by_address_point_id($addr_id) < 1)
+								{
+									ORM::factory('address_point')->delete($addr_id);
+								}
+							}
+
+							// add GPS
+							if (!empty($domicile_gpsx) && !empty($domicile_gpsy))
+							{ // save
+								$address_point->update_gps_coordinates(
+										$address_point->id, $domicile_gpsx, $domicile_gpsy
+								);
+							}
+							else
+							{ // delete gps
+								$address_point->gps = '';
+								$address_point->save();
+							}
+						}
+						// address of connecting place is same as address of domicile
+						else if ($member->members_domicile)
+						{
+							$addrp_id = $member->members_domicile->address_point_id;
+							$member->members_domicile->delete();
+
+							// delete orphan address point
+							if ($address_point_model->count_all_items_by_address_point_id(
+									$addrp_id
+								) < 1)
+							{
+								ORM::factory('address_point')->delete($addrp_id);
+							}
+						}
+						// removes duplicity
+						if (($member->members_domicile->address_point_id == $member->address_point_id) &&
+							$member->members_domicile)
+						{
+							$member->members_domicile->delete();
+						}
+					}
+
+					if ($this->acl_check_edit(get_class($this),'type',$member->id) &&
+						$member->type != Member_Model::TYPE_APPLICANT &&
+						$form_data['type'] != Member_Model::TYPE_APPLICANT)
+					{
+						$member->type = $form_data['type'];
+					}
+
+					// access control
+					if ($this->acl_check_edit('Members_Controller', 'organization_id', $member->id))
+					{
+						$member->organization_identifier = $form_data['organization_identifier'];
+					}
+
+					// access control
+					if ($this->acl_check_edit('Members_Controller', 'vat_organization_identifier', $member->id))
+					{
+						$member->vat_organization_identifier = $form_data['vat_organization_identifier'];
+					}
+
+					if ($this->acl_check_edit(get_class($this),'locked',$member->id) && 
+						$member->id != Member_Model::ASSOCIATION)
+					{
+						$member->locked = $form_data['locked'];
+					}
+
+					if ($member->id != Member_Model::ASSOCIATION &&
+						$this->acl_check_edit('Members_Controller', 'registration', $member->id))
+					{
+						$member->registration = $form_data['registration'];
+					}
+
+					if ($this->acl_check_edit('Members_Controller', 'user_id'))
+						$member->user_id = $form_data['user_id'];
+
+					if ($this->acl_check_edit(get_class($this),'comment',$member->id))
+						$member->comment = $form_data['comment'];
+
+					$entrance_date_changed = FALSE;
+
+					// member data
+					if ($this->acl_check_edit(get_class($this),'entrance_date',$member->id))
+					{
+						if ($member->type != Member_Model::TYPE_APPLICANT)
+						{
+							$entrance_date_changed = ($member->entrance_date != date("Y-m-d",$form_data['entrance_date']));
+							$member->entrance_date = date("Y-m-d",$form_data['entrance_date']);
+						}
+						else
+							$member->entrance_date = NULL;
+					}
+
+					if ($this->acl_check_edit(get_class($this),'name',$member->id))
+						$member->name = $form_data['membername'];
+
+					if ($this->acl_check_edit(get_class($this), 'qos_ceil',$member->id) &&
+						$this->acl_check_edit(get_class($this), 'qos_rate',$member->id))
+						$member->speed_class_id = $form_data['speed_class'];
+
+					if (Settings::get('finance_enabled'))
+					{
+						$entrance_fee_changed = FALSE;
+
+						if ($this->acl_check_edit(get_class($this),'en_fee',$member->id))
+						{
+							$entrance_fee_changed = ($member->entrance_fee != $form_data['entrance_fee']);
+
+							$member->entrance_fee = $form_data['entrance_fee'];
+						}
+
+						$debt_payment_rate_changed = FALSE;
+
+						if ($this->acl_check_edit(get_class($this),'debit',$member->id))
+						{
+							$debt_payment_rate_changed = ($member->debt_payment_rate != $form_data['debt_payment_rate']);
+
+							$member->debt_payment_rate = $form_data['debt_payment_rate'];
+						}
+					}
+
+					$member->save_throwable();
+
+					// entrance date, fee or debt payment has been changed => recalculate entrance fee's transfers
+					if (Settings::get('finance_enabled') && ($entrance_date_changed || $entrance_fee_changed || $debt_payment_rate_changed))
+					{
+						Accounts_Controller::recalculate_entrance_fees($member->get_credit_account()->id);
+					}
+
+					// entrance date has been changed => recalculate member fee's transfers
+					if (Settings::get('finance_enabled') && $entrance_date_changed)
+					{
+						Accounts_Controller::recalculate_member_fees($member->get_credit_account()->id);
+					}
+
+					$member->transaction_commit();
+
+					ORM::factory('member')->reactivate_messages($member->id);
+
+					status::success('Member has been successfully updated.');
+				}
+				catch (Exception $e)
+				{
+					$member->transaction_rollback();
+					status::error('Error - cant update member.', $e);
+				}
+
+				$this->redirect('members/show/', $member_id);
 			}
-			
-			$this->redirect('members/show/', $member_id);
 		}
-		else
+		
+		$headline = __('Edit member');
+
+		if ($member->type == Member_Model::TYPE_APPLICANT)
 		{
-			$headline = __('Edit member');
-
-			// breadcrumbs navigation
-			$breadcrumbs = breadcrumbs::add()
-					->link('members/show_all', 'Members',
-							$this->acl_check_view(get_class($this),'members'))
-					->disable_translation()
-					->link('members/show/'.$member->id,
-							"ID $member->id - $member->name",
-							$this->acl_check_view(
-									get_class($this),'members', $member->id
-							)
-					)
-					->text($headline);
-
-			$view = new View('main');
-			$view->breadcrumbs = $breadcrumbs->html();
-			$view->title = $headline;
-			$view->content = new View('form');
-			$view->content->headline =
-					__('Editing of member').' '.$member->name;
-			$view->content->form = $form->html();
-			$view->content->link_back = '';
-			$view->render(TRUE);
+			$headline = __('Edit applicant for membership');
 		}
+
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view(get_class($this),'members'))
+				->disable_translation()
+				->link('members/show/'.$member->id,
+						"ID $member->id - $member->name",
+						$this->acl_check_view(
+								get_class($this),'members', $member->id
+						)
+				)
+				->text($headline);
+
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $headline;
+		$view->content = new View('form');
+		$view->content->headline = $headline . ' ' . $member->name;
+		$view->content->form = $form->html();
+		$view->content->link_back = '';
+		$view->render(TRUE);
 	} // end of edit function
+	
+	/**
+	 * Enables to edid member settings (e.g. notification settings).
+	 * 
+	 * @param integer $member_id Member ID
+	 */
+	public function settings($member_id = NULL)
+	{
+		// bad parameter
+		if (!isset($member_id) || !is_numeric($member_id))
+			self::warning(PARAMETER);
+
+		$member = new Member_Model($member_id);
+
+		// member doesn't exist
+		if (!$member->id)
+			self::error(RECORD);
+		
+		if (!$this->acl_check_edit('Members_Controller', 'notification_settings', $member_id))
+			self::error(ACCESS);
+
+		// form
+		$form = new Forge('members/settings/'.$member->id);
+		
+		$form->hidden('checkbox_hack');
+
+		$ns_group = $form->group(__('Notification settings') . ' ' .
+								 help::hint('notification_member_settings'));
+		
+		$ns_group->checkbox('notification_by_redirection')
+			->label('Enable notification by redirection')
+			->checked($member->notification_by_redirection);
+		
+		$ns_group->checkbox('notification_by_email')
+			->label('Enable notification by e-mail')
+			->checked($member->notification_by_email);
+		
+		$ns_group->checkbox('notification_by_sms')
+			->label('Enable notification by SMS messages')
+			->checked($member->notification_by_sms);
+		
+		$form->submit('Edit');
+
+		// form validation
+		if($form->validate())
+		{
+			$form_data = $form->as_array();
+			
+			try
+			{
+				$member->transaction_start();
+				
+				$member->notification_by_redirection = $form_data['notification_by_redirection'];
+				$member->notification_by_email = $form_data['notification_by_email'];
+				$member->notification_by_sms = $form_data['notification_by_sms'];
+				$member->save_throwable();
+				
+				$member->transaction_commit();
+
+				status::success('Member settings has been successfully updated.');
+				$this->redirect('members/show/', $member_id);
+			}
+			catch (Exception $e)
+			{
+				$member->transaction_rollback();
+				status::error('Error - cant update member settings.', $e);
+			}
+		}
+			
+		$headline = __('Edit member settings');
+
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view(get_class($this), 'members'))
+				->disable_translation()
+				->link('members/show/'.$member->id,
+						"ID $member->id - $member->name",
+						$this->acl_check_view(
+								get_class($this), 'members', $member->id
+						)
+				)
+				->text($headline);
+
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $headline;
+		$view->content = new View('form');
+		$view->content->headline = $headline . ' ' . $member->name;
+		$view->content->form = $form->html();
+		$view->content->link_back = '';
+		$view->render(TRUE);
+	}
 
 	/**
 	 * Function ends membership of member.
@@ -2495,6 +3911,9 @@ class Members_Controller extends Controller
 		
 		$member = new Member_Model($member_id);
 		
+		$end_membership = ORM::factory('membership_interrupt')
+				->has_member_end_after_interrupt_end_in_date($member->id, date('Y-m-d'));
+		
 		// wrong id
 		if (!$member->id)
 			Controller::error(RECORD);
@@ -2503,8 +3922,21 @@ class Members_Controller extends Controller
 		if (!$this->acl_check_edit(get_class($this), 'members', $member_id))
 			Controller::error(ACCESS);
 		
+		if ($end_membership)
+		{
+			status::warning('Cannot end membership when interrupt with end membership is activated.');
+			$this->redirect('members/show/', $member->id);
+		}
+		
+		// cannot end membership to association (#725)
+		if ($member->id == Member_Model::ASSOCIATION)
+		{
+			status::warning('Cannot end membership to association.');
+			$this->redirect('members/show/', $member->id);
+		}
+		
 		// form
-		$form = new Forge('members/end_membership/' . $member_id);
+		$form = new Forge();
 		
 		$form->date('leaving_date')
 				->label('Leaving date');
@@ -2513,21 +3945,71 @@ class Members_Controller extends Controller
 		
 		// validation
 		if ($form->validate())
-		{
+		{	
 			$form_data = $form->as_array();
-			$member->leaving_date = date('Y-m-d', $form_data['leaving_date']);
-			$enum_type_model = new Enum_type_Model();
-			$member->type = $enum_type_model->get_type_id('Former member');
 			
-			if ($member->save())
+			try
 			{
+				$member->transaction_start();
+				
+				$member->leaving_date = date('Y-m-d', $form_data['leaving_date']);
+
+				// leaving date is in past or today
+				if ($member->leaving_date <= date('Y-m-d'))
+				{
+					$member->type = Member_Model::TYPE_FORMER;
+					$member->locked = 1; // lock account
+				}
+				
+				$member->save_throwable();
+				
+				// leaving date is in past or today and deletion of devices is enabled
+				if ($member->leaving_date <= date('Y-m-d') &&
+					Settings::get('former_member_auto_device_remove'))
+				{
+					$member->delete_members_devices($member_id);
+				}
+
+				// reactivate messages
+				$member->reactivate_messages();
+				
+				// recalculates member's fees
+				Accounts_Controller::recalculate_member_fees(
+					$member->get_credit_account()->id
+				);
+
+				// leaving date is in past or today
+				if (module::e('notification') &&
+					$member->leaving_date <= date('Y-m-d'))
+				{
+					// get message
+					$message = ORM::factory('message')->get_message_by_type(
+							Message_Model::FORMER_MEMBER_MESSAGE
+					);
+					// create notification object
+					$member_notif = array
+					(
+						'member_id'		=> $member->id,
+						'whitelisted'	=> $member->has_whitelist()
+					);
+					// notify by email
+					Notifications_Controller::notify(
+							$message, array($member_notif), $this->user_id,
+							NULL, FALSE, TRUE, TRUE, FALSE, FALSE, TRUE
+					);
+				}
+				
+				$member->transaction_commit();
+				
 				status::success('Membership of the member has been ended.');
 			}
-			else
+			catch (Exception $e)
 			{
-				status::error('Error - cant end membership.');
+				$member->transaction_rollback();
+				Log::add_exception($e);
+				status::error('Error - cant end membership.', $e);
 			}
-			
+				
 			$this->redirect('members/show/', $member_id);
 		}
 
@@ -2575,25 +4057,46 @@ class Members_Controller extends Controller
 			Controller::error(RECORD);
 		
 		// acess
-		if (!$this->acl_check_edit(get_class($this), 'members', $member_id))
+		if ($member->type != Member_Model::TYPE_FORMER ||
+			!$this->acl_check_edit(get_class($this), 'members', $member_id))
 			Controller::error(ACCESS);
 		
-		// this sets member to regular member
-		$member->leaving_date = '0000-00-00';
-		$enum_type_model = new Enum_type_Model();
-		$member->type = $enum_type_model->get_type_id('Regular member');
-		
-		if ($member->save())
+		try
 		{
+			$member->transaction_start();
+			
+			// this sets member to regular member
+			$member->leaving_date = '0000-00-00';
+			$member->type = Member_Model::TYPE_REGULAR;
+			$member->locked = 0;
+
+			$member->save_throwable();
+			
+			$membership_transfer_model = new Membership_transfer_Model();
+			
+			// remove membership transfer from member (if exist)
+			$membership_transfer_model->delete_transfer_from_member($member->id);
+			
+			// reload messages of worker
+			ORM::factory('member')->reactivate_messages($member->id);
+			
+			// recalculates member's fees
+			Accounts_Controller::recalculate_member_fees(
+				$member->get_credit_account()->id
+			);
+			
+			$member->transaction_commit();
 			status::success('Membership of the member has been successfully restored.');
 		}
-		else
+		catch (Exception $e)
 		{
-			status::error('Error - cant restore membership.');
+			$member->transaction_rollback();
+			status::error('Error - cant restore membership.', $e);
+			Log::add_exception($e);
 		}
 		
 		// redirect
-		url::redirect('members/show/'.(int)$member_id);
+		$this->redirect('members/show/', $member->id);
 	}
 
 	/**
@@ -2615,7 +4118,7 @@ class Members_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_view(get_class($this), 'members', $member_id))
+		if (!$this->acl_check_view(get_class($this), 'registration_export', $member_id))
 			Controller::error(ACCESS);
 
 		// creates new form
@@ -2644,12 +4147,13 @@ class Members_Controller extends Controller
 			{
 				case 'html':
 					// do html export
-					$this->registration_html_export($member_id);
+					die($this->registration_html_export($member_id));
 					break;
 
 				case 'pdf':
 					// do pdf export
 					$this->registration_pdf_export($member_id);
+					die();
 					break;
 			}
 		}
@@ -2682,64 +4186,100 @@ class Members_Controller extends Controller
 	/**
 	 * Export member registration to HTML
 	 *
-	 * @todo implement
-	 * @param integer $member_id 
+	 * @param integer $member_id
+	 * @param string $page_width Width of result page [default 18cm]
+	 * @return string Registration in HTML format
 	 */
-	private function registration_html_export($member_id)
+	private function registration_html_export($member_id, $page_width = '18cm')
 	{
-		// no parameter
-		if (!isset($member_id))
-			Controller::warning(PARAMETER);
-
 		$member = new Member_Model($member_id);
 
 		// record doesn't exist
 		if ($member->id == 0)
-			Controller::error(RECORD);
-
-		// access control
-		if (!$this->acl_check_view(get_class($this), 'members', $member_id))
-			Controller::error(ACCESS);
+			throw new Exception('Invalid member ID');
 		
 		// html head
 		$page = "<html>";
 		$page .= "<head>";
-		$page .= "<title>".__('export of registration').' - '.$member->name."</title>";
+		$page .= "<title>".__('Export of registration').' - '.$member->name."</title>";
 		$page .= "</head>";
 		$page .= '<body style="font-size:14px">';
 		
 		// -------------------- LOGO -------------------------------
 		
 		$logo = Settings::get('registration_logo');
-		$page .= '<div style="width:18cm">';
+		$page .= '<div style="width:' . $page_width . '">';
+		
 		if (file_exists($logo))
 		{
-			$page .= '<div style="float:left"><img src="'.url_lang::base().'export/logo" width=274 height=101></div>';
+			$page .= '<div style="float:left; width: 50%">'.
+					'<img src="'.url_lang::base().'export/logo" width=274 height=101>'.
+					'</div>';
 		}
 		else	//if logo doesn't exist, insert only blank div
 		{
-			$page .= '<div style="float:left" width=274 height=101>';
+			$page .= '<div style="float:left; width: 50%" width=274 height=101></div>';
 		}
 		
 		// --------------- INFO ABOUT ASSOCIATION -----------------
 		
-		$page .= '<div style="float:right">';
-		$a_member = new Member_Model(1);
+		$page .= '<div style="float:right; position: relative; width: 47%">';
+		$page .= '<table style="float:right;">';
+		$a_member = new Member_Model(Member_Model::ASSOCIATION);
 		
-		$bank_account_model = new Bank_account_Model();
-		$a_bank_account = $bank_account_model->get_assoc_bank_accounts()->current();
+		if (Settings::get('finance_enabled'))
+		{
+			$ba_model = new Bank_account_Model();
+			$a_bank_account_number = NULL;
+
+			if (Settings::get('export_header_bank_account'))
+			{
+				$ba_model->find(Settings::get('export_header_bank_account'));
+			}
+
+			// not set in settings
+			if (!$ba_model->id)
+			{
+				$bank_accounts = $ba_model->get_assoc_bank_accounts();
+
+				if ($bank_accounts->count())
+				{
+					$a_bank_account_number = $bank_accounts->current()->account_number;
+				}
+			}
+			else
+			{
+				$a_bank_account_number = $ba_model->account_nr . '/' . $ba_model->bank_nr;
+			}
+		}
 		
-		$page .= $a_member->name ."</br>";
-		$page .= __('organization identifier').
-				': '.$a_member->organization_identifier. "</br>";
-		$page .= __('account number').': '
-				.$a_bank_account->account_number. "</br>";
-		$page .= $a_member->address_point->street->street.' '.
-				$a_member->address_point->street_number. "</br>";
-		$page .= $a_member->address_point->town->zip_code .' '.
-				$a_member->address_point->town->town. "</br>";
+		$page .= '<tr><td colspan="2"><b>' . $a_member->name . '</b></td></tr>';
 		
-		$page .= '</div><div style="clear:both;text-align:center;font-weight:bold;margin:0px;">';
+		if (!empty($a_member->organization_identifier))
+		{
+			$page .= '<tr><td>' . __('Organization identifier') . ':</td>
+					<td><b>'.$a_member->organization_identifier. '</b></td></tr>';
+		}
+		
+		if (!empty($a_member->vat_organization_identifier))
+		{
+			$page .= '<tr><td>' . __('VAT organization identifier') . ':</td>
+					<td><b>'.$a_member->vat_organization_identifier. '</b></td></tr>';
+		}
+		
+		if (Settings::get('finance_enabled'))
+		{	
+			$page .= '<tr><td>' . __('Account number').':</td>';
+			$page .= '<td><b>' . $a_bank_account_number. '</b></td></tr>';
+		}
+		
+		$page .= '<tr><td colspan="2"><b>' . $a_member->address_point->street->street.' '.
+				$a_member->address_point->street_number. '</b></td></tr>';
+		$page .= '<tr><td colspan="2"><b>' . $a_member->address_point->town->zip_code .' '.
+				$a_member->address_point->town->town. '</b></td></tr>';
+		
+		$page .= '</table></div>'.
+				'<div style="clear:both;text-align:center;font-weight:bold;margin:0px;">';
 		
 		// --------------------- MAIN TITLE -------------------------
 		
@@ -2748,313 +4288,11 @@ class Members_Controller extends Controller
 		
 		// --------------------- INFO -------------------------
 		
-		$page .= '<span>'.$this->settings->get('registration_info').'</span>';
+		$page .= '<div style="text-align: left">'
+			  . $this->settings->get('registration_info').'</div>';
 		
 		// ----------- TABLE WITH INFORMATION ABOUT MEMBER --------
 		
-				$member_name = $member->name;
-		
-		$street = $member->address_point->street->street.' '
-				.$member->address_point->street_number;
-		
-		$town = $member->address_point->town->town;
-		
-		if ($member->address_point->town->quarter != '') 
-			$town .= '-'.$member->address_point->town->quarter;
-		
-		$zip_code = $member->address_point->town->zip_code;
-		
-		$variable_symbol_model = new Variable_Symbol_Model();
-		$account_model = new Account_Model();
-		$account_id = $account_model->where('member_id',$member_id)->find()->id;
-		
-		$variable_symbols = array();
-		$var_syms = $variable_symbol_model->find_account_variable_symbols($account_id);
-		
-		foreach ($var_syms as $var_sym)
-		{
-			$variable_symbols[] = $var_sym->variable_symbol;
-		}	
-		
-		$entrance_date = date::pretty($member->entrance_date);
-
-		$user_model = new User_Model();
-		
-		$user = $user_model->where('member_id',$member_id)
-				->where('type',User_Model::MAIN_USER)
-				->find();
-		
-		$emails = $user->get_user_emails($user->id);
-		$email = '';
-		if ($emails && $emails->current())
-		{
-			$email = $emails->current()->email;
-		}
-		$birthday = date::pretty($user->birthday);
-
-		$enum_type_model = new Enum_type_Model();
-		$types = $enum_type_model->get_values(Enum_type_Model::CONTACT_TYPE_ID);
-		$contact_model = new Contact_Model();
-		$contacts = $contact_model->find_all_users_contacts($user->id);
-		$phone_id = $enum_type_model->get_type_id('Phone');
-		$icq_id = $enum_type_model->get_type_id('ICQ');
-		$msn_id = $enum_type_model->get_type_id('MSN');
-		$jabber_id = $enum_type_model->get_type_id('Jabber');
-		$skype_id = $enum_type_model->get_type_id('Skype');
-		$phones = array();
-		$arr_contacts = array();
-		
-		foreach ($contacts as $contact)
-		{
-			if ($contact->type == $phone_id)
-			{
-			    $phones[] = $contact->value;
-			}
-			else if($contact->type == $icq_id OR
-					$contact->type == $msn_id OR
-					$contact->type == $jabber_id OR
-					$contact->type == $skype_id)
-			{
-			    $arr_contacts[] = $types[$contact->type].': '.$contact->value;
-			}
-		}
-		
-		$contact_info = implode('<br />', $arr_contacts);
-
-		$device_engineer_model = new Device_engineer_Model();
-		$device_engineers = $device_engineer_model->get_engineers_of_user($user->id);
-		$arr_engineers = array();
-		
-		foreach ($device_engineers as $device_engineer)
-		{
-		    $arr_engineers[] = $device_engineer->surname;
-		}
-		
-		$engineers = (count($arr_engineers)) ? implode(', ',$arr_engineers) : $member->user->surname;
-		
-		$subnet = new Subnet_Model();
-		$subnet = $subnet->get_subnet_of_user($user->id);
-		$subnet_name = isset($subnet->name) ? $subnet->name : '';
-		
-		$tbl = '<table border="1" cellpadding="5" cellspacing="0" width="100%" style="font-size:14px;">';
-		$tbl .= "<tr>";
-		$tbl .= "	<td><b>". __('name',NULL,1) .", ";
-		$tbl .= __('surname',NULL,1) .",<br /> ";
-		$tbl .= __('title',NULL,1) ."</b></td>";
-		$tbl .= "	<td align=\"center\">$member_name</td>";
-		$tbl .= "	<td><b>". __('email address') ."</b></td>";
-		$tbl .= "	<td align=\"center\">$email</td>";
-		$tbl .= "</tr>";
-		$tbl .= "<tr>";
-		$tbl .= "	<td><b>". __('address of connecting place',NULL,1);
-		$tbl .= "</b> (". strtolower(__('street',NULL,1)) .", ";
-		$tbl .= __('street_number',NULL,1) .", ";
-		$tbl .= __('zip code') .", ". __('town',NULL,1) .")</td>";
-		$tbl .= "	<td align=\"center\">$street<br />$town<br />$zip_code</td>";
-		$tbl .= "	<td><b>". __('id of member') ."</b><br /> (";
-		$tbl .= __('according to freenetis') .")</td>";
-		$tbl .= "	<td align=\"center\">$member_id</td>";
-		$tbl .= "</tr>";
-		$tbl .= "<tr>";
-		$tbl .= "	<td><b>". __('birthday',NULL,1) ."</b></td>";
-		$tbl .= "	<td align=\"center\">$birthday</td>";
-		$tbl .= "	<td><b>ICQ, Jabber, Skype, ". __('etc') ."…</b></td>";
-		$tbl .= "	<td align=\"center\">$contact_info</td>";
-		$tbl .= "</tr>";
-		$tbl .= "<tr>";
-		$tbl .= "	<td><b>".__('variable symbols',NULL,1) ."</b></td>";
-		$tbl .= "	<td align=\"center\">".implode("<br />", $variable_symbols)."</td>";
-		$tbl .= "	<td><b>". __('phones',NULL,1) ."<b/></td>";
-		$tbl .= "	<td align=\"center\">".implode("<br />", $phones)."</td>";
-		$tbl .= "</tr>";
-		$tbl .= "<tr>";
-		$tbl .= "	<td><b>".__('Subnet',NULL,1)."</b></td>";
-		$tbl .= "	<td align=\"center\">$subnet_name</td>";
-		$tbl .= "	<td></td>";
-		$tbl .= "	<td align=\"center\"></td>";
-		$tbl .= "</tr>";
-		$tbl .= "<tr>";
-		$tbl .= "	<td><b>". __('entrance date',NULL,1) ."</b></td>";
-		$tbl .= "	<td align=\"center\">$entrance_date</td>";
-		$tbl .= "	<td><b>". __('engineers',NULL,1) .":</b></td>";
-		$tbl .= "	<td align=\"center\">$engineers</td>";
-		$tbl .= "</tr>";
-		$tbl .= "</table>";
-		
-		$page .= $tbl;
-		
-		$page .= '<div style="text-align:left">';
-		$page .= $this->settings->get('registration_license');
-		$page .= "</div>";
-		
-		$page .= '<br><p style="text-align:right;font-size:1.1em">'.__('signature of applicant member').' : ........................................</p>';
-		
-		$page .= '<p style="font-size:1.2em">'.__('decision Counsil about adoption of member').'</p>';
-		
-		$page .= '<p style="text-align:left">'.__('Member adopted on').
-				':    .........................................</p>';
-		
-		$page .= '<p style="text-align:left">'.__('signature and stamp').
-				':    .........................................</p>';
-		
-		$page .= "</div></div>";
-		$page .= "</body>";
-		$page .= "</html>";
-		die($page);
-	}
-
-	/**
-	 * Function to export registration of member to pdf-format
-	 * 
-	 * @author Michal Kliment
-	 * @param integer $member_id	id of member to export
-	 */
-	private function registration_pdf_export($member_id)
-	{
-		// no parameter
-		if (!isset($member_id))
-			Controller::warning(PARAMETER);
-
-		$member = new Member_Model($member_id);
-
-		// record doesn't exist
-		if ($member->id == 0)
-			Controller::error(RECORD);
-
-		// access control
-		if (!$this->acl_check_view(get_class($this), 'members', $member_id))
-			Controller::error(ACCESS);
-		
-		require_once(APPPATH.'vendors/tcpdf/tcpdf.php');
-		require_once(APPPATH.'vendors/tcpdf/config/lang/eng.php');
-
-		// create new PDF document
-		$pdf = new TCPDF(
-				PDF_PAGE_ORIENTATION, PDF_UNIT,
-				PDF_PAGE_FORMAT, true, 'UTF-8', false
-		);
-
-		// set document information
-		$pdf->SetCreator(PDF_CREATOR);
-		$pdf->SetAuthor('Michal Kliment');
-		$pdf->SetTitle(__('export of registration').' - '.$member->name);
-
-		// remove default header/footer
-		$pdf->setPrintHeader(false);
-		$pdf->setPrintFooter(false);
-
-		// set default monospaced font
-		$pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
-
-		//set margins
-		$pdf->SetMargins(0, 0, 0);
-		$pdf->SetFooterMargin(0);
-
-		//set auto page breaks
-		$pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
-
-		//set image scale factor
-		$pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
-
-		//set some language-dependent strings
-		$pdf->setLanguageArray($l);
-
-		// ---------------------------------------------------------
-
-		// set font
-		$pdf->SetFont('freemono', 'b', 10);
-
-		// add a page
-		$pdf->AddPage();
-
-		// -------------------- LOGO -------------------------------
-		$logo = Settings::get('registration_logo');
-		
-		if (file_exists($logo))
-		{
-			$pdf->writeHTML(
-					'<img src="'.substr($logo, strlen($_SERVER['DOCUMENT_ROOT'])).'" width=274 height=101>',
-					true, false, false, false, ''
-			);
-		}
-		else	//if logo doesn't exist, insert only blank div
-		{
-			$pdf->writeHTML(
-					'<div width=274 height=101>',
-					true, false, false, false, ''
-			);
-		}
-
-		// --------------- INFO ABOUT ASSOCIATION -----------------
-
-		$pdf->SetTextColor(185, 185, 185);
-
-		$a_member = new Member_Model(1);
-
-		$bank_account_model = new Bank_account_Model();
-		$a_bank_account = $bank_account_model->get_assoc_bank_accounts()->current();
-
-		$pdf->SetXY(98, 9.7);
-		$pdf->Write(10, $a_member->name);
-
-		$pdf->SetXY(98, 13.7);
-		$pdf->Write(
-				10, __('organization identifier').
-				': '.$a_member->organization_identifier
-		);
-
-		$pdf->SetXY(98, 17.7);
-		$pdf->Write(
-				10, __('account number').': '
-				.$a_bank_account->account_number
-		);
-
-		$pdf->SetXY(98, 21.7);
-		$pdf->Write(
-				10, $a_member->address_point->street->street.' '.
-				$a_member->address_point->street_number
-		);
-
-		$pdf->SetXY(98, 25.7);
-		$pdf->Write(
-				10, $a_member->address_point->town->zip_code .' '.
-				$a_member->address_point->town->town
-		);
-
-		// --------------------- MAIN TITLE -------------------------
-
-		$pdf->SetFont('dejavusans', 'b', 14);
-		$pdf->SetTextColor(0, 0, 0);
-
-		$pdf->SetXY(41, 36.7);
-		$pdf->Write(
-				10, __('Request for membership'). ' – '
-				. __('registration in association')
-		);
-
-		// ----------------------- INFO ----------------------------
-
-		$pdf->SetFont('dejavusans', 'b', 9);
-
-		$pdf->SetXY(0, 47.7);
-
-		$pdf->SetLeftMargin(24);
-		$pdf->SetRightMargin(24);
-
-		$pdf->writeHTML(
-				$this->settings->get('registration_info'),
-				true, false, true, false, ''
-		);
-
-		$pdf->Ln();
-
-		// ----------- TABLE WITH INFORMATION ABOUT MEMBER --------
-
-		$pdf->SetFillColor(255, 255, 255);
-
-		$pdf->SetLeftMargin(20);
-		$pdf->SetRightMargin(20);
-
 		$member_name = $member->name;
 		
 		$street = $member->address_point->street->street.' '
@@ -3067,24 +4305,28 @@ class Members_Controller extends Controller
 		
 		$zip_code = $member->address_point->town->zip_code;
 		
-		$variable_symbol_model = new Variable_Symbol_Model();
-		$account_model = new Account_Model();
-		$account_id = $account_model->where('member_id',$member_id)->find()->id;
-		
-		$variable_symbols = array();
-		$var_syms = $variable_symbol_model->find_account_variable_symbols($account_id);
-		
-		foreach ($var_syms as $var_sym)
+		if (Settings::get('finance_enabled'))
 		{
-			$variable_symbols[] = $var_sym->variable_symbol;
-		}	
+			$account_model = new Account_Model();
+			$account_id = $account_model->where('member_id',$member_id)->find()->id;
+			
+			$variable_symbol_model = new Variable_Symbol_Model();
+		
+			$variable_symbols = array();
+			$var_syms = $variable_symbol_model->find_account_variable_symbols($account_id);
+		
+			foreach ($var_syms as $var_sym)
+			{
+				$variable_symbols[] = $var_sym->variable_symbol;
+			}	
+		}
 		
 		$entrance_date = date::pretty($member->entrance_date);
 
 		$user_model = new User_Model();
 		
-		$user = $user_model->where('member_id',$member_id)
-				->where('type',User_Model::MAIN_USER)
+		$user = $user_model->where('member_id', $member_id)
+				->where('type', User_Model::MAIN_USER)
 				->find();
 		
 		$emails = $user->get_user_emails($user->id);
@@ -3099,139 +4341,154 @@ class Members_Controller extends Controller
 		$types = $enum_type_model->get_values(Enum_type_Model::CONTACT_TYPE_ID);
 		$contact_model = new Contact_Model();
 		$contacts = $contact_model->find_all_users_contacts($user->id);
-		$phone_id = $enum_type_model->get_type_id('Phone');
-		$icq_id = $enum_type_model->get_type_id('ICQ');
-		$msn_id = $enum_type_model->get_type_id('MSN');
-		$jabber_id = $enum_type_model->get_type_id('Jabber');
-		$skype_id = $enum_type_model->get_type_id('Skype');
+		
 		$phones = array();
 		$arr_contacts = array();
 		
 		foreach ($contacts as $contact)
 		{
-			if ($contact->type == $phone_id)
+			if ($contact->type == Contact_Model::TYPE_PHONE)
 			{
 			    $phones[] = $contact->value;
 			}
-			else if($contact->type == $icq_id OR
-					$contact->type == $msn_id OR
-					$contact->type == $jabber_id OR
-					$contact->type == $skype_id)
+			else if($contact->type == Contact_Model::TYPE_ICQ ||
+					$contact->type == Contact_Model::TYPE_MSN ||
+					$contact->type == Contact_Model::TYPE_JABBER ||
+					$contact->type == Contact_Model::TYPE_SKYPE)
 			{
 			    $arr_contacts[] = $types[$contact->type].': '.$contact->value;
 			}
 		}
 		
 		$contact_info = implode('<br />', $arr_contacts);
-
-		$device_engineer_model = new Device_engineer_Model();
-		$device_engineers = $device_engineer_model->get_engineers_of_user($user->id);
-		$arr_engineers = array();
 		
-		foreach ($device_engineers as $device_engineer)
+		if (Settings::get('networks_enabled')) 
 		{
-		    $arr_engineers[] = $device_engineer->surname;
+			$device_engineer_model = new Device_engineer_Model();
+			$device_engineers = $device_engineer_model->get_engineers_of_user($user->id);
+			$arr_engineers = array();
+
+			foreach ($device_engineers as $device_engineer)
+			{
+				$arr_engineers[] = $device_engineer->surname;
+			}
+
+			$engineers = (count($arr_engineers)) ? implode(', ',$arr_engineers) : $member->user->surname;
+
+			$subnet = new Subnet_Model();
+			$subnet = $subnet->get_subnet_of_user($user->id);
+			$subnet_name = isset($subnet->name) ? $subnet->name : '';
 		}
 		
-		$engineers = (count($arr_engineers)) ? implode(', ',$arr_engineers) : $member->user->surname;
-		
-		$subnet = new Subnet_Model();
-		$subnet = $subnet->get_subnet_of_user($user->id);
-		$subnet_name = isset($subnet->name) ? $subnet->name : '';
-		
-		$tbl = "<table border=\"1\" cellpadding=\"5\" cellspacing=\"0\" width=\"100%\">";
+		$tbl = '<table border="1" cellpadding="5" cellspacing="0" width="100%" style="font-size:14px;">';
 		$tbl .= "<tr>";
-		$tbl .= "	<td><b>". __('name',NULL,1) .", ";
-		$tbl .= __('surname',NULL,1) .",<br /> ";
-		$tbl .= __('title',NULL,1) ."</b></td>";
+		$tbl .= "	<td><b>". __('Name') .", ";
+		$tbl .= __('Surname') .",".__('Title') ."</b></td>";
 		$tbl .= "	<td align=\"center\">$member_name</td>";
-		$tbl .= "	<td>". __('email address') ."</td>";
+		$tbl .= "	<td><b>". __('ID of member') ."</b><br /> (";
+		$tbl .= __('according to freenetis') .")</td>";
+		$tbl .= "	<td align=\"center\"><b>$member_id</b></td>";
+		$tbl .= "</tr>";
+		$tbl .= "<tr>";
+		$tbl .= "	<td><b>". __('Address of connecting place');
+		$tbl .= "</b> (". __('Street') .", ";
+		$tbl .= __('Street number') .", ";
+		$tbl .=  __('Town') . ", " . __('ZIP code') .")</td>";
+		$tbl .= "	<td align=\"center\">$street<br />$town<br />$zip_code</td>";
+		$tbl .= "	<td><b>". __('Email') ."</b></td>";
 		$tbl .= "	<td align=\"center\">$email</td>";
 		$tbl .= "</tr>";
 		$tbl .= "<tr>";
-		$tbl .= "	<td><b>". __('address of connecting place',NULL,1);
-		$tbl .= "</b> (". strtolower(__('street',NULL,1)) .", ";
-		$tbl .= __('street_number',NULL,1) .", ";
-		$tbl .= __('zip code') .", ". __('town',NULL,1) .")</td>";
-		$tbl .= "	<td align=\"center\">$street<br />$town<br />$zip_code</td>";
-		$tbl .= "	<td><b>". __('id of member') ."</b><br /> (";
-		$tbl .= __('according to freenetis') .")</td>";
-		$tbl .= "	<td align=\"center\"><br />$member_id</td>";
-		$tbl .= "</tr>";
-		$tbl .= "<tr>";
-		$tbl .= "	<td>". __('birthday',NULL,1) ."</td>";
+		$tbl .= "	<td><b>". __('Birthday') ."</b></td>";
 		$tbl .= "	<td align=\"center\">$birthday</td>";
-		$tbl .= "	<td>ICQ, Jabber, Skype, ". __('etc') ."…</td>";
-		$tbl .= "	<td align=\"center\">$contact_info</td>";
-		$tbl .= "</tr>";
-		$tbl .= "<tr>";
-		$tbl .= "	<td><b>".__('variable symbols',NULL,1) ."</b></td>";
-		$tbl .= "	<td align=\"center\">".implode("<br />", $variable_symbols)."</td>";
-		$tbl .= "	<td>". __('phones',NULL,1) ."</td>";
+		$tbl .= "	<td><b>". __('Phone') ."<b/></td>";
 		$tbl .= "	<td align=\"center\">".implode("<br />", $phones)."</td>";
 		$tbl .= "</tr>";
 		$tbl .= "<tr>";
-		$tbl .= "	<td><b>".__('Subnet',NULL,1)."</b></td>";
-		$tbl .= "	<td align=\"center\">$subnet_name</td>";
-		$tbl .= "	<td></td>";
-		$tbl .= "	<td align=\"center\"></td>";
+		if (Settings::get('finance_enabled'))
+		{
+			$tbl .= "	<td><b>".__('Variable symbol') ."</b></td>";
+			$tbl .= "	<td align=\"center\">".implode("<br />", $variable_symbols)."</td>";
+		}
+		else
+			$tbl .= "	<td></td><td></td>";
+		$tbl .= "	<td><b>ICQ, Jabber, Skype, ". __('etc') .".</b></td>";
+		$tbl .= "	<td align=\"center\">$contact_info</td>";
 		$tbl .= "</tr>";
+		if (Settings::get('networks_enabled'))
+		{
+			$tbl .= "<tr>";
+			$tbl .= "	<td><b>".__('Subnet')."</b></td>";
+			$tbl .= "	<td align=\"center\">$subnet_name</td>";
+			$tbl .= "	<td><b>". __('Engineer') ."</b></td>";
+			$tbl .= "	<td align=\"center\">$engineers</td>";
+			$tbl .= "</tr>";
+		}
 		$tbl .= "<tr>";
-		$tbl .= "	<td><b>". __('entrance date',NULL,1) ."</b></td>";
+		$tbl .= "	<td><b>". __('Entrance date') ."</b></td>";
 		$tbl .= "	<td align=\"center\">$entrance_date</td>";
-		$tbl .= "	<td><b>". __('engineers',NULL,1) .":</b></td>";
-		$tbl .= "	<td align=\"center\">$engineers</td>";
+		$tbl .= "	<td>&nbsp;</td>";
+		$tbl .= "	<td align=\"center\">&nbsp;</td>";
 		$tbl .= "</tr>";
 		$tbl .= "</table>";
+		
+		$page .= $tbl;
+		
+		$page .= '<div style="text-align:left">';
+		$page .= $this->settings->get('registration_license');
+		$page .= "</div>";
+		
+		$page .= '<br><p style="text-align:right;font-size:1.1em">'
+			  .__('Signature of applicant member', NULL, 1)
+			  .' : ........................................</p>';
+		
+		$page .= '<p style="margin-top: 50px; font-size:1.2em">'.
+				__('Decision Counsil about adoption of member').'</p>';
+		
+		$page .= '<p style="text-align:left">'.__('Member adopted on').
+				':    .........................................</p>';
+		
+		$page .= '<p style="text-align:left">'.__('Signature and stamp').
+				':    .........................................</p>';
+		
+		$page .= "</div></div>";
+		$page .= "</body>";
+		$page .= "</html>";
+		
+		return $page;
+	}
 
-		$pdf->writeHTML($tbl, true, false, false, false, '');
+	/**
+	 * Function to export registration of member to pdf-format
+	 * 
+	 * @author Ondřej Fibich
+	 * @param integer $member_id	id of member to export
+	 */
+	private function registration_pdf_export($member_id)
+	{
+		$member = new Member_Model($member_id);
 
-		// ----------------- LICENSE -----------------------------
-
-		$pdf->SetFont('dejavusans', 'B', 10);
-		$pdf->SetXY(0, 142.7);
-
-		$pdf->SetLeftMargin(24);
-		$pdf->SetRightMargin(24);
-
-		$pdf->writeHTML($this->settings->get('registration_license'));
-
-		// ------------ SIGNATURE OF MEMBER ---------------------
-
-		$pdf->Ln();
-		$pdf->SetX(88);
-		$pdf->SetRightMargin(14);
-		$pdf->SetFont('dejavusans', 'BU', 10);
-		$pdf->Write(10, __('signature of applicant member').' :');
-		$pdf->SetFont('dejavusans', 'B', 10);
-		$pdf->Write(10, ' ........................................');
-
-		// -------------------- DECISION OF COUNSIL ------------
-
-		$pdf->Ln();
-		$pdf->SetX(68);
-		$pdf->SetFont('dejavusans', 'B', 11);
-		$pdf->Write(10, __('decision Counsil about adoption of member'));
-
-		$pdf->Ln();
-		$pdf->SetFont('dejavusans', 'B', 10);
-		$pdf->Write(
-				10, __('Member adopted on').
-				':    .........................................'
+		// record doesn't exist
+		if ($member->id == 0)
+			throw new Exception('Invalid member ID');
+		
+		// include pdf library
+		require_once(APPPATH.'vendors/mpdf/mpdf.php');
+		
+		// get HTML content
+		$html = $this->registration_html_export($member_id);
+		// logo image change (cannot load image from export/logo)
+		$html_logo_correct = str_replace(
+				url_lang::base() . 'export/logo',
+				Settings::get('registration_logo'),
+				$html
 		);
-
-		$pdf->Ln();
-		$pdf->Write(
-				10, __('signature and stamp').
-				':    .........................................'
-		);
-
-		// Close and output PDF document
-		$pdf->Output(
-				url::title(__('registration')).
-				'-'.url::title($member->name).'.pdf', 'D'
-		);
-
+		
+		// transform it to PDF
+		$filename = url::title(__('registration').'-'.$member->name).'.pdf';
+		$mpdf = new mPDF('utf-8', 'A4');
+		$mpdf->WriteHTML($html_logo_correct);
+		$mpdf->Output($filename, 'I');
 	}
 
 	/**
@@ -3248,12 +4505,13 @@ class Members_Controller extends Controller
 		}
 		
 		$user_model = new User_Model();
+		$username_regex = Settings::get('username_regex');
 		
 		if ($user_model->username_exist($input->value) && !trim($input->value)=='')
 		{
 			$input->add_error('required', __('Username already exists in database'));
 		}
-		else if (!preg_match("/^[a-z][a-z0-9]*[_]{0,1}[a-z0-9]+$/", $input->value))
+		else if (!preg_match($username_regex, $input->value))
 		{
 			$input->add_error('required', __(
 					'Login must contains only a-z and 0-9 and starts with literal.'
@@ -3284,37 +4542,6 @@ class Members_Controller extends Controller
 		else if ($user_model->phone_exist($value))
 		{
 			$input->add_error('required', __('Phone already exists in database.'));
-		}
-	}
-
-	/**
-	 * Check validity of variable symbol
-	 *
-	 * @param object $input 
-	 */
-	public function valid_var_sym($input = NULL)
-	{
-		// validators cannot be accessed
-		if (empty($input) || !is_object($input))
-		{
-			self::error(PAGE);
-		}
-		
-		$value = trim($input->value);
-		
-		$variable_symbol_model = new Variable_Symbol_Model();
-		
-		$total = $variable_symbol_model->get_variable_symbol_id($value);
-
-		if (!preg_match("/^[0-9]{1,10}$/", $value))
-		{
-			$input->add_error('required', __('Bad variable symbol format.'));
-		}
-		else if ($total)
-		{
-			$input->add_error('required', __(
-					'Variable symbol already exists in database.'
-			));
 		}
 	}
 
@@ -3447,18 +4674,24 @@ class Members_Controller extends Controller
 						Enum_type_Model::MEMBER_TYPE_ID
 					)
 				);
+		
+		if (Settings::get('membership_interrupt_enabled'))
+		{
+			$filter_form->add('membership_interrupt')
+					->type('select')
+					->values(arr::bool());
+		}
+		
+		if (Settings::get('finance_enabled'))
+		{
+			$filter_form->add('balance')
+					->table('a')
+					->type('number');
 
-		$filter_form->add('membership_interrupt')
-				->type('select')
-				->values(arr::bool());
-		
-		$filter_form->add('balance')
-				->table('a')
-				->type('number');
-		
-		$filter_form->add('variable_symbol')
-				->table('vs')
-				->callback('json/variable_symbol');
+			$filter_form->add('variable_symbol')
+					->table('vs')
+					->callback('json/variable_symbol');
+		}
 		
 		$filter_form->add('entrance_date')
 				->type('date');
@@ -3466,8 +4699,11 @@ class Members_Controller extends Controller
 		$filter_form->add('leaving_date')
 				->type('date');
 		
-		$filter_form->add('entrance_fee')
-				->type('number');
+		if (Settings::get('finance_enabled'))
+		{
+			$filter_form->add('entrance_fee')
+					->type('number');
+		}
 		
 		$filter_form->add('comment');
 		
@@ -3477,6 +4713,9 @@ class Members_Controller extends Controller
 		
 		$filter_form->add('organization_identifier')
 				->callback('json/organization_identifier');
+		
+		$filter_form->add('vat_organization_identifier')
+				->callback('json/vat_organization_identifier');
 		
 		$filter_form->add('town')
 				->type('select')
@@ -3497,33 +4736,720 @@ class Members_Controller extends Controller
 				);
 		
 		$filter_form->add('street_number')
-				->type('number')
 				->table('ap');
 		
-		$filter_form->add('redirect_type_id')
-				->label(__('Redirection'))
-				->type('select')
-				->values(array
-				(
-					Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE => __('Membership interrupt'),
-					Message_Model::DEBTOR_MESSAGE => __('Debtor'),
-					Message_Model::PAYMENT_NOTICE_MESSAGE => __('Payment notice'),
-					Message_Model::UNALLOWED_CONNECTING_PLACE_MESSAGE => __('Unallowed connecting place'),
-					Message_Model::USER_MESSAGE => __('User message')
-				))->table('ms');
+		if (Settings::get('redirection_enabled'))
+		{
+			$filter_form->add('redirect_type_id')
+					->label(__('Redirection'))
+					->type('select')
+					->values(array
+					(
+						Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE => __('Membership interrupt'),
+						Message_Model::DEBTOR_MESSAGE => __('Debtor'),
+						Message_Model::PAYMENT_NOTICE_MESSAGE => __('Payment notice'),
+						Message_Model::UNALLOWED_CONNECTING_PLACE_MESSAGE => __('Unallowed connecting place'),
+						Message_Model::CONNECTION_TEST_EXPIRED => __('Connection test expired'),
+						Message_Model::USER_MESSAGE => __('User message')
+					))->table('ms');
+		}
 		
-		$filter_form->add('whitelisted')
-				->label(__('Whitelist'))
-				->type('select')
-				->table('ip')
-				->values(Ip_address_Model::get_whitelist_types());
+		if (module::e('notification'))
+		{
+			$filter_form->add('whitelisted')
+					->label(__('Whitelist'))
+					->type('select')
+					->table('ip')
+					->values(Ip_address_Model::get_whitelist_types());
+		}
 		
-		$filter_form->add('cloud')
+		$filter_form->add('speed_class_id')
+				->table('m')
+				->label('Speed class')
+				->type('select')
+				->values(ORM::factory('speed_class')->select_list());
+		
+		if (Settings::get('networks_enabled'))
+		{
+			$filter_form->add('cloud')
 				->table('cl')
 				->type('select')
 				->values(ORM::factory('cloud')->select_list());
+		}
+		
+		$filter_form->add('login')
+				->label('Login name')
+				->table('u')
+				->callback('json/user_login');
 		
 		return $filter_form;
 	}
 	
+	/**
+	 * Syncs contacts from FreenetIS to Vtiger CRM.
+	 * 
+	 * @author Jan Dubina
+	 */
+	public static function vtiger_sync()
+	{
+		ini_set('max_execution_time', 3600);
+		
+		//set size of chucks used to create and update records vie webservice
+		$chunk_size = 100;
+
+		// vtiger web service client
+		$client = new Vtiger_WSClient(Settings::get('vtiger_domain'));
+		
+		//login
+		$login = $client->doLogin(Settings::get('vtiger_username'), 
+									Settings::get('vtiger_user_access_key'));
+		
+		// if logged in
+		if ($login)
+		{
+			//number of contact (phone and email) fields in vtiger
+			$contacts_max = 3;
+			
+			// module names
+			$module_contacts = 'Contacts';
+			$module_accounts = 'Accounts';
+			
+			$user_model = new User_Model();
+			$member_model = new Member_Model();
+
+			// get vtiger field names from settings
+			$account_fields = json_decode(Settings::get('vtiger_member_fields'), true);
+			$contact_fields = json_decode(Settings::get('vtiger_user_fields'), true);
+
+			//check fields in vtiger - accounts
+			$accounts_desc = $client->doDescribe($module_accounts);
+			
+			if (is_array($accounts_desc))
+			{
+				$fields = array();
+
+				foreach ($accounts_desc['fields'] as $desc)
+				{
+					$fields[] = $desc['name'];
+
+					// check mandatory fields
+					if ($desc['mandatory'] == 1 && !in_array($desc['name'], $account_fields) && 
+							$desc['name'] != 'assigned_user_id')
+						throw new Exception(__('Error - wrong vtiger fields settings'));
+				}
+
+				foreach ($account_fields as $field)
+					if (!in_array($field, $fields))
+						throw new Exception(__('Error - wrong vtiger fields settings'));
+			}
+			else
+				throw new Exception(__('Error - vtiger webservice not responding'));
+
+			//check fields in vtiger - contacts
+			$contacts_desc = $client->doDescribe($module_contacts);
+			
+			if(is_array($contacts_desc))
+			{
+				$fields = array();
+
+				foreach ($contacts_desc['fields'] as $desc)
+				{
+					$fields[] = $desc['name'];
+
+					//check mandatory fields
+					if ($desc['mandatory'] == 1 && !in_array($desc['name'], $contact_fields) &&
+							$desc['name'] != 'assigned_user_id')
+						throw new Exception(__('Error - wrong vtiger fields settings'));
+				}
+
+				foreach ($contact_fields as $field)
+					if (!in_array($field, $fields))
+						throw new Exception(__('Error - wrong vtiger fields settings'));
+			}
+			else
+				throw new Exception(__('Error - vtiger webservice not responding'));
+
+			// create new accounts
+			// get member ids from vtiger
+			$query = 'SELECT id,' . $account_fields['id'] . ' FROM ' . $module_accounts; 
+			$accounts_create_ids = array();
+			
+			$result = $client->doQueryNotLimited($query);
+
+			if(is_array($result))
+			{
+				// array with links between vtiger ids and fntis ids
+				$links = array();
+				
+				foreach ($result as $value) {
+					$links[$value['id']] = $value[$account_fields['id']];
+				}
+				
+				$vtiger_ids = array_values($links);
+	
+				// get member ids from freenetis
+				$result = $member_model->select_list('id');
+				$freenetis_ids = array();
+
+				foreach ($result as $key => $value) {
+					$freenetis_ids[] = $key;
+				}
+
+				// ids of members that need to be created
+				$accounts_create_ids = array_unique(array_filter(array_diff($freenetis_ids, $vtiger_ids)));
+
+				//if there are members to be created
+				if(!empty($accounts_create_ids))
+				{
+					$accounts_create = $member_model->get_members_to_sync_vtiger($accounts_create_ids, true);
+
+					$accounts_create_vtiger = array();
+
+					foreach ($accounts_create as $account)
+					{
+						$acc_arr = array();
+						$acc_arr[$account_fields['id']] = $account->id;
+						$acc_arr[$account_fields['name']] = $account->name;
+						$acc_arr[$account_fields['acc_type']] = 'Customer';
+						$acc_arr[$account_fields['entrance_date']] = strtotime($account->entrance_date);
+						$acc_arr[$account_fields['organization_identifier']] = $account->organization_identifier;
+						$acc_arr[$account_fields['var_sym']] = $account->variable_symbol;
+						$acc_arr[$account_fields['type']] = Member_Model::get_type($account->type);
+						$acc_arr[$account_fields['street']] = address::street_join($account->street,
+																					$account->street_number);
+						$acc_arr[$account_fields['town']] = $account->town;
+						$acc_arr[$account_fields['country']] = $account->country_name;
+						$acc_arr[$account_fields['zip_code']] = $account->zip_code;
+						$acc_arr[$account_fields['employees']] = $account->employees;
+						$acc_arr[$account_fields['do_not_send_emails']] = false;
+						$acc_arr[$account_fields['notify_owner']] = true;
+						$acc_arr[$account_fields['comment']] = $account->comment;
+
+						$phone = explode(';', $account->phone);
+
+						for ($i = 0; $i<$contacts_max; $i++)
+						{
+							$key = 'phone' . ($i + 1);
+							if(array_key_exists($i, $phone))
+								$acc_arr[$account_fields[$key]] = $phone[$i];
+						}
+
+						$email = explode(';', $account->email);
+
+						for ($i = 0; $i<$contacts_max; $i++)
+						{
+							$key = 'email' . ($i + 1);
+							if(array_key_exists($i, $email))
+								$acc_arr[$account_fields[$key]] = $email[$i];
+						}
+
+						$accounts_create_vtiger[] = $acc_arr;
+					}
+
+					if (count($accounts_create_vtiger) > $chunk_size)
+					{
+						$create_arrays = array_chunk($accounts_create_vtiger, $chunk_size);
+
+						foreach ($create_arrays as $create_array)
+						{
+							$records = $client->doCreateBulk($module_accounts, $create_array);
+
+							if(is_array($records))
+								foreach ($records as $record)
+									if (array_key_exists($account_fields['id'], $record))
+										$links[$record['id']] = $record[$account_fields['id']];						
+						}
+					}
+					else 
+					{
+						$records = $client->doCreateBulk($module_accounts, $accounts_create_vtiger);
+
+						//create array with links between freenetis ID and vtiger ID
+						if(is_array($records))
+							foreach ($records as $record)
+								if (array_key_exists($account_fields['id'], $record))
+									$links[$record['id']] = $record[$account_fields['id']];
+					}
+				}
+			}
+			
+			// create new contacts
+			// get user ids from vtiger
+			$query = 'SELECT ' . $contact_fields['id'] . ' FROM ' . $module_contacts; 
+			$contacts_create_ids = array();
+			
+			$result = $client->doQueryNotLimited($query);
+
+			if(is_array($result) && isset($links))
+			{
+				$vtiger_ids = array();
+
+				foreach ($result as $value) {
+					$vtiger_ids[] = $value[$contact_fields['id']];
+				}
+
+				//get member ids from freenetis
+				$result = $user_model->select_list('id');
+				$freenetis_ids = array();
+
+				foreach ($result as $key => $value)
+					$freenetis_ids[] = $key;
+
+				// ids of users that need to be created
+				$contacts_create_ids = array_unique(array_filter(array_diff($freenetis_ids, $vtiger_ids)));
+
+				//if there are users to be created
+				if(!empty($contacts_create_ids))
+				{
+					$contacts_create = $user_model->get_users_to_sync_vtiger($contacts_create_ids, true);
+
+					$contacts_create_vtiger = array();
+
+					foreach ($contacts_create as $contact)
+					{
+						$con_arr = array();
+						$con_arr[$contact_fields['id']] = $contact->id;
+						$con_arr[$contact_fields['name']] = $contact->name;
+						$con_arr[$contact_fields['middle_name']] = $contact->middle_name;
+						$con_arr[$contact_fields['surname']] = $contact->surname;
+						$con_arr[$contact_fields['pre_title']] = $contact->pre_title;
+						$con_arr[$contact_fields['post_title']] = $contact->post_title;
+						$con_arr[$contact_fields['birthday']] = date("d-m-Y", strtotime($contact->birthday));
+						$con_arr[$contact_fields['comment']] = $contact->comment;
+						$con_arr[$contact_fields['street']] = address::street_join($contact->street, 
+																					$contact->street_number);
+						$con_arr[$contact_fields['town']] = $contact->town;
+						$con_arr[$contact_fields['zip_code']] = $contact->zip_code;
+						$con_arr[$contact_fields['country']] = $contact->country_name;
+						$con_arr[$contact_fields['do_not_call']] = false;
+						$con_arr[$contact_fields['do_not_send_emails']] = false;
+						$con_arr[$contact_fields['notify_owner']] = true;
+
+						// try to link member and user record
+						$key = array_search($contact->member_id, $links);
+						if(!empty($key))
+							$con_arr[$contact_fields['member_id']] = $key;
+						else 
+						{
+							// create new array with links
+							$query = 'SELECT id,' . $account_fields['id'] . ' FROM ' . $module_accounts; 
+			
+							$result = $client->doQueryNotLimited($query);
+
+							if(is_array($result))
+							{
+								$links = array();
+
+								foreach ($result as $value) {
+									$links[$value['id']] = $value[$account_fields['id']];
+								}
+							}		
+						}
+
+						$phone = explode(';', $contact->phone);
+
+						for ($i = 0; $i<$contacts_max; $i++)
+						{
+							$key = 'phone' . ($i + 1);
+							if(array_key_exists($i, $phone))
+								$con_arr[$contact_fields[$key]] = $phone[$i];
+						}
+
+						$email = explode(';', $contact->email);
+
+						for ($i = 0; $i<$contacts_max; $i++)
+						{
+							$key = 'email' . ($i + 1);
+							if(array_key_exists($i, $email))
+								$con_arr[$contact_fields[$key]] = $email[$i];
+						}
+
+						$contacts_create_vtiger[] = $con_arr;
+					}
+
+					if (count($contacts_create_vtiger) > $chunk_size)
+					{
+						$create_arrays = array_chunk($contacts_create_vtiger, $chunk_size);
+
+						foreach ($create_arrays as $create_array)
+							$records = $client->doCreateBulk($module_contacts, $create_array);
+					}
+					else 
+					{
+						$records = $client->doCreateBulk($module_contacts, $contacts_create_vtiger);
+					}
+				}
+			}
+			
+			// delete users
+			$contacts_delete_ids = array_unique(array_filter(array_diff($vtiger_ids, $freenetis_ids)));
+
+			if (!empty($contacts_delete_ids))
+			{		
+				$query = 'SELECT id FROM ' . $module_contacts . ' WHERE ' . 
+							$contact_fields['id'] . ' IN (' . 
+							implode(',', $contacts_delete_ids) . ')';
+				
+				$results = $client->doQueryNotLimited($query);
+
+				if(is_array($results))
+					foreach ($results as $result)
+						$client->doDelete($result['id']);
+			}
+
+			// update accounts
+			$accounts_update = $member_model->get_members_to_sync_vtiger($accounts_create_ids, false);
+
+			if($accounts_update->count() != 0)
+			{
+				$query = 'SELECT * FROM ' . $module_accounts;
+
+				$results = $client->doQueryNotLimited($query);
+				
+				if(is_array($results))
+				{
+					$accounts_update_vtiger = array();
+
+					// "NOT IN" statement not working in vtiger ws query
+					foreach ($results as $result)
+						if (!in_array($result[$account_fields['id']], $accounts_create_ids))
+							$accounts_update_vtiger[$result[$account_fields['id']]] = $result;
+
+					$update = array();
+
+					foreach ($accounts_update as $record)
+					{
+						$record_vtiger = $accounts_update_vtiger[$record->id];
+
+						if ($record->name != $record_vtiger[$account_fields['name']])
+							$record_vtiger[$account_fields['name']] = $record->name;
+
+						if ($record->organization_identifier != $record_vtiger[$account_fields['organization_identifier']])
+							$record_vtiger[$account_fields['organization_identifier']] = $record->organization_identifier;
+
+						if ($record->entrance_date != $record_vtiger[$account_fields['entrance_date']] &&
+								!(empty($record->entrance_date) && $record_vtiger[$account_fields['entrance_date']] == '1970-01-01'))
+							$record_vtiger[$account_fields['entrance_date']] = $record->entrance_date;	
+
+						if ($record->variable_symbol != $record_vtiger[$account_fields['var_sym']])
+							$record_vtiger[$account_fields['var_sym']] = $record->variable_symbol;
+
+						if (Member_Model::get_type($record->type) != $record_vtiger[$account_fields['type']])
+							$record_vtiger[$account_fields['type']] = Member_Model::get_type($record->type);
+
+						$street = address::street_join($record->street, $record->street_number);
+
+						if ($street != $record_vtiger[$account_fields['street']])
+							$record_vtiger[$account_fields['street']] = $street;
+
+						if ($record->town != $record_vtiger[$account_fields['town']])
+							$record_vtiger[$account_fields['town']] = $record->town;
+
+						if ($record->country_name != $record_vtiger[$account_fields['country']])
+							$record_vtiger[$account_fields['country']] = $record->country_name;
+
+						if ($record->zip_code != $record_vtiger[$account_fields['zip_code']])
+							$record_vtiger[$account_fields['zip_code']] = $record->zip_code;
+
+						if ($record->employees != $record_vtiger[$account_fields['employees']])
+							$record_vtiger[$account_fields['employees']] = $record->employees;
+
+						if ($record->comment != $record_vtiger[$account_fields['comment']])
+							$record_vtiger[$account_fields['comment']] = $record->comment;
+
+						// update contact information - phone
+						$phone = explode(';', $record->phone);
+
+						$phone_vtiger = array(
+												$accounts_update_vtiger[$record->id][$account_fields['phone1']],
+												$accounts_update_vtiger[$record->id][$account_fields['phone2']],
+												$accounts_update_vtiger[$record->id][$account_fields['phone3']]
+						);
+
+						$phone_vtiger_orig = $phone_vtiger;
+
+						$phone_vtiger = array_filter($phone_vtiger);
+
+						$add_phone_nos = array_diff($phone, $phone_vtiger);
+						$phone_diff = array_diff($phone_vtiger, $phone);
+
+						if (!empty($phone_diff) || !empty($add_phone_nos))
+						{
+							if (!empty($phone_diff))
+								foreach($phone_diff as $key => $value)
+									unset($phone_vtiger[$key]);
+
+							if (!empty($add_phone_nos) && (count($phone_vtiger) < $contacts_max))
+								foreach($add_phone_nos as $phone_no)
+									if (count($phone_vtiger) < $contacts_max)
+										$phone_vtiger[] = $phone_no;
+
+							$new_phone_nos = array_values(array_diff($phone_vtiger, array_filter($phone_vtiger_orig)));
+
+							for ($i = 0; $i < $contacts_max; $i++)
+							{
+								if (!in_array($phone_vtiger_orig[$i], $phone_vtiger))
+								{
+									if (!empty($new_phone_nos))
+									{
+										$record_vtiger[$account_fields['phone'.($i+1)]] = $new_phone_nos[0];
+										unset($new_phone_nos[0]);
+										$new_phone_nos = array_values($new_phone_nos);
+									}
+									else
+										$record_vtiger[$account_fields['phone'.($i+1)]] = '';
+								}
+							}
+						}
+
+						// update contact information - email
+						$email = explode(';', $record->email);
+
+						$email_vtiger = array(
+												$accounts_update_vtiger[$record->id][$account_fields['email1']],
+												$accounts_update_vtiger[$record->id][$account_fields['email2']],
+												$accounts_update_vtiger[$record->id][$account_fields['email3']]
+						);
+
+						$email_vtiger_orig = $email_vtiger;
+
+						$email_vtiger = array_filter($email_vtiger);
+
+						$add_emails = array_diff($email, $email_vtiger);
+						$email_diff = array_diff($email_vtiger, $email);
+
+						if (!empty($email_diff) || !empty($add_emails))
+						{
+							if (!empty($email_diff))
+								foreach($email_diff as $key => $value)
+									unset($email_vtiger[$key]);
+
+							if (!empty($add_emails) && (count($email_vtiger) < $contacts_max))
+								foreach($add_emails as $emails)
+									if (count($email_vtiger) < $contacts_max)
+										$email_vtiger[] = $emails;
+
+							$new_emails = array_values(array_diff($email_vtiger, $email_vtiger_orig));
+
+							for ($i = 0; $i < $contacts_max; $i++)
+							{
+								if (!in_array($email_vtiger_orig[$i], $email_vtiger))
+								{
+									if (!empty($new_emails))
+									{
+										$record_vtiger[$account_fields['email'.($i+1)]] = $new_emails[0];
+										unset($new_emails[0]);
+										$new_emails = array_values($new_emails);
+									}
+									else
+										$record_vtiger[$account_fields['email'.($i+1)]] = '';
+								}
+							}
+						}
+
+						// checks if original and updated records are different
+						$update_diff = array_diff($record_vtiger, $accounts_update_vtiger[$record->id]);
+
+						if (!empty($update_diff))
+							$update[] = $record_vtiger;
+					}
+
+					if (count($update) > $chunk_size)
+					{
+						$create_arrays = array_chunk($update, $chunk_size);
+
+						foreach ($create_arrays as $create_array)
+							$client->doUpdateBulk($module_accounts, $create_array);
+					}
+					else 
+					{
+						$client->doUpdateBulk($module_accounts, $update);
+					}
+				}
+			}
+
+			//update contacts
+			$contacts_update = $user_model->get_users_to_sync_vtiger($contacts_create_ids, false);
+			
+			if ($contacts_update->count() != 0)
+			{
+				$query = 'SELECT * FROM ' . $module_contacts;
+
+				$results = $client->doQueryNotLimited($query);
+				
+				if(is_array($results))
+				{
+					$contacts_update_vtiger = array();
+
+					// "NOT IN" statement not working in vtiger ws query
+					foreach ($results as $result)
+						if (!in_array($result[$contact_fields['id']], $contacts_create_ids))
+							$contacts_update_vtiger[$result[$contact_fields['id']]] = $result;
+
+					$update = array();
+
+					foreach ($contacts_update as $record)
+					{
+						$record_vtiger = $contacts_update_vtiger[$record->id];
+
+						if ($record->name != $record_vtiger[$contact_fields['name']])
+							$record_vtiger[$contact_fields['name']] = $record->name;
+
+						if ($record->middle_name != $record_vtiger[$contact_fields['middle_name']])
+							$record_vtiger[$contact_fields['middle_name']] = $record->middle_name;
+
+						if ($record->surname != $record_vtiger[$contact_fields['surname']])
+							$record_vtiger[$contact_fields['surname']] = $record->surname;
+
+						if ($record->pre_title != $record_vtiger[$contact_fields['pre_title']])
+							$record_vtiger[$contact_fields['pre_title']] = $record->pre_title;
+
+						if ($record->post_title != $record_vtiger[$contact_fields['post_title']])
+							$record_vtiger[$contact_fields['post_title']] = $record->post_title;
+
+						if ($record->birthday != $record_vtiger[$contact_fields['birthday']] &&
+								!(empty($record->birthday) && $record_vtiger[$contact_fields['birthday']] == '1970-01-01'))
+							$record_vtiger[$contact_fields['birthday']] = $record->birthday;
+
+						if ($record->comment != $record_vtiger[$contact_fields['comment']])
+							$record_vtiger[$contact_fields['comment']] = $record->comment;
+
+						$street = address::street_join($record->street, $record->street_number);
+
+						if ($street != $record_vtiger[$contact_fields['street']])
+							$record_vtiger[$contact_fields['street']] = $street;
+
+						if ($record->town != $record_vtiger[$contact_fields['town']])
+							$record_vtiger[$contact_fields['town']] = $record->town;
+
+						if ($record->zip_code != $record_vtiger[$contact_fields['zip_code']])
+							$record_vtiger[$contact_fields['zip_code']] = $record->zip_code;
+
+						if ($record->country_name != $record_vtiger[$contact_fields['country']])
+							$record_vtiger[$contact_fields['country']] = $record->country_name;
+
+						if ($record->member_id != $links[$record_vtiger[$contact_fields['member_id']]])
+						{
+							$key = array_search ($record->member_id, $links);
+							if(!empty($key))
+								$record_vtiger[$contact_fields['member_id']] = $key;
+						}
+
+						//update contact information - phone
+						$phone = explode(';', $record->phone);
+
+						$phone_vtiger = array(
+												$contacts_update_vtiger[$record->id][$contact_fields['phone1']],
+												$contacts_update_vtiger[$record->id][$contact_fields['phone2']],
+												$contacts_update_vtiger[$record->id][$contact_fields['phone3']]
+						);
+
+						$phone_vtiger_orig = $phone_vtiger;
+
+						$phone_vtiger = array_filter($phone_vtiger);
+
+						$add_phone_nos = array_diff($phone, $phone_vtiger);
+						$phone_diff = array_diff($phone_vtiger, $phone);
+
+						if (!empty($phone_diff) || !empty($add_phone_nos))
+						{
+							if (!empty($phone_diff))
+								foreach($phone_diff as $key => $value)
+									unset($phone_vtiger[$key]);
+
+							if (!empty($add_phone_nos) && (count($phone_vtiger) < $contacts_max))
+								foreach($add_phone_nos as $phone_no)
+									if (count($phone_vtiger) < $contacts_max)
+										$phone_vtiger[] = $phone_no;
+
+							$new_phone_nos = array_values(array_diff($phone_vtiger, array_filter($phone_vtiger_orig)));
+
+							for ($i = 0; $i < $contacts_max; $i++)
+							{
+								if (!in_array($phone_vtiger_orig[$i], $phone_vtiger))
+								{
+									if (!empty($new_phone_nos))
+									{
+										$record_vtiger[$contact_fields['phone'.($i+1)]] = $new_phone_nos[0];
+										unset($new_phone_nos[0]);
+										$new_phone_nos = array_values($new_phone_nos);
+									}
+									else
+										$record_vtiger[$contact_fields['phone'.($i+1)]] = '';
+								}
+							}
+						}
+
+						//update contact information - email
+						$email = explode(';', $record->email);
+
+						$email_vtiger = array(
+												$contacts_update_vtiger[$record->id][$contact_fields['email1']],
+												$contacts_update_vtiger[$record->id][$contact_fields['email2']],
+												$contacts_update_vtiger[$record->id][$contact_fields['email3']]
+						);
+
+						$email_vtiger_orig = $email_vtiger;
+						
+						$email_vtiger = array_filter($email_vtiger);
+
+						$add_emails = array_diff($email, $email_vtiger);
+						$email_diff = array_diff($email_vtiger, $email);
+
+						if (!empty($email_diff) || !empty($add_emails))
+						{
+							if (!empty($email_diff))
+								foreach($email_diff as $key => $value)
+									unset($email_vtiger[$key]);
+
+							if (!empty($add_emails) && (count($email_vtiger) < $contacts_max))
+								foreach($add_emails as $emails)
+									if (count($email_vtiger) < $contacts_max)
+										$email_vtiger[] = $emails;
+
+							$new_emails = array_values(array_diff($email_vtiger, $email_vtiger_orig));
+
+							for ($i = 0; $i < $contacts_max; $i++)
+							{
+								if (!in_array($email_vtiger_orig[$i], $email_vtiger))
+								{
+									if (!empty($new_emails))
+									{
+										$record_vtiger[$contact_fields['email'.($i+1)]] = $new_emails[0];
+										unset($new_emails[0]);
+										$new_emails = array_values($new_emails);
+									}
+									else
+										$record_vtiger[$contact_fields['email'.($i+1)]] = '';
+								}
+							}
+						}
+
+						// checks if original and updated records are different
+						$update_diff = array_diff($record_vtiger, $contacts_update_vtiger[$record->id]);
+
+						if (!empty($update_diff))
+							$update[] = $record_vtiger;
+					}
+
+					if (count($update) > $chunk_size)
+					{
+						$create_arrays = array_chunk($update, $chunk_size);
+
+						foreach ($create_arrays as $create_array)
+							$client->doUpdateBulk($module_contacts, $create_array);
+					}
+					else 
+					{
+						$client->doUpdateBulk($module_contacts, $update);
+					}
+				}
+			}
+		}
+		else
+		{
+			//login failed
+			throw new Exception(__('Connection to vtiger server has failed'));
+		}
+	}
 }

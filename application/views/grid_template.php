@@ -3,9 +3,11 @@
 <?php echo ($filter) ? $filter.'<br />' : '' ?>
 <?php echo empty($buttons) ? '' : implode(' | ', $buttons).'<br /><br />' ?>
 
+<?php if(isset($items)): ?>
+	
 <?php if ($form)
 {
-	echo form::open(NULL, array('class' => 'grid_form'));
+	echo form::open(NULL, array('class' => 'grid_form', 'method' => $method));
 	
 	if (isset($form_extra_buttons["position"]) && $form_extra_buttons["position"] == 'top')
 	{
@@ -41,7 +43,7 @@
 	else if ($field instanceof Action_Field)
 	{
 	    ?>
-	    <th class="{sorter: false}"><?php echo $field->label?><?php if ($field->help!='') echo $field->help ?>
+	    <th class="noprint {sorter: false}"><?php echo $field->label?><?php if ($field->help!='') echo $field->help ?>
 	    </th>
 	    <?php
 	}
@@ -50,7 +52,7 @@
 		if (count($field->actions_fields))
 		{
 			?>
-			<th class="{sorter: false}"><?php echo $field->label?><?php if ($field->help!='') echo $field->help ?>
+			<th class="noprint {sorter: false}"><?php echo $field->label?><?php if ($field->help!='') echo $field->help ?>
 			</th>
 			<?php
 		}
@@ -127,6 +129,11 @@
 				}
 				
 				$property = $action_field->name;
+				
+				// do not display row with empty property
+				if (!$item->$property)
+					continue;
+				
 				$class = array();
 				
 				if (!empty($action_field->class))
@@ -156,15 +163,18 @@
 			$href = $item->$property;
 			$property = $field->data_name;
 			$text = $item->$property;
+			$property = $field->data_title;
+			$title = ($property) ? $item->$property : '';
 			
-			echo '<td class="noprint">';
+			echo '<td>';
 			
 			if (!empty($href))
 			{
 				echo html::anchor($field->url.'/'.$href, $text, array
 				(
 					'script'	=> $field->script,
-					'class'		=> $field->class
+					'class'		=> $field->class,
+					'title'		=> $title
 				));
 			}
 			else
@@ -186,7 +196,12 @@
 			if ($field instanceof Callback_Field || $field instanceof Order_Callback_Field)
 			{
 			    if (isset($field->callback))
+				{
+					if (!is_callable($field->callback))
+						$field->callback = 'callback::'.$field->callback;
+					
 					call_user_func($field->callback, $item, $field->name, $field->args['callback']);
+				}
 			    else
 					echo $item->$field;
 			}
@@ -263,11 +278,14 @@ if ($form)
 			echo $form_extra_button;
 	}
 
-	echo form::submit('submit', $form_submit_value);
+	echo form::submit('submit', $form_submit_value, ' class="submit"');
 	echo form::close();
 }
 ?>
 
 <?php echo  $paginator; ?>
 <?php echo  $selector; ?>
+
+<?php endif ?>
+	
 </div>

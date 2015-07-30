@@ -40,7 +40,7 @@ class Email_queue_Model	extends ORM
 	/**
 	 * Unsuccessfully sent e-mail, almost same as new
 	 */
-	const STATE_FAIL	= 2;
+	const STATE_FAIL		= 2;
 	
 	/**
 	 * Returns current email queue, by default 10 e-mails to send
@@ -72,19 +72,15 @@ class Email_queue_Model	extends ORM
 			$limit_from = 0, $limit_results = 50,
 			$order_by = 'id', $order_by_direction = 'ASC', $filter_sql='')
 	{
-		// filter
-		$where = "";
-		if ($filter_sql != '')
-			$where = " AND $filter_sql";
+		// args
+		$args = array(Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK);
 		
-		return $this->db->query("
-			SELECT * FROM
-			(
-				SELECT eq.*,
-				fuc.user_id AS from_user_id,
-				CONCAT(fu.name,' ',fu.surname) AS from_user_name,
-				tuc.user_id AS to_user_id,
-				CONCAT(tu.name,' ',tu.surname) AS to_user_name
+		// sql body
+		$body = "SELECT eq.id, eq.from, eq.to, eq.subject, eq.state, eq.access_time,
+					fuc.user_id AS from_user_id,
+					CONCAT(fu.name,' ',fu.surname) AS from_user_name,
+					tuc.user_id AS to_user_id,
+					CONCAT(tu.name,' ',tu.surname) AS to_user_name
 				FROM email_queues eq
 				LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
 				LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
@@ -92,12 +88,27 @@ class Email_queue_Model	extends ORM
 				LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 				LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 				LEFT JOIN users tu ON tuc.user_id = tu.id
-			) eq
-			WHERE eq.state = ? $where
-			GROUP BY eq.id
-			ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
-			LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
-		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK);
+				WHERE eq.state = ?";
+		
+		// filter
+		if (empty($filter_sql))
+		{
+			return $this->db->query("
+				$body
+				GROUP BY eq.id
+				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
+				LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
+			", $args);
+		}
+		else
+		{
+			return $this->db->query("
+				$body
+				HAVING $filter_sql
+				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
+				LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
+			", $args);
+		}
 	}
 	
 	/**
@@ -109,34 +120,125 @@ class Email_queue_Model	extends ORM
 	 */
 	public function count_all_sent_emails($filter_sql='')
 	{
+		if (empty($filter_sql))
+		{
+			return  $this->db->query("
+				SELECT COUNT(*) AS total
+				FROM email_queues eq
+				WHERE eq.state = ?
+			", self::STATE_OK)->current()->total;
+		}
+		
 		// filter
-		$where = "";
+		$having = "";
 		if ($filter_sql != '')
-			$where = " AND $filter_sql";
+			$having = "HAVING $filter_sql";
 		
 		return $this->db->query("
-			SELECT COUNT(*) AS total FROM
+			SELECT eq.id, eq.from, eq.to, eq.subject, eq.state, eq.access_time,
+				fuc.user_id AS from_user_id,
+				CONCAT(fu.name,' ',fu.surname) AS from_user_name,
+				tuc.user_id AS to_user_id,
+				CONCAT(tu.name,' ',tu.surname) AS to_user_name
+			FROM email_queues eq
+			LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
+			LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
+			LEFT JOIN users fu ON fuc.user_id = fu.id
+			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
+			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
+			LEFT JOIN users tu ON tuc.user_id = tu.id
+			WHERE eq.state = ?
+			$having
+		", array
+		(
+			Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL,
+			self::STATE_OK
+		))->count();
+	}
+	
+	/**
+	 * Returns all sent e-mails for export
+	 * 
+	 * @param string $filter_sql
+	 * @return Mysql_Result
+	 */
+	public function get_all_sent_emails_for_export($filter_sql = '')
+	{
+		// filter
+		$having = '';
+		if (!empty($filter_sql))
+			$having = "HAVING $filter_sql";
+		
+		return $this->db->query("
+			SELECT eq.id,
+				CONCAT(eq.from, ' (', IFNULL(CONCAT(from_user_id, ' - ', from_user_name),'-'), ')') AS sender,
+				CONCAT(eq.to, ' (', IFNULL(CONCAT(to_user_id, ' - ', to_user_name),'-'), ')') AS receiver,
+				eq.access_time AS sended,
+				eq.subject,
+				eq.body AS message
+			FROM
 			(
-				SELECT eq.id FROM
-				(
-					SELECT eq.*,
-					fuc.user_id AS from_user_id,
+				SELECT eq.*, fuc.user_id AS from_user_id,
 					CONCAT(fu.name,' ',fu.surname) AS from_user_name,
 					tuc.user_id AS to_user_id,
 					CONCAT(tu.name,' ',tu.surname) AS to_user_name
-					FROM email_queues eq
-					LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
-					LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
-					LEFT JOIN users fu ON fuc.user_id = fu.id
-					LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
-					LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
-					LEFT JOIN users tu ON tuc.user_id = tu.id
-				) eq
-				WHERE eq.state = ? $where
-				GROUP BY eq.id
+				FROM email_queues eq
+				LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
+				LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
+				LEFT JOIN users fu ON fuc.user_id = fu.id
+				LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
+				LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
+				LEFT JOIN users tu ON tuc.user_id = tu.id
+				WHERE eq.state = ?
+				$having
 			) eq
-		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK)
-		->current()->total;
+		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK);
+	}
+	
+	/**
+	 * Returns all sent e-mails for export
+	 * 
+	 * @param string $filter_sql
+	 * @return Mysql_Result
+	 */
+	public function delete_sent_emails($filter_sql = '')
+	{
+		// filter
+		$having = '';
+		if (!empty($filter_sql))
+			$having = "HAVING $filter_sql";
+		
+		// cannot select from deleted table, so.. two step function
+		$ids = $this->db->query("
+			SELECT eq.*, fuc.user_id AS from_user_id,
+				CONCAT(fu.name,' ',fu.surname) AS from_user_name,
+				tuc.user_id AS to_user_id,
+				CONCAT(tu.name,' ',tu.surname) AS to_user_name
+			FROM email_queues eq
+			LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
+			LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
+			LEFT JOIN users fu ON fuc.user_id = fu.id
+			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
+			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
+			LEFT JOIN users tu ON tuc.user_id = tu.id
+			WHERE eq.state = ?
+			$having
+		", array
+		(
+			Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL,
+			self::STATE_OK
+		))->as_array();
+		
+		$pids = array();
+		
+		foreach ($ids as $id)
+		{
+			$pids[] = $id->id;
+		}
+		
+		$this->db->query("
+			DELETE FROM email_queues WHERE id IN (" . implode(',', $pids) . ")
+		");
 	}
 	
 	/**
@@ -155,28 +257,25 @@ class Email_queue_Model	extends ORM
 			$order_by = 'id', $order_by_direction = 'ASC', $filter_sql='')
 	{
 		// filter
-		$where = "";
+		$having = "";
 		if ($filter_sql != '')
-			$where = " AND $filter_sql";
+			$having = 'HAVING '.$filter_sql;
 		
 		return $this->db->query("
-			SELECT * FROM
-			(
-				SELECT eq.*,
-				fuc.user_id AS from_user_id,
+			SELECT eq.id, eq.from, eq.to, eq.subject, eq.state, eq.access_time,
+				fuc.user_id,
 				CONCAT(fu.name,' ',fu.surname) AS from_user_name,
-				tuc.user_id AS to_user_id,
+				tuc.user_id,
 				CONCAT(tu.name,' ',tu.surname) AS to_user_name
-				FROM email_queues eq
-				LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
-				LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
-				LEFT JOIN users fu ON fuc.user_id = fu.id
-				LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
-				LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
-				LEFT JOIN users tu ON tuc.user_id = tu.id
-			) eq
-			WHERE eq.state <> ? $where
-			GROUP BY eq.id
+			FROM email_queues eq
+			LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
+			LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
+			LEFT JOIN users fu ON fuc.user_id = fu.id
+			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
+			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
+			LEFT JOIN users tu ON tuc.user_id = tu.id
+			WHERE eq.state <> ?
+			$having
 			ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
 			LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
 		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK);
@@ -191,34 +290,40 @@ class Email_queue_Model	extends ORM
 	 */
 	public function count_all_unsent_emails($filter_sql='')
 	{
+		if (empty($filter_sql))
+		{
+			return  $this->db->query("
+				SELECT COUNT(*) AS total
+				FROM email_queues eq
+				WHERE eq.state <> ?
+			", self::STATE_OK)->current()->total;
+		}
+		
 		// filter
-		$where = "";
+		$having = "";
 		if ($filter_sql != '')
-			$where = " AND $filter_sql";
+			$having = 'HAVING '.$filter_sql;
 		
 		return $this->db->query("
-			SELECT COUNT(*) AS total FROM
-			(
-				SELECT eq.id FROM
-				(
-					SELECT eq.*,
-					fuc.user_id AS from_user_id,
-					CONCAT(fu.name,' ',fu.surname) AS from_user_name,
-					tuc.user_id AS to_user_id,
-					CONCAT(tu.name,' ',tu.surname) AS to_user_name
-					FROM email_queues eq
-					LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
-					LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
-					LEFT JOIN users fu ON fuc.user_id = fu.id
-					LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
-					LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
-					LEFT JOIN users tu ON tuc.user_id = tu.id
-				) eq
-				WHERE eq.state <> ? $where
-				GROUP BY eq.id
-			) eq
-		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK)
-		->current()->total;
+			SELECT  eq.id, eq.from, eq.to, eq.subject, eq.state, eq.access_time,
+				fuc.user_id,
+				CONCAT(fu.name,' ',fu.surname) AS from_user_name,
+				tuc.user_id,
+				CONCAT(tu.name,' ',tu.surname) AS to_user_name
+			FROM email_queues eq
+			LEFT JOIN contacts fc ON eq.from = fc.value AND fc.type = ?
+			LEFT JOIN users_contacts fuc ON fc.id = fuc.contact_id
+			LEFT JOIN users fu ON fuc.user_id = fu.id
+			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
+			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
+			LEFT JOIN users tu ON tuc.user_id = tu.id
+			WHERE eq.state <> ? 
+			$having
+		", array
+		(
+			Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL,
+			self::STATE_OK
+		))->count();
 	}
 	
 	/**

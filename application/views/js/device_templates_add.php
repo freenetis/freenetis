@@ -61,6 +61,16 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			for (var i = ch_count; i < count; i++)
 			{
 				e.append($('<tr>').attr('id', ename + '_id_' + i).append(
+					$('<td>').html(
+						$('<input>').attr({
+							'name'	: 'default_iface',
+							'value'	: '<?php echo Iface_Model::TYPE_ETHERNET ?>:' + i,
+							'type'	: 'radio',
+							'checked' : ($('input[name="default_iface"]').length == 0),
+							'title'	: '<?php echo __('Default iface is used as filled iface in permitting of the connection request') ?>'
+						}).css('width', 'auto').css('marginRight', '10px').addClass('help')
+					)
+				).append(
 					$('<td>').html($('<label>').text('<?php echo __('Name') ?>:')).append(
 						$('<input>').attr({
 							'name'	: 'values[<?php echo Iface_Model::TYPE_ETHERNET ?>][items][' + i + '][name]',
@@ -117,6 +127,16 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			for (var i = ch_count; i < count; i++)
 			{
 				e.append($('<tr>').attr('id', ename + '_id_' + i).append(
+					$('<td>').html(
+						$('<input>').attr({
+							'name'	: 'default_iface',
+							'value'	: '<?php echo Iface_Model::TYPE_PORT ?>:' + i,
+							'type'	: 'radio',
+							'checked' : ($('input[name="default_iface"]').length == 0),
+							'title'	: '<?php echo __('Default iface is used as filled iface in permitting of the connection request') ?>'
+						}).css('width', 'auto').css('marginRight', '10px').addClass('help')
+					)
+				).append(
 					$('<td>').html($('<label>').text('<?php echo __('Name') ?>:')).append(
 						$('<input>').attr({
 							'name'	: 'values[<?php echo Iface_Model::TYPE_PORT ?>][items][' + i + '][name]',
@@ -190,6 +210,16 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			for (var i = ch_count; i < count; i++)
 			{
 				e.append($('<tr>').attr('id', ename + '_id_' + i).append(
+					$('<td>').html(
+						$('<input>').attr({
+							'name'	: 'default_iface',
+							'value'	: '<?php echo Iface_Model::TYPE_WIRELESS ?>:' + i,
+							'type'	: 'radio',
+							'checked' : ($('input[name="default_iface"]').length == 0),
+							'title'	: '<?php echo __('Default iface is used as filled iface in permitting of the connection request') ?>'
+						}).css('width', 'auto').css('marginRight', '10px').addClass('help')
+					)
+				).append(
 					$('<td>').html($('<label>').text('<?php echo __('Name') ?>:')).append(
 						$('<input>').attr({
 							'name'	: 'values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][' + i + '][name]',
@@ -426,5 +456,10 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	<?php $i = 0; foreach ($device_template_value[Iface_Model::TYPE_INTERNAL]['items'] as $item): ?>
 	$('input[name="values[<?php echo Iface_Model::TYPE_INTERNAL ?>][items][<?php echo $i++ ?>][name]"]').val('<?php echo $item['name'] ?>');
 	<?php endforeach; ?>
+		
+	// set default iface id setted
+	<?php if (preg_match('/^(\d+):(\d+)$/', @$device_template_value['default_iface'], $r)): ?>
+	$('input[name="values[<?php echo $r[1] ?>][items][<?php echo $r[2] ?>][name]"]').parent().parent().find('input[name="default_iface"]').attr('checked', true);
+	<?php endif ?>
 		
 	<?php endif; ?>

@@ -45,7 +45,7 @@
 		<th><?php echo __('State') ?></th>
 		<td><b><?php echo $state_text ?></b></td>
 	</tr>
-	<?php if ($work->state == 3 && $transfer->id): ?>
+	<?php if ($work->state == Vote_Model::STATE_APPROVED && isset($transfer) && $transfer->id): ?>
 		<tr>
 			<th><?php echo __('Confirmed time') ?></th>
 			<td><?php echo $transfer->creation_datetime ?></td>

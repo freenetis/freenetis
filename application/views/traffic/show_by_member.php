@@ -38,7 +38,7 @@
 		});
 	});
 	
---></script>
+//--></script>
 
 <h2><?php echo __('Traffic of member') ?> <?php echo $member->name ?></h2><br />
 

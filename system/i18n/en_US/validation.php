@@ -10,7 +10,9 @@ $lang = array
 	'unknown_error' => 'Unknown validation error while validating the %s field.',
 	'required'      => 'The %s field is required.',
 	'min_length'    => 'The %s field must be at least %d characters long.',
+	'min_value'     => 'The value of the %s field must be at least %d.',
 	'max_length'    => 'The %s field must be %d characters or fewer.',
+	'max_value'     => 'The value of the %s field must be %d or fewer.',
 	'exact_length'  => 'The %s field must be exactly %d characters.',
 	'in_array'      => 'The %s field must be selected from the options listed.',
 	'matches'       => 'The %s field must match the %s field.',
@@ -34,7 +36,9 @@ $lang = array
 	// Field types
 	'alpha'         => 'alphabetical',
 	'alpha_dash'    => 'alphabetical, dash, and underscore',
+	'date_interval'	=> 'Date is not in valid interval',
 	'digit'         => 'digit',
 	'numeric'       => 'numeric',
-	'gps'			=> 'Wrong formar of GPS coordinate',
+	'gps'			=> 'Wrong format of GPS coordinate',
+	'preg_regex'	=> 'Wrong regular expresion format',
 );

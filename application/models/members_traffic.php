@@ -158,13 +158,15 @@ class Members_traffic_Model extends Model
 	{
 		// get all old partitions
 		$partitions = $this->db->query("
-			SELECT partition_name FROM
-			(
-				SELECT DISTINCT CONCAT('p_', DATE_FORMAT(date, '%Y_%m_%d')) AS partition_name
-				FROM members_traffics_daily
-				WHERE DATE_SUB(NOW(), INTERVAL 2 MONTH) > date
-			) p GROUP BY partition_name
-		");
+			SELECT DISTINCT PARTITION_NAME AS partition_name
+			FROM INFORMATION_SCHEMA.PARTITIONS
+			WHERE TABLE_NAME = 'members_traffics_daily' AND
+				TABLE_SCHEMA = ? AND
+				PARTITION_NAME <> 'p_first' AND
+				STR_TO_DATE(PARTITION_NAME, 'p_%Y_%m_%d') < 
+					DATE_SUB(NOW(), INTERVAL 2 MONTH)
+			ORDER BY PARTITION_NAME
+		", Config::get('db_name'));
 		
 		foreach ($partitions as $partition)
 		{
@@ -184,13 +186,15 @@ class Members_traffic_Model extends Model
 	{
 		// get all old partitions
 		$partitions = $this->db->query("
-			SELECT partition_name FROM
-			(
-				SELECT DISTINCT CONCAT('p_', DATE_FORMAT(date, '%Y_%m_01')) AS partition_name
-				FROM members_traffics_monthly
-				WHERE DATE_SUB(NOW(), INTERVAL 2 YEAR) > date
-			) p GROUP BY partition_name
-		");
+			SELECT DISTINCT PARTITION_NAME AS partition_name
+			FROM INFORMATION_SCHEMA.PARTITIONS
+			WHERE TABLE_NAME = 'members_traffics_monthly' AND
+				TABLE_SCHEMA = ? AND
+				PARTITION_NAME <> 'p_first' AND
+				STR_TO_DATE(PARTITION_NAME, 'p_%Y_%m_%d') < 
+					DATE_SUB(NOW(), INTERVAL 2 YEAR)
+			ORDER BY PARTITION_NAME
+		", Config::get('db_name'));
 		
 		foreach ($partitions as $partition)
 		{
@@ -788,9 +792,7 @@ class Members_traffic_Model extends Model
 			(
 				SELECT id
 				FROM members
-				WHERE
-					(qos_rate IS NULL OR qos_rate = '') AND
-					(qos_ceil IS NULL OR qos_ceil = '')
+				WHERE speed_class_id IS NULL
 			)
 			ORDER BY $type DESC
 			LIMIT ?

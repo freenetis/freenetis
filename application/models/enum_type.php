@@ -22,13 +22,14 @@
  * @property string $value
  * @property boolean $read_only
  * @property ORM_Iterator $device_templates
+ * @property ORM_Iterator $connection_requests
  */
 class Enum_type_Model extends ORM
 {
 	/* enum types names (same as enum type name IDs) ==> */
 	// types for device, member, user, contact, fee
-	const MEMBER_TYPE_ID			= 1;
-	const DEVICE_TYPE_ID			= 2;
+	const MEMBER_TYPE_ID				= 1;
+	const DEVICE_TYPE_ID				= 2;
 	const USER_TYPE_ID				= 3;
 	const CONTACT_TYPE_ID			= 4;
 	const FEE_TYPE_ID				= 6;
@@ -38,17 +39,17 @@ class Enum_type_Model extends ORM
 	const ANTENNA_TYPE_ID			= 10;
 	const POLARIZATION_TYPE_ID		= 11;
 
-	const MEDIUM_TYPE_ID			= 12;
+	const MEDIUM_TYPE_ID				= 12;
 	// types for redirection
 	const REDIRECT_DURATION_ID		= 13;
 	const REDIRECT_DESTINATION_ID	= 14;
-	const REDIRECT_ACTION_ID		= 15;
+	const REDIRECT_ACTION_ID			= 15;
 	// types for bacup
 	const BACUP_ID					= 16;
 	/* <== enum types names */
 	
 	const READ_ONLY					= 1;
-	const READ_WRITE				= 0;
+	const READ_WRITE					= 0;
 	
 	protected $belongs_to = array
 	(
@@ -57,7 +58,7 @@ class Enum_type_Model extends ORM
 	
 	protected $has_many = array
 	(
-		'device_templates'
+		'device_templates', 'connection_requests'
 	);
 
 	/**
@@ -116,11 +117,24 @@ class Enum_type_Model extends ORM
 	 */
 	public function get_all($order_by, $order_by_direction)
 	{
-		return $this->select('enum_types.id', 'enum_type_names.type_name as type', 'enum_types.value')
-				->join('enum_type_names', 'enum_types.type_id', 'enum_type_names.id')
-				->where('read_only', 0)
-				->orderby($order_by, $order_by_direction)
-				->find_all();
+		// order by check
+		if (!$this->has_column($order_by))
+		{
+			$order_by = 'id';
+		}
+		// order by direction check
+		if (strtolower($order_by_direction) != 'desc')
+		{
+			$order_by_direction = 'asc';
+		}
+		// query
+		return $this->db->query("
+			SELECT et.id, etn.type_name as type, et.value, et.read_only AS readonly
+			FROM enum_types et
+			JOIN enum_type_names etn ON et.type_id = etn.id
+			LEFT JOIN translations t ON etn.type_name = t.original_term AND t.lang = ?
+			ORDER BY $order_by $order_by_direction
+		", Config::get('lang'));
 	}
 
 	/**

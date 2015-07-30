@@ -46,8 +46,8 @@ class Translations_Controller extends Controller
 			Controller::Error(ACCESS);
 
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		// get order of grid from parameters
 		$allowed_order_type = array('id', 'original_term', 'translated_term', 'lang');

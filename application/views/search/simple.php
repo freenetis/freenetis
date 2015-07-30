@@ -2,8 +2,8 @@
 <?php echo __('Total found items') ?>: <?php echo $total_items ?>
 <?php for ($i = $from; $i <= $to; $i++): ?>
 	<div class="search_result">
-		<b><?php echo html::anchor(url_lang::base() . $results[$i]->link . $results[$i]->id, $results[$i]->return_value, array('class' => 'search_result_title')) ?></b><br />
-		<i><?php echo $results[$i]->desc ?></i>
+		<b><?php echo html::anchor(url_lang::base() . $results[$i]->link . $results[$i]->id, text::highligth($keyword, $results[$i]->return_value), array('class' => 'search_result_title')) ?></b><br />
+		<i><?php echo text::highligth($keyword, $results[$i]->desc) ?></i>
 	</div>
 <?php endfor ?>
 

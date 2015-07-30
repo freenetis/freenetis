@@ -62,9 +62,9 @@ final class Config
 		if (self::$cache === NULL)
 		{
 			// Invalid config file
-			if (file_exists('config' . EXT))
+			if (file_exists(DOCROOT . 'config' . EXT))
 			{
-				require('config' . EXT);
+				require(DOCROOT . 'config' . EXT);
 			}
 
 			if (!isset($config))

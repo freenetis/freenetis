@@ -380,7 +380,7 @@ class Link_Model extends ORM
 			JOIN users u ON d.user_id = u.id
 			JOIN members m ON u.member_id = m.id
 			WHERE i.link_id = ?
-			ORDER BY i.wireless_mode DESC, i.name ASC
+			ORDER BY i.wireless_mode ASC, i.name ASC, i.type ASC
 		", $link_id);
 	}
 	

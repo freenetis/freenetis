@@ -65,6 +65,29 @@ class Variable_Symbol_Model extends ORM
 	}
 	
 	/**
+	 * Returns member id of given variable_symbol
+	 * 
+	 * @param int $variable_symbol
+	 * @return null|int
+	 */
+	public function get_member_id($variable_symbol)
+	{
+		$query = $this->db->query("
+				SELECT a.member_id
+				FROM variable_symbols vs
+				JOIN accounts a ON a.id = vs.account_id
+				WHERE vs.variable_symbol = ?
+			", $variable_symbol);
+		
+		if ($query->count() > 0)
+		{
+			return $query->current()->member_id;
+		}
+		
+		return NULL;
+	}
+	
+	/**
 	 * Returns variable symbol id of given variable_symbol
 	 * 
 	 * @param int $variable_symbol
@@ -73,7 +96,7 @@ class Variable_Symbol_Model extends ORM
 	public function get_variable_symbol_id($variable_symbol)
 	{
 		$query = $this->db->query("
-				SELECT id
+				SELECT *
 				FROM variable_symbols
 				WHERE variable_symbol = ?
 			", $variable_symbol);

@@ -20,6 +20,166 @@ class Settings_Controller extends Controller
 {
 
 	private $links;
+	
+	/**
+	 * Definitions of modules and their dependencies
+	 * 
+	 * @author Michal Kliment
+	 * @var array 
+	 */
+	public static $modules = array
+	(
+		'allowed_subnets'		=> array
+		(
+			'name'			=> 'allowed_subnets_enabled',
+			'dependencies'	=> array('notification', 'redirection')
+		),
+		'approval'				=> array
+		(
+			'name'			=> 'approval_enabled',
+			'dependencies'	=> array()
+		),
+		'connection_request'	=> array
+		(
+			'name'			=> 'connection_request_enable',
+			'dependencies'	=> array('networks'),
+		),
+		'email'					=> array
+		(
+			'name'			=> 'email_enabled',
+			'dependencies'	=> array()
+		),
+		'finance'				=> array
+		(
+			'name'			=> 'finance_enabled',
+			'dependencies'	=> array()
+		),
+		'forgotten_password'	=> array
+		(
+			'name'			=> 'forgotten_password',
+			'dependencies'	=> array('email')
+		),
+		'membership_interrupt'	=> array
+		(
+			'name'			=> 'membership_interrupt_enabled',
+			'dependencies'	=> array()
+		),
+		'monitoring'			=> array
+		(
+			'name'			=> 'monitoring_enabled',
+			'dependencies'	=> array('networks', 'email', 'notification')
+		),
+		'networks'				=> array
+		(
+			'name'			=> 'networks_enabled',
+			'dependencies'	=> array()
+		),
+		'notification'			=> array
+		(
+			'name'			=> 'notification_enabled',
+			'dependencies'	=> array()
+		),
+		'phone_invoices'		=> array
+		(
+			'name'			=> 'users_enabled',
+			'dependencies'	=> array()
+		),
+		'qos'					=> array
+		(
+			'name'			=> 'qos_enabled',
+			'dependencies'	=> array('networks')
+		),
+		'redirection'			=> array
+		(
+			'name'			=> 'redirection_enabled',
+			'dependencies'	=> array('networks', 'notification')
+		),
+		'self_registration'		=> array
+		(
+			'name'			=> 'self_registration',
+			'dependencies'	=> array()
+		),
+		'sms'					=> array
+		(
+			'name'			=> 'sms_enabled',
+			'dependencies'	=> array()
+		),
+		'snmp'					=> array
+		(
+			'name'			=> 'snmp_enabled',
+			'dependencies'	=> array('networks')
+		),
+		'cgi'					=> array
+		(
+			'name'			=> 'cgi_enabled',
+			'dependencies'	=> array('networks')
+		),
+		'ulogd'					=> array
+		(
+			'name'			=> 'ulogd_enabled',
+			'dependencies'	=> array('networks')
+		),
+		'users'					=> array
+		(
+			'name'			=> 'users_enabled',
+			'dependencies'	=> array()
+		),
+		'voip'					=> array
+		(
+			'name'			=> 'voip_enabled',
+			'dependencies'	=> array()
+		),
+		'vtiger'			=> array
+		(
+			'name'			=> 'vtiger_integration',
+			'dependencies'	=> array()
+		),
+		'works'					=> array
+		(
+			'name'			=> 'works_enabled',
+			'dependencies'	=> array('approval')
+		),
+	);
+	
+	/**
+	 * Test whether module is enabled
+	 * 
+	 * @author Michal Kliment
+	 * @param string $module
+	 * @return boolean
+	 * @throws Exception
+	 */
+	public static function isModuleEnabled($module)
+	{
+		if (isset(self::$modules[$module]['name']))
+		{
+			return Settings::get(self::$modules[$module]['name']);
+		}
+		else
+		{
+			throw new Exception('Unknown module: '.$module);
+		}
+	}
+	
+	/**
+	 * Disable given module
+	 * 
+	 * @author Michal Kliment
+	 * @param type $module
+	 * @return type
+	 * @throws Exception
+	 */
+	private static function disableModule($module)
+	{
+		if (isset(self::$modules[$module]['name']))
+		{
+			return Settings::set(self::$modules[$module]['name'], 0);
+		}
+		else
+		{
+			throw new Exception('Unknown module: '.$module);
+		}
+	}
 
 	/**
 	 * Contruct of controller sets tabs names
@@ -28,20 +188,71 @@ class Settings_Controller extends Controller
 	{
 		parent::__construct();
 
-		$this->sections = array
-		(
-			'info'					=> __('Info'),
-			'system'				=> __('System'),
-			'approval'				=> __('Approval'),
-			'email'					=> __('Email'),
-			'sms'					=> __('SMS'),
-			'voip'					=> __('VoIP'),
-			'notifications'			=> __('Notifications'),
-			'qos'					=> __('QoS'),
-			'monitoring'			=> __('Monitoring'),
-			'logging'				=> __('Logging'),
-			'registration_export'	=> __('Export of registration')
-		);
+		$this->sections = array();
+
+		if ($this->acl_check_view('Settings_Controller', 'info'))
+			$this->sections['info']         = __('Info');
+		
+		if ($this->acl_check_edit('Settings_Controller', 'system_settings'))
+			$this->sections['system'] 		= __('System');
+
+		if ($this->acl_check_edit('Settings_Controller', 'users_settings'))
+			$this->sections['users'] 		= __('Users');
+
+		// are finance enabled
+		if (self::isModuleEnabled('finance') &&
+			$this->acl_check_edit('Settings_Controller', 'finance_settings'))
+			$this->sections['finance'] 		= __('Finance');
+
+		// is approval enabled
+		if (self::isModuleEnabled('approval') &&
+			$this->acl_check_edit('Settings_Controller', 'approval_settings'))
+			$this->sections['approval'] 	= __('Approval');
+
+		// are networks enabled
+		if (self::isModuleEnabled('networks') &&
+			$this->acl_check_edit('Settings_Controller', 'networks_settings'))
+			$this->sections['networks']		= __('Networks');
+
+		if (self::isModuleEnabled('email') &&
+			$this->acl_check_edit('Settings_Controller', 'email_settings'))
+			$this->sections['email'] 		= __('Email');
+
+		// are SMS enabled
+		if (self::isModuleEnabled('sms') &&
+			$this->acl_check_edit('Settings_Controller', 'sms_settings'))
+			$this->sections['sms'] 			= __('SMS');
+
+		// is voip enabled
+		if (self::isModuleEnabled('voip') &&
+			$this->acl_check_edit('Settings_Controller', 'voip_settings'))
+			$this->sections['voip'] 		= __('VoIP');
+
+		// is notification enabled
+		if (self::isModuleEnabled('notification') &&
+			$this->acl_check_edit('Settings_Controller', 'notification_settings'))
+			$this->sections['notifications'] = __('Notifications');
+
+		// is QoS enabled
+		if (self::isModuleEnabled('qos') &&
+			$this->acl_check_edit('Settings_Controller', 'qos_settings'))
+			$this->sections['qos'] 			= __('QoS');
+
+		// is monitoring enabled
+		if (self::isModuleEnabled('monitoring') &&
+			$this->acl_check_edit('Settings_Controller', 'monitoring_settings'))
+			$this->sections['monitoring'] 	= __('Monitoring');
+
+		// is vtiger integration enabled
+		if (self::isModuleEnabled('vtiger') &&
+			$this->acl_check_edit('Settings_Controller', 'vtiger_settings'))
+			$this->sections['vtiger']		= __('Vtiger');
+
+		if ($this->acl_check_edit('Settings_Controller', 'logging_settings'))
+			$this->sections['logging'] 		= __('Logging');
+		
+		if (count($this->sections) <= 1)
+			$this->sections = NULL;
 	}
 
 	/**
@@ -49,7 +260,36 @@ class Settings_Controller extends Controller
 	 */
 	public function index()
 	{
-		$this->info();
+		if ($this->acl_check_view('Settings_Controller', 'info'))
+			$this->info();
+		else if ($this->acl_check_edit('Settings_Controller', 'system_settings'))
+			$this->system();
+		else if ($this->acl_check_edit('Settings_Controller', 'users_settings'))
+			$this->users();
+		else if ($this->acl_check_edit('Settings_Controller', 'finance_settings'))
+			$this->finance();
+		else if ($this->acl_check_edit('Settings_Controller', 'approval_settings'))
+			$this->approval();
+		else if ($this->acl_check_edit('Settings_Controller', 'networks_settings'))
+			$this->networks();
+		else if ($this->acl_check_edit('Settings_Controller', 'email_settings'))
+			$this->email();
+		else if ($this->acl_check_edit('Settings_Controller', 'sms_settings'))
+			$this->sms();
+		else if ($this->acl_check_edit('Settings_Controller', 'voip_settings'))
+			$this->voip();
+		else if ($this->acl_check_edit('Settings_Controller', 'notification_settings'))
+			$this->notifications();
+		else if ($this->acl_check_edit('Settings_Controller', 'qos_settings'))
+			$this->qos();
+		else if ($this->acl_check_edit('Settings_Controller', 'monitoring_settings'))
+			$this->monitoring();
+		else if ($this->acl_check_edit('Settings_Controller', 'vtiger_settings'))
+			$this->vtiger();
+		else if ($this->acl_check_edit('Settings_Controller', 'logging_settings'))
+			$this->logging();
+		else
+			Controller::error(ACCESS);
 	}
 	
 	/**
@@ -59,7 +299,7 @@ class Settings_Controller extends Controller
 	 */
 	public function info()
 	{
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Settings_Controller', 'info'))
 			Controller::error(ACCESS);
 
 		$data = array();
@@ -70,11 +310,23 @@ class Settings_Controller extends Controller
 		}
 		
 		$data[__('DB schema revision')] = Settings::get('db_schema_version');
-		$data[__('CRON state')] = module_state::get_state('cron');
-		$data[__('Redirection state')] = module_state::get_state('redirection');
-		$data[__('QoS state')] = module_state::get_state('qos');
-		$data[__('Monitoring state')] = module_state::get_state('monitoring');
-		$data[__('Logging state')] = module_state::get_state('logging');
+		$data[__('CRON state')] = module::get_state('cron');
+		
+		// redirection is enabled
+		if (Settings::get('redirection_enabled'))
+			$data[__('Redirection state')] = module::get_state('redirection');
+		
+		if (Settings::get('qos_enabled'))
+			$data[__('QoS state')] = module::get_state('qos');
+		
+		if (Settings::get('monitoring_enabled'))
+			$data[__('Monitoring state')] = module::get_state('monitoring');
+		
+		if (Settings::get('logging_enabled'))
+			$data[__('Logging state')] = module::get_state('logging');
+		
+		if (Settings::get('allowed_subnets_enabled'))
+			$data[__('Allowed subnet state')] = module::get_state('allowed_subnets_update');
 		
 		ob_start();
 		
@@ -117,11 +369,13 @@ class Settings_Controller extends Controller
 	public function system()
 	{
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!$this->acl_check_edit('Settings_Controller', 'system_settings'))
 			Controller::error(ACCESS);
 
 		// creating of new forge
 		$this->form = new Forge('settings/system');
+		
+		$this->form->set_attr('id', 'settings-system-form');
 
 		$this->form->group('System variables');
 
@@ -139,35 +393,161 @@ class Settings_Controller extends Controller
 				->options($countries)
 				->selected(Settings::get('default_country'))
 				->style('width:200px');
-
-		// currency
-		$this->form->input('currency')
-				->rules('length[3,40]|required')
-				->value(Settings::get('currency'));
+		
+		$this->form->radio('grid_hide_on_first_load')
+				->label('Hide grid on its first load')
+				->options(arr::bool())
+				->default(Settings::get('grid_hide_on_first_load'))
+				->help('grid_hide_on_first_load');
+		
+		$form_modules = array();
+                
+		$this->form->group(__('Modules').' '.help::hint('modules'));
 
 		// self-registration
-		$this->form->radio('self_registration')
+		$form_modules['self_registration'] = $this->form->radio('self_registration')
 				->label('Self-registration')
 				->options(arr::bool())
 				->default(Settings::get('self_registration'));
+		
+		// connection requests
+		$form_modules['connection_request'] = $this->form->radio('connection_request_enable')
+				->label('Connection requests')
+				->options(arr::bool())
+				->default(Settings::get('connection_request_enable'));
 
 		// forgotten password
-		$this->form->radio('forgotten_password')
+		$form_modules['forgotten_password'] = $this->form->radio('forgotten_password')
 				->label('Forgotten password')
 				->options(arr::bool())
 				->default(Settings::get('forgotten_password'));
+		
+		// membership interrupts		
+		$form_modules['membership_interrupt'] = $this->form->radio('membership_interrupt_enabled')
+				->label('Membership interrupt')
+				->options(arr::bool())
+				->default(Settings::get('membership_interrupt_enabled'));
+		
+		// finance
+		$form_modules['finance'] = $this->form->radio('finance_enabled')
+				->label('Finance')
+				->options(arr::bool())
+				->default(Settings::get('finance_enabled'));
+		
+		// approval
+		$form_modules['approval'] = $this->form->radio('approval_enabled')
+				->label('Approval')
+				->options(arr::bool())
+				->default(Settings::get('approval_enabled'));
+		
+		// Works
+		$form_modules['works'] = $this->form->radio('works_enabled')
+				->label('Works')
+				->options(arr::bool())
+				->default(Settings::get('works_enabled'));
+		
+		// Phone invoice
+		$form_modules['phone_invoices'] = $this->form->radio('phone_invoices_enabled')
+				->label('Phone invoices')
+				->options(arr::bool())
+				->default(Settings::get('phone_invoices_enabled'));
+		
+		// e-mail
+		$form_modules['email'] = $this->form->radio('email_enabled')
+				->label('E-mail')
+				->options(arr::bool())
+				->default(Settings::get('email_enabled'));
+		
+		// SMS
+		$form_modules['sms'] = $this->form->radio('sms_enabled')
+				->label('SMS')
+				->options(arr::bool())
+				->default(Settings::get('sms_enabled'));
+		
+		// VoIP
+		$form_modules['voip'] = $this->form->radio('voip_enabled')
+				->label('VoIP')
+				->options(arr::bool())
+				->default(Settings::get('voip_enabled'));
+		
+		// Network
+		$form_modules['networks'] = $this->form->radio('networks_enabled')
+				->label('Networks')
+				->options(arr::bool())
+				->default(Settings::get('networks_enabled'));
+		
+		// SNMP
+		$form_modules['snmp'] = $this->form->radio('snmp_enabled')
+				->label('SNMP')
+				->options(arr::bool())
+				->default(Settings::get('snmp_enabled'));
+		
+		// CGI
+		$form_modules['cgi'] = $this->form->radio('cgi_enabled')
+				->label('CGI scripts')
+				->options(arr::bool())
+				->default(Settings::get('cgi_enabled'));
+		
+		// QoS
+		$form_modules['qos'] = $this->form->radio('qos_enabled')
+				->label('QoS')
+				->options(arr::bool())
+				->default(Settings::get('qos_enabled'));
+		
+		// Monitoring
+		$form_modules['monitoring'] = $this->form->radio('monitoring_enabled')
+				->label('Monitoring')
+				->options(arr::bool())
+				->default(Settings::get('monitoring_enabled'));
+		
+		// Redirection
+		$form_modules['redirection'] = $this->form->radio('redirection_enabled')
+				->label('Redirection')
+				->options(arr::bool())
+				->default(Settings::get('redirection_enabled'));
+		
+		// Notification
+		$form_modules['notification'] = $this->form->radio('notification_enabled')
+				->label('Notifications')
+				->options(arr::bool())
+				->default(Settings::get('notification_enabled'));
 
-		$this->form->group('E-mail settings');
+		// vtiger CRM integration
+		$form_modules['vtiger'] = $this->form->radio('vtiger_integration')
+				->label('Vtiger integration')
+				->options(arr::bool())
+				->default(Settings::get('vtiger_integration'));
+		
+		// add info about modules dependencies
+		foreach ($form_modules as $module => $item)
+		{
+			// module have at least one dependency
+			if (count(self::$modules[$module]['dependencies']))
+			{
+				$form_modules[$module]->additional_info(
+					__('Require module') . ': <b>' . 
+					implode(', ', array_map(
+						'__', self::$modules[$module]['dependencies'])
+					) . '</b>'
+				);
+			}
+		}
 
-		$this->form->input('email_default_email')
-				->label('Default e-mail')
-				->rules('length[3,100]|valid_email')
-				->value(Settings::get('email_default_email'));
+		$this->form->group('Module settings');
 
+		$timeout = Settings::get('module_status_timeout');
+		
+		$this->form->input('module_status_timeout')
+				->rules('required|valid_numeric')
+				->class('increase_decrease_buttons')
+				->value($timeout)
+				->style('width:30px')
+				->help('Time threshold in minutes, before module is shown as inactive');
+		
 		$this->form->group(__('URL settings') . ' ' . help::hint('url_settings'));
 
 		$this->form->dropdown('protocol')
-				->rules('length[3,100]')
+				->rules('required|length[3,100]')
 				->options(array
 				(
 					'http' => 'http',
@@ -176,11 +556,29 @@ class Settings_Controller extends Controller
 		
 		$this->form->input('domain')
 				->rules('required|length[3,100]')
+				->callback(array($this, 'valid_domain'))
 				->value(url::domain());
 		
 		$this->form->input('suffix')
-				->rules('required|valid_suffix')
+				->rules('required')
+				->callback(array($this, 'valid_suffix'))
 				->value(url::suffix());
+		
+		$this->form->group(__('Address points'));
+		
+		$this->form->input('address_point_url')
+				->label('Address point URL')
+				->help('address_point_url')
+				->value(Settings::get('address_point_url'));
+		
+		$selected_countries = ORM::factory('country')->select('id')->where('enabled', 1)->find_all()->as_array();
+		
+		$this->form->dropdown('enabled_countries[]')
+					->label('Enabled countries')
+					->options($countries)
+					->selected($selected_countries)
+					->multiple('multiple')
+					->size(10);
 
 		// load .htaccess sample file
 		if (($htaccessFile = @file('.htaccess-sample')) != FALSE)
@@ -217,25 +615,6 @@ class Settings_Controller extends Controller
 						->help($help);
 			}
 		}
-
-		$this->form->group('Network settings');
-
-		$this->form->textarea('address_ranges')
-				->help('address_ranges')
-				->rules('valid_address_ranges')
-				->value(str_replace(",","\n", Settings::get('address_ranges')))
-				->class('autosize');
-
-		$this->form->group('Module settings');
-
-		$timeout = Settings::get('module_status_timeout');
-		
-		$this->form->input('module_status_timeout')
-				->rules('required|valid_numeric')
-				->class('increase_decrease_buttons')
-				->value($timeout)
-				->help('Time threshold in minutes, before module is shown as inactive');
-
 		
 		$this->form->submit('Save');
 
@@ -244,21 +623,106 @@ class Settings_Controller extends Controller
 		{
 			$form_data = $this->form->as_array();
 
-			$issaved = true;
+			$issaved = TRUE;
 			$message = '';
+			
+			$issaved = $issaved && ORM::factory('country')->enable_countries($form_data['enabled_countries']);
+			
+			unset($form_data['enabled_countries']);
+			
+			// write suffix to .htaccess
+			if (!file_exists('.htaccess'))
+			{
+				$htaccess = '.htaccess-sample';
+			}
+			else
+			{
+				$htaccess = '.htaccess';
+			}
+			
+			if (is_writable('.') || (file_exists('.htaccess') && is_writable('.htaccess')))
+			{
+				// load .htaccess file
+				$htaccessFile = @file($htaccess);
 
+				if ($htaccessFile)
+				{
+					foreach ($htaccessFile as $line_num => $line)
+					{
+						// find line with RewriteBase
+						if (preg_match("/^RewriteBase (.+)/", $line))
+						{
+							// and set there our suffix (subdirectory)
+							$htaccessFile[$line_num] = preg_replace(
+									"/^(RewriteBase )(.+)/", 
+									'${1}/'.trim($form_data['suffix'], " /").'/', $line
+							);
+						}
+					}
+					
+					$handle = @fopen('.htaccess', 'w');
+
+					if ($handle)
+					{
+						foreach($htaccessFile as $line)
+						{
+							@fwrite($handle, $line);
+						}
+
+						@fclose($handle);
+					}
+					else
+					{
+						$issaved = FALSE;
+						$message = __('Cannot open %s for writing', '.htaccess');
+					
+						// if not saved to htaccess do not save to database
+						unset($form_data['suffix']);
+					}
+				}
+				else
+				{
+					$issaved = FALSE;
+					$message = __('Failed to read from %s', '.htaccess');
+					
+					// if not saved to htaccess do not save to database
+					unset($form_data['suffix']);
+				}
+			}
+			else
+			{
+				$issaved = FALSE;
+				$message = __('File %s does not exists and cannot be created', '.htaccess');
+
+				// if not saved to htaccess do not save to database
+				unset($form_data['suffix']);
+			}
+			
 			foreach ($form_data as $name => $value)
 			{
 				if ($name == 'module_status_timeout')
 				{
 					$value = max($value, 1);
 				}
-				else if ($name == 'address_ranges')
+				else if ($name == 'security_password_length')
 				{
-					$value = str_replace("\n", ",", $value);
+					$value = min(50, max(1, $value)); // <1..50>
 				}
 
 				$issaved = $issaved && Settings::set($name, $value);
+			}
+			
+			foreach (self::$modules as $module => $module_info)
+			{
+				foreach ($module_info['dependencies'] as $dependency)
+				{
+					if (self::isModuleEnabled($module) && !self::isModuleEnabled($dependency))
+					{
+						status::error(__('Cannot enable module %s, enabled module %s is required.', array($module, $dependency)));
+						self::disableModule($module);
+						break;
+					}
+				}
 			}
 			
 			if ($issaved)
@@ -273,8 +737,8 @@ class Settings_Controller extends Controller
 			// if not
 			{
 				status::error(
-						__('System variables havent been successfully updated.').
-						'<br />' . $message, FALSE
+						__('System variables havent been updated.').
+						'<br />' . $message, NULL, FALSE
 				);
 			}
 
@@ -292,25 +756,263 @@ class Settings_Controller extends Controller
 	}
 	
 	/**
+	 * Settings of users variables
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function users()
+	{
+		// access control
+		if (!$this->acl_check_edit('Settings_Controller', 'users_settings'))
+			Controller::error(ACCESS);
+
+		// creating of new forge
+		$this->form = new Forge();
+		
+		$this->form->group('Members');		
+
+		$this->form->checkbox('former_member_auto_device_remove')
+				->label('Enable automatical deletion of devices of former members')
+				->checked(Settings::get('former_member_auto_device_remove'));
+		
+		$this->form->group('Security');
+		
+		$this->form->input('security_password_length')
+				->label('Minimal password length')
+				->rules('required|valid_numeric')
+				->class('increase_decrease_buttons')
+				->style('width:30px')
+				->value(Settings::get('security_password_length'));
+		
+		$pass_levels = array
+		(
+			1 => __('very weak'),
+			2 => __('weak'),
+			3 => __('good'),
+			4 => __('strong'),
+		);
+		
+		$this->form->dropdown('security_password_level')
+				->options($pass_levels)
+				->label('Minimal password level')
+				->rules('required')
+				->selected(Settings::get('security_password_level'));
+		
+		
+		if (Settings::get('membership_interrupt_enabled'))
+		{
+			$this->form->group('Membership interrupt');
+
+			$this->form->input('membership_interrupt_minimum')
+					->label('Minimum membership interrupt period (months)')
+					->rules('valid_numeric')
+					->value(Settings::get('membership_interrupt_minimum'));
+
+			$this->form->input('membership_interrupt_maximum')
+					->label('Maximum membership interrupt period (months)')
+					->rules('valid_numeric')
+					->value(Settings::get('membership_interrupt_maximum'));
+		}
+		
+		if (Settings::get('self_registration'))
+		{
+			$this->form->group('Applicant for membership');
+			
+			$this->form->checkbox('self_registration_enable_approval_without_registration')
+					->label('Enable approval of membership without submited registration')
+					->checked(Settings::get('self_registration_enable_approval_without_registration'));
+			
+			if (Settings::get('finance_enabled'))
+			{
+				$this->form->checkbox('self_registration_enable_additional_payment')
+						->label('Enable additional member fee during the approval of membership')
+						->checked(Settings::get('self_registration_enable_additional_payment'));
+			}
+		}
+		
+		$this->form->group('Export of registration');
+		
+		if (Settings::get('finance_enabled'))
+		{
+			$bank_account = new Bank_account_Model();
+			$concat = "CONCAT(account_nr, '/', bank_nr, IF(name IS NULL, '', CONCAT(' - ', name)))";
+		
+			$this->form->dropdown('export_header_bank_account')
+					->label('Bank account')
+					->options($bank_account->where('member_id', Member_Model::ASSOCIATION)->select_list('id', $concat))
+					->selected(Settings::get('export_header_bank_account'))
+					->rules('required');
+		}
+		
+		// directory is writable
+		if (is_writable('upload'))
+		{
+			$additional_info = '';
+			$logo = Settings::get('registration_logo');
+			
+			if (file_exists($logo))
+			{
+				$additional_info = '<img src="'. url_lang::base().'export/logo" style="margin-left:10%;height:50px;vertical-align:middle"/>';
+			}
+			
+			$this->form->upload('registration_logo')
+					->label('Logo')
+					->rules('allow[jpg]')
+					->new_name('registration_logo.jpg')
+					->help(help::hint('registration_logo'))
+					->additional_info($additional_info);
+		}
+
+		$this->form->html_textarea('registration_info')
+				->label('Info')
+				->rows(5)
+				->cols(100)
+				->value(Settings::get('registration_info'));
+		
+		$this->form->html_textarea('registration_license')
+				->label('License')
+				->rows(5)
+				->cols(100)
+				->value(Settings::get('registration_license'));
+
+		$this->form->submit('Save');
+
+		// form validate
+		if ($this->form->validate())
+		{
+			$form_data = $this->form->as_array(FALSE);
+
+			$issaved = true;
+
+			foreach ($form_data as $name => $value)
+			{
+				$issaved = $issaved && Settings::set($name, $value);
+			}
+			
+			if ($issaved)
+			// if all action were succesfull
+			{
+				status::success('System variables have been successfully updated.');
+			}
+			else
+			// if not
+			{
+				status::error('System variables havent been successfully updated.');
+			}
+
+			url::redirect('settings/users');
+		}
+
+		$view = new View('main');
+		$view->title = __('Settings') . ' - ' . __('Users');
+		$view->content = new View('settings/main');
+		$view->content->current = 'users';
+		$view->content->content = $this->form->html();
+		$view->content->headline = __('Users');
+		
+		// directory is not writable
+		if (!is_writable('upload'))
+		{
+			$view->content->warning = __(
+					'Directory "upload" is not writable, change access ' .
+					'rights to be able upload your own logo.'
+			);
+		}
+		
+		$view->render(TRUE);
+	}
+	
+	/**
+	 * Settings of finance variables
+	 * 
+	 * @author Ondrej Fibich
+	 */
+	public function finance()
+	{
+		// access control
+		if (!module::e('finance') ||
+			!$this->acl_check_edit('Settings_Controller', 'finance_settings'))
+			Controller::error(ACCESS);
+
+		// creating of new forge
+		$this->form = new Forge();
+		
+		$this->form->group('Finance settings');
+		
+		$this->form->input('currency')
+				->rules('length[3,40]|required')
+				->value(Settings::get('currency'));
+		
+		$this->form->group('Automatic actions');
+		
+		$deduct_day = Settings::get('deduct_day');
+		
+		$this->form->checkbox('deduct_fees_automatically_enabled')
+				->value('1')
+				->checked(Settings::get('deduct_fees_automatically_enabled'))
+				->label(__('Deduct fees automatically') . ' ' . 
+						help::hint('deduct_fees_automatically_enabled', $deduct_day));
+		
+		$this->form->group('Variable symbol settings');
+		
+		$this->form->dropdown('variable_key_generator_id')
+				->options(array(NULL => '') + Variable_Key_Generator::get_drivers_for_dropdown())
+				->label('Algorithm for generation of variable symbols')
+				->selected(Variable_Key_Generator::get_active_driver())
+				->style('width:200px');
+
+		$this->form->submit('Save');
+
+		// form validate
+		if ($this->form->validate())
+		{
+			$form_data = $this->form->as_array(FALSE);
+
+			$issaved = true;
+
+			foreach ($form_data as $name => $value)
+			{
+				$issaved = $issaved && Settings::set($name, $value);
+			}
+			
+			if ($issaved)
+			// if all action were succesfull
+			{
+				status::success('System variables have been successfully updated.');
+			}
+			else
+			// if not
+			{
+				status::error('System variables havent been successfully updated.');
+			}
+
+			url::redirect('settings/finance');
+		}
+
+		$view = new View('main');
+		$view->title = __('Settings') . ' - ' . __('Finance');
+		$view->content = new View('settings/main');
+		$view->content->current = 'finance';
+		$view->content->content = $this->form->html();
+		$view->content->headline = __('Finance');
+		
+		$view->render(TRUE);
+	}
+	
+	/**
 	 * Settings for QoS 
 	 */
 	public function qos()
 	{
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!module::e('qos') ||
+			!$this->acl_check_edit('Settings_Controller', 'qos_settings'))
 			Controller::error(ACCESS);
 		
 		// creating of new forge
 		$this->form = new Forge('settings/qos');
 		
 		$this->form->group('Variables for QoS');
-		
-		$this->form->checkbox('qos_enabled')
-				->value('1')
-				->label('Enable QoS');
-		
-		if (Settings::get('qos_enabled') == 1)
-			$this->form->qos_enabled->checked('checked');
 
 		$this->form->input('qos_total_speed')
 				->rules('valid_speed_size')
@@ -405,7 +1107,7 @@ class Settings_Controller extends Controller
 		$view->content->current = 'qos';
 		$view->content->content = $this->form->html();
 		$view->content->headline = __('QoS');
-		$view->content->description = module_state::get_state('qos', TRUE);
+		$view->content->description = module::get_state('qos', TRUE);
 		
 		$view->render(TRUE);
 	}
@@ -418,12 +1120,22 @@ class Settings_Controller extends Controller
 	public function email()
 	{
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!module::e('email') ||
+			!$this->acl_check_edit('Settings_Controller', 'email_settings'))
+		{
 			Controller::error(ACCESS);
+		}
 
 		// creating of new forge
 		$this->form = new Forge('settings/email');
 
+		$this->form->group('E-mail settings');
+
+		$this->form->input('email_default_email')
+				->label('Default e-mail')
+				->rules('length[3,100]|valid_email')
+				->value(Settings::get('email_default_email'));
+		
 		$this->form->group('E-mail variables');
 
 		$this->form->dropdown('email_driver')
@@ -438,23 +1150,23 @@ class Settings_Controller extends Controller
 		$this->form->input('email_hostname')
 				->label('Hostname')
 				->value(Settings::get('email_hostname'))
-				->help('For SMTP settings only.');
+				->help(__('For SMTP settings only.'));
 
 		$this->form->input('email_port')
 				->label('Port')
 				->rules('valid_numeric')
 				->value(Settings::get('email_port'))
-				->help('For SMTP settings only.');
+				->help(__('For SMTP settings only.'));
 
 		$this->form->input('email_username')
 				->label('User name')
 				->value(Settings::get('email_username'))
-				->help('For SMTP settings only.');
+				->help(__('For SMTP settings only.'));
 
 		$this->form->input('email_password')
 				->label('Password')
 				->value(Settings::get('email_password'))
-				->help('For SMTP settings only.');
+				->help(__('For SMTP settings only.'));
 
 		$this->form->submit('Save');
 
@@ -503,7 +1215,8 @@ class Settings_Controller extends Controller
 	public function approval()
 	{
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!module::e('approval') ||
+			!$this->acl_check_edit('Settings_Controller', 'approval_settings'))
 			Controller::error(ACCESS);
 
 		$approval_templates = ORM::factory('approval_template')->select_list('id', 'name');
@@ -515,30 +1228,40 @@ class Settings_Controller extends Controller
 
 		// creating of new forge
 		$this->form = new Forge('settings/approval');
+		
+		if (Settings::get('works_enabled'))
+		{
+		    $this->form->group('Work');
+		    
+		    $this->form->dropdown('default_work_approval_template')
+				    ->label('Default approval template')
+				    ->options($arr_approval_templates)
+				    ->selected(Settings::get('default_work_approval_template'))
+				    ->rules('required');
 
-		$this->form->group('Work');
+		    $this->form->group('Work report');
 
-		$this->form->dropdown('default_work_approval_template')
-				->label('Default approval template')
-				->options($arr_approval_templates)
-				->selected(Settings::get('default_work_approval_template'))
-				->rules('required');
-
-		$this->form->group('Work report');
-
-		$this->form->dropdown('default_work_report_approval_template')
-				->label('Default approval template')
-				->options($arr_approval_templates)
-				->selected(Settings::get('default_work_report_approval_template'))
-				->rules('required');
+		    $this->form->dropdown('default_work_report_approval_template')
+				    ->label('Default approval template')
+				    ->options($arr_approval_templates)
+				    ->selected(Settings::get('default_work_report_approval_template'))
+				    ->rules('required');
+		}
 
 		$this->form->group('Request');
 
 		$this->form->dropdown('default_request_approval_template')
-				->label('Default approval template')
+				->label('Default approval template for "proposals to association"')
 				->options($arr_approval_templates)
 				->selected(Settings::get('default_request_approval_template'))
 				->rules('required');
+
+		$this->form->dropdown('default_request_support_approval_template')
+				->label('Default approval template for "support requests"')
+				->options($arr_approval_templates)
+				->selected(Settings::get('default_request_support_approval_template'))
+				->rules('required');
+
 
 		$this->form->submit('Save');
 
@@ -573,6 +1296,157 @@ class Settings_Controller extends Controller
 		$view->content->content = $this->form->html();
 		$view->render(TRUE);
 	}
+	
+	/**
+	 * Networks settings
+	 */
+	public function networks()
+	{
+		// access control
+		if (!module::e('networks') ||
+			!$this->acl_check_edit('Settings_Controller', 'networks_settings'))
+			Controller::error(ACCESS);
+
+		// creating of new forge
+		$this->form = new Forge();
+		
+		$this->form->group('Network settings');
+
+		$this->form->textarea('address_ranges')
+				->help('address_ranges')
+				->rules('valid_address_ranges')
+				->value(str_replace(",","\n", Settings::get('address_ranges')))
+				->class('autosize');
+
+		$this->form->textarea('dns_servers')
+				->help('dns_servers')
+				->rules('valid_ip_address')
+				->value(str_replace(",","\n", Settings::get('dns_servers')))
+				->class('autosize');
+
+		$this->form->input('dhcp_server_reload_timeout')
+				->label('DHCP server maximal timeout')
+				->rules('required|valid_numeric')
+				->class('increase_decrease_buttons')
+				->value(Settings::get('dhcp_server_reload_timeout'))
+				->style('width:50px')
+				->help('dhcp_server_reload_timeout');
+		
+		if (Settings::get('connection_request_enable'))
+		{
+			$this->form->group('Connection requests');
+			
+			// enum types for device
+			$enum_type_model = new Enum_type_Model();
+			$types = $enum_type_model->get_values(Enum_type_Model::DEVICE_TYPE_ID);
+			
+			$allowed_types = explode(':', Settings::get('connection_request_device_types'));
+			$default_types = $types;
+			
+			// throw away unallowed types		
+			if (Settings::get('connection_request_device_types'))
+			{
+				foreach ($default_types as $key => $val)
+				{
+					if (array_search($key, $allowed_types) === FALSE)
+					{
+						unset($default_types[$key]);
+					}
+				}
+			}
+			
+			$default_types[NULL] = '--- ' . __('Select type') . ' ---';
+			asort($default_types);
+			
+			$this->form->dropdown('connection_request_device_default_type')
+					->label('Default device type')
+					->options($default_types)
+					->selected(Settings::get('connection_request_device_default_type'))
+					->style('width:200px');
+			
+			$this->form->dropdown('connection_request_device_types[]')
+					->label('Allowed device types')
+					->options($types)
+					->selected($allowed_types)
+					->multiple('multiple')
+					->size(10);
+			
+			$this->form->html_textarea('connection_request_info')
+					->label('Add form information')
+					->help(help::hint('connection_request_info_form'))
+					->rows(5)
+					->cols(100)
+					->value(Settings::get('connection_request_info'));
+		}
+		
+		$this->form->group('Other settings');
+		
+		$this->form->checkbox('device_add_auto_link_enabled')
+				->label('Enable automatic loading of "connected to" field during adding of device')
+				->checked(Settings::get('device_add_auto_link_enabled'));
+		
+		// CGI scripts
+		if (module::e('cgi'))
+		{
+			$this->form->group('CGI scripts');
+			
+			$this->form->input('cgi_arp_url')
+				->label('URL for ARP table')
+				->value(Settings::get('cgi_arp_url'))
+				->style('width: 400px');
+		}
+
+		$this->form->submit('Save');
+
+		if ($this->form->validate())
+		{
+			$form_data = $this->form->as_array(FALSE);
+			$issaved = true;
+			
+			foreach ($form_data as $name => $value)
+			{
+				if ($name == 'address_ranges')
+				{
+					$value = str_replace("\n", ",", $value);
+				}
+				else if ($name == 'connection_request_device_types')
+				{
+					$value = empty($value) ? '' : implode(':', $value);
+				}
+				else if ($name == 'dns_servers')
+				{
+					$old_value = Settings::get('dns_servers');
+					// expire DHCP? (#472)
+					if (trim($value) != trim($old_value))
+					{
+						ORM::factory('subnet')->set_expired_all_subnets();
+					}
+				}
+				
+				$issaved = $issaved && Settings::set($name, $value);
+			}
+			
+			if ($issaved)
+			{
+				status::success('System variables have been successfully updated.');
+			}
+			else
+			{
+				status::error('System variables havent been successfully updated.');
+			}
+
+			url::redirect('settings/networks');
+		}
+
+		$view = new View('main');
+		$view->title = __('Settings') . ' - ' . __('Networks');
+		$view->content = new View('settings/main');
+		$view->content->current = 'networks';
+		$view->content->headline = __('Networks');
+		$view->content->link_back = $this->links;
+		$view->content->content = $this->form->html();
+		$view->render(TRUE);
+	}
 
 	/**
 	 * VOIP settings
@@ -580,7 +1454,8 @@ class Settings_Controller extends Controller
 	public function voip()
 	{
 		// access control
-		if (!$this->acl_check_edit(get_class($this), 'system'))
+		if (!module::e('voip') ||
+			!$this->acl_check_edit(get_class($this), 'voip_settings'))
 			Controller::error(ACCESS);
 
 		// creating of new forge
@@ -710,7 +1585,7 @@ class Settings_Controller extends Controller
 				status::error(__(
 						'Cannot enable VoIP driver, allow `%s` rights for MySQL user',
 						array('CREATE ROUTINE')
-				) . '.', FALSE);
+				) . '.',NULL,  FALSE);
 			}
 			else if ($issaved)
 			{
@@ -759,7 +1634,8 @@ class Settings_Controller extends Controller
 	public function sms()
 	{
 		// access control
-		if (!$this->acl_check_edit(get_class($this), 'system'))
+		if (!module::e('sms') || 
+			!$this->acl_check_edit(get_class($this), 'sms_settings'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -806,7 +1682,7 @@ class Settings_Controller extends Controller
 		
 			/* Build form */
 			
-			$this->form->group(Sms::get_driver_name($key));
+			$this->form->group(Sms::get_driver_name($key, TRUE));
 
 			$this->form->dropdown('sms_driver_state' . $key)
 					->label('Driver state')
@@ -840,6 +1716,8 @@ class Settings_Controller extends Controller
 			{
 				$this->form->dropdown('sms_test_mode' . $key)
 						->label(__('Test mode') . ':')
+						->help(__('SMS will not be send if test mode is enabled, ' .
+								  'driver will only try to send them'))
 						->options(arr::rbool())
 						->selected(Settings::get('sms_test_mode' . $key));
 			}
@@ -931,7 +1809,8 @@ class Settings_Controller extends Controller
 	public function notifications()
 	{
 		// access control
-		if (!$this->acl_check_edit('Messages_Controller', 'message'))
+		if (!self::isModuleEnabled('notification') ||
+			!$this->acl_check_edit('Settings_Controller', 'notification_settings'))
 			Controller::error(ACCESS);
 		
 		// creating of new forge
@@ -963,40 +1842,70 @@ class Settings_Controller extends Controller
 				->rules('required|valid_numeric')
 				->value(Settings::get('initial_debtor_immunity'));
 		
-		$this->form->group('Redirection');
-		
-		$this->form->input('gateway')
-				->label(__('Gateway IP address').":")
-				->value(Settings::get('gateway'));
-		
-		$this->form->input('redirection_port_self_cancel')
-				->label(__('Port for self-canceling').": ".help::hint('redirection_port_self_cancel'))
-				->rules('valid_numeric')
-				->value(Settings::get('redirection_port_self_cancel'));
-		
-		// directory is writable
-		if (is_writable('upload'))
+		if (Settings::get('self_registration'))
 		{
-			$additional_info = '';
-			$logo = Settings::get('redirection_logo_url');
-			
-			if (file_exists($logo))
-			{
-				$additional_info = '<img src="'. url_lang::base().'redirect/logo" style="margin-left:10%;height:49px;vertical-align:middle"/>';
-			}
-			
-			$this->form->upload('redirection_logo_url')
-					->label('Redirection logo URL')
-					->rules('allow[jpg,png]')
-					->new_name('redirection_logo.jpg')
-					->help(help::hint('redirection_logo'))
-					->additional_info($additional_info);
+			$this->form->input('applicant_connection_test_duration')
+					->label('Test connection duration')
+					->help(help::hint('applicant_connection_test_duration'))
+					->rules('valid_numeric')
+					->value(Settings::get('applicant_connection_test_duration'));
 		}
 		
-		$this->form->input('self_cancel_text')
-				->label(__('Text for self cancel anchor').":&nbsp;".
-						help::hint('self_cancel_text'))
-				->value(Settings::get('self_cancel_text'));
+		// redirection is enabled
+		if (Settings::get('redirection_enabled'))
+		{
+			$this->form->group('Redirection');
+
+			$this->form->input('gateway')
+					->label(__('Gateway IP address').":")
+					->value(Settings::get('gateway'));
+
+			$this->form->input('redirection_port_self_cancel')
+					->label(__('Port for self-canceling').": ".help::hint('redirection_port_self_cancel'))
+					->rules('valid_numeric')
+					->value(Settings::get('redirection_port_self_cancel'));
+
+			// directory is writable
+			if (is_writable('upload'))
+			{
+				$additional_info = '';
+				$logo = Settings::get('redirection_logo_url');
+
+				if (file_exists($logo))
+				{
+					$additional_info = '<img src="'. url_lang::base().'redirect/logo" style="margin-left:10%;height:49px;vertical-align:middle"/>';
+				}
+
+				$this->form->upload('redirection_logo_url')
+						->label('Redirection logo URL')
+						->rules('allow[jpg,png]')
+						->new_name('redirection_logo.jpg')
+						->help(help::hint('redirection_logo'))
+						->additional_info($additional_info);
+			}
+
+			$this->form->input('self_cancel_text')
+					->label(__('Text for self cancel anchor').":&nbsp;".
+							help::hint('self_cancel_text'))
+					->value(Settings::get('self_cancel_text'));
+		
+			// allowed subnets
+			$this->form->group(__('Allowed subnets') . ' ' . help::hint('allowed_subnets'));
+			
+			$this->form->checkbox('allowed_subnets_enabled')
+				->value('1')
+				->checked(Settings::get('allowed_subnets_enabled'))
+				->label('Enable allowed subnets');
+			
+			if (Settings::get('allowed_subnets_enabled'))
+			{
+				$this->form->input('allowed_subnets_update_interval')
+						->label('Interval of update')
+						->help(help::hint('allowed_subnets_update_interval'))
+						->rules('required|valid_numeric')
+						->value(Settings::get('allowed_subnets_update_interval'));
+			}
+		}
 		
 		$this->form->group('E-mail');
 		
@@ -1028,7 +1937,16 @@ class Settings_Controller extends Controller
 
 			url::redirect('settings/notifications');
 		}
-		 
+		
+		// states of modules
+		$states = array();
+		
+		if (Settings::get('redirection_enabled'))
+			$states[] = module::get_state('redirection', TRUE);
+		
+		if (Settings::get('allowed_subnets_enabled'))
+			$states[] = module::get_state('allowed_subnets_update', TRUE);
+		
 		// create view for this template
 		$view = new View('main');
 		$view->title = __('System') . ' - ' . __('Notification settings');
@@ -1036,7 +1954,7 @@ class Settings_Controller extends Controller
 		$view->content->current = 'notifications';
 		$view->content->content = $this->form->html();
 		$view->content->headline = __('Notification settings');
-		$view->content->description = module_state::get_state('redirection', TRUE);
+		$view->content->description = implode('<br />', $states);
 		
 		$view->render(TRUE);		
 	}
@@ -1049,7 +1967,7 @@ class Settings_Controller extends Controller
 	public function logging()
 	{
 		// access control
-		if (!$this->acl_check_edit(get_class($this), 'system'))
+		if (!$this->acl_check_edit(get_class($this), 'logging_settings'))
 			Controller::error(ACCESS);
 
 		$user_model = new User_Model();
@@ -1181,7 +2099,7 @@ class Settings_Controller extends Controller
 			}
 
 			// action logs value
-			if (isset($form_data['ulogd_enabled']) &&
+			if (Settings::get('networks_enabled') && isset($form_data['ulogd_enabled']) &&
 				$form_data['ulogd_enabled'] == 1)
 			{
 				$ulogd_enabled = '1';
@@ -1192,7 +2110,7 @@ class Settings_Controller extends Controller
 			}
 			
 			// syslog-ng mysql
-			if (isset($form_data['syslog_ng_mysql_api_enabled']) &&
+			if (Settings::get('networks_enabled') && isset($form_data['syslog_ng_mysql_api_enabled']) &&
 				$form_data['syslog_ng_mysql_api_enabled'] == 1)
 			{
 				$syslog_ng_mysql_api_enabled = '1';
@@ -1276,6 +2194,8 @@ class Settings_Controller extends Controller
 			{
 				status::error('System variables havent been successfully updated.');
 			}
+			
+			url::redirect(url::base().url::current());
 		}
 		// create view for this template
 		$view = new View('main');
@@ -1284,7 +2204,7 @@ class Settings_Controller extends Controller
 		$view->content->current = 'logging';
 		$view->content->content = $this->form->html();
 		$view->content->headline = __('Logging');
-		$view->content->description = module_state::get_state('logging', TRUE);
+		$view->content->description = module::get_state('logging', TRUE);
 		$view->render(TRUE);
 	}
 	
@@ -1296,7 +2216,8 @@ class Settings_Controller extends Controller
 	public function monitoring()
 	{
 		// access control
-		if (!$this->acl_check_edit('Settings_Controller', 'system'))
+		if (!module::e('monitoring') ||
+			!$this->acl_check_edit('Settings_Controller', 'monitoring_settings'))
 			Controller::error(ACCESS);
 		
 		// creating of new forge
@@ -1304,24 +2225,37 @@ class Settings_Controller extends Controller
 
 		$this->form->group('Variables for monitoring');
 		
-		$this->form->checkbox('monitoring_enabled')
-				->value('1')
-				->label('Enable monitoring');
-		
-		if (Settings::get('monitoring_enabled') == 1)
-			$this->form->monitoring_enabled->checked('checked');
-		
 		$this->form->input('monitoring_server_ip_address')
 				->rules('valid_ip_address')
 				->value(Settings::get('monitoring_server_ip_address'))
 				->label('IP address of monitoring server')
 				->help('monitoring_server_ip_address');
 		
+		$this->form->group('Notifications');
+		
 		$this->form->input('monitoring_email_to')
 				->rules('valid_email')
 				->value(Settings::get('monitoring_email_to'))
 				->label('Send to e-mail address')
 				->help('monitoring_email_to');
+		
+		$this->form->input('monitoring_notification_interval')
+				->label('Interval of loop')
+				->value(Settings::get('monitoring_notification_interval'))
+				->help('monitoring_notification_interval')
+				->class('number increase_decrease_buttons');
+		
+		$this->form->input('monitoring_notification_down_host_interval')
+				->label('Maximum period of notification from host failure')
+				->value(Settings::get('monitoring_notification_down_host_interval'))
+				->help('monitoring_notification_down_host_interval')
+				->class('number increase_decrease_buttons');
+		
+		$this->form->input('monitoring_notification_up_host_interval')
+				->label('Maximum period of notification from host functionality again')
+				->value(Settings::get('monitoring_notification_up_host_interval'))
+				->help('monitoring_notification_up_host_interval')
+				->class('number increase_decrease_buttons');
 
 		$this->form->submit('Save');
 
@@ -1331,13 +2265,6 @@ class Settings_Controller extends Controller
 			$form_data = $this->form->as_array();
 			
 			$issaved = TRUE;
-			
-			if (isset($form_data['monitoring_enabled']))
-				$monitoring_enabled = arr::remove('monitoring_enabled', $form_data);
-			else
-				$monitoring_enabled = 0;
-
-			$issaved = $issaved && Settings::set('monitoring_enabled', $monitoring_enabled);
 			
 			foreach ($form_data as $key => $val)
 				$issaved = $issaved && Settings::set($key, $val);
@@ -1356,96 +2283,343 @@ class Settings_Controller extends Controller
 		$view->content->current = 'monitoring';
 		$view->content->content = $this->form->html();
 		$view->content->headline = __('Monitoring');
-		$view->content->description = module_state::get_state('monitoring', TRUE);		
+		$view->content->description = module::get_state('monitoring', TRUE);		
 		$view->render(TRUE);
 	}
 
 	/**
-	 * Export of registration
+	 * Form to set up vtiger variables
+	 * 
+	 * @author Jan Dubina
 	 */
-	public function registration_export()
+	public function vtiger()
 	{
 		// access control
-		if (!$this->acl_check_edit(get_class($this), 'system'))
+		if (!module::e('vtiger') ||
+			!$this->acl_check_edit('Settings_Controller', 'vtiger_settings'))
 			Controller::error(ACCESS);
 
+		$values_member = json_decode(Settings::get('vtiger_member_fields'), true);
+		$values_user = json_decode(Settings::get('vtiger_user_fields'), true);
+		
 		// creating of new forge
-		$this->form = new Forge('settings/registration_export');
+		$this->form = new Forge();
 		
-		$this->form->group('Export of registration');
+		$this->form->group('Vtiger integration');
 
-		// directory is writable
-		if (is_writable('upload'))
-		{
-			$additional_info = '';
-			$logo = Settings::get('registration_logo');
-			
-			if (file_exists($logo))
-			{
-				$additional_info = '<img src="'. url_lang::base().'export/logo" style="margin-left:10%;height:50px;vertical-align:middle"/>';
-			}
-			
-			$this->form->upload('registration_logo')
-					->label('Logo')
-					->rules('allow[jpg]')
-					->new_name('registration_logo.jpg')
-					->help(help::hint('registration_logo'))
-					->additional_info($additional_info);
-		}
+		$this->form->input('vtiger_domain')
+				->label('Domain')
+				->rules('valid_url|required')
+				->value(Settings::get('vtiger_domain'));
 
-		$this->form->html_textarea('registration_info')
-				->label('Info')
-				->rows(5)
-				->cols(100)
-				->value(Settings::get('registration_info'));
+		$this->form->input('vtiger_username')
+				->label('Username')
+				->rules('required')
+				->value(Settings::get('vtiger_username'));
+
+		$this->form->input('vtiger_user_access_key')
+				->label('User access key')
+				->rules('required')
+				->value(Settings::get('vtiger_user_access_key'));
 		
-		$this->form->html_textarea('registration_license')
-				->label('License')
-				->rows(5)
-				->cols(100)
-				->value(Settings::get('registration_license'));
+		$this->form->group(__('Vtiger field names').' - '.__('Accounts'));
+		
+		$this->form->input('member_id')
+				->label('FreenetIS ID')
+				->rules('required')
+				->value($values_member['id']);
+		
+		$this->form->input('member_name')
+				->rules('required')
+				->value($values_member['name']);
+		
+		$this->form->input('member_acc_type')
+				->label('Account type')
+				->rules('required')
+				->value($values_member['acc_type']);
+		
+		$this->form->input('member_employees')
+				->label('Employees')
+				->rules('required')
+				->value($values_member['employees']);
+		
+		$this->form->input('member_type')
+				->label('Type')
+				->rules('required')
+				->value($values_member['type']);
+		
+		$this->form->input('member_entrance_date')
+				->label('Entrance date')
+				->rules('required')
+				->value($values_member['entrance_date']);
+		
+		$this->form->input('member_var_sym')
+				->label('Variable symbol')
+				->rules('required')
+				->value($values_member['var_sym']);
+		
+		$this->form->input('member_organization_identifier')
+				->label('Organization identifier')
+				->rules('required')
+				->value($values_member['organization_identifier']);
+		
+		$this->form->input('member_do_not_send_emails')
+				->label('Do not send emails')
+				->rules('required')
+				->value($values_member['do_not_send_emails']);
+		
+		$this->form->input('member_notify_owner')
+				->label('notify owner')
+				->rules('required')
+				->value($values_member['notify_owner']);
+		
+		$this->form->input('member_phone1')
+				->label('Phone')
+				->rules('required')
+				->value($values_member['phone1']);
+		
+		$this->form->input('member_phone2')
+				->label(__('Phone').' 2')
+				->rules('required')
+				->value($values_member['phone2']);
+		
+		$this->form->input('member_phone3')
+				->label(__('Phone').' 3')
+				->rules('required')
+				->value($values_member['phone3']);
+		
+		$this->form->input('member_email1')
+				->label('Email')
+				->rules('required')
+				->value($values_member['email1']);
+		
+		$this->form->input('member_email2')
+				->label(__('Email').' 2')
+				->rules('required')
+				->value($values_member['email2']);
+		
+		$this->form->input('member_email3')
+				->label(__('Email').' 3')
+				->rules('required')
+				->value($values_member['email3']);
+		
+		$this->form->input('member_street')
+				->label('Street')
+				->rules('required')
+				->value($values_member['street']);
+		
+		$this->form->input('member_town')
+				->label('Town')
+				->rules('required')
+				->value($values_member['town']);
+		
+		$this->form->input('member_country')
+				->label('Country')
+				->rules('required')
+				->value($values_member['country']);
+		
+		$this->form->input('member_zip_code')
+				->label('Zip code')
+				->rules('required')
+				->value($values_member['zip_code']);
+		
+		$this->form->input('member_comment')
+				->label('Comment')
+				->rules('required')
+				->value($values_member['comment']);
+		
+		$this->form->group(__('Vtiger field names').' - '.__('Contacts'));
+		
+		$this->form->input('user_id')
+				->label('FreenetIS ID')
+				->rules('required')
+				->value($values_user['id']);
+		
+		$this->form->input('user_name')
+				->label('Name')
+				->rules('required')
+				->value($values_user['name']);
+		
+		$this->form->input('user_middle_name')
+				->label('Middle name')
+				->rules('required')
+				->value($values_user['middle_name']);
+		
+		$this->form->input('user_surname')
+				->label('surname')
+				->rules('required')
+				->value($values_user['surname']);
+		
+		$this->form->input('user_pre_title')
+				->label('Pre title')
+				->rules('required')
+				->value($values_user['pre_title']);
+		
+		$this->form->input('user_post_title')
+				->label('Post title')
+				->rules('required')
+				->value($values_user['post_title']);
+		
+		$this->form->input('user_member_id')
+				->label('Member ID')
+				->rules('required')
+				->value($values_user['member_id']);
+		
+		$this->form->input('user_birthday')
+				->label('Birthday')
+				->rules('required')
+				->value($values_user['birthday']);
+		
+		$this->form->input('user_do_not_call')
+				->label('Do not call')
+				->rules('required')
+				->value($values_user['do_not_call']);
+		
+		$this->form->input('user_do_not_send_emails')
+				->label('Do not send emails')
+				->rules('required')
+				->value($values_user['do_not_send_emails']);
+		
+		$this->form->input('user_notify_owner')
+				->label('Notify owner')
+				->rules('required')
+				->value($values_user['notify_owner']);
+		
+		$this->form->input('user_phone1')
+				->label('Phone')
+				->rules('required')
+				->value($values_user['phone1']);
+		
+		$this->form->input('user_phone2')
+				->label(__('Phone').' 2')
+				->rules('required')
+				->value($values_user['phone2']);
+		
+		$this->form->input('user_phone3')
+				->label(__('Phone').' 3')
+				->rules('required')
+				->value($values_user['phone3']);
+		
+		$this->form->input('user_email1')
+				->label('Email')
+				->rules('required')
+				->value($values_user['email1']);
+		
+		$this->form->input('user_email2')
+				->label(__('Email').' 2')
+				->rules('required')
+				->value($values_user['email2']);
+		
+		$this->form->input('user_email3')
+				->label(__('Email').' 3')
+				->rules('required')
+				->value($values_user['email3']);
+		
+		$this->form->input('user_street')
+				->label('Street')
+				->rules('required')
+				->value($values_user['street']);
+		
+		$this->form->input('user_town')
+				->label('Town')
+				->rules('required')
+				->value($values_user['town']);
+		
+		$this->form->input('user_country')
+				->label('Country')
+				->rules('required')
+				->value($values_user['country']);
+		
+		$this->form->input('user_zip_code')
+				->label('Zip code')
+				->rules('required')
+				->value($values_user['zip_code']);
+		
+		$this->form->input('user_comment')
+				->label('Comment')
+				->rules('required')
+				->value($values_user['comment']);
 		
 		$this->form->submit('Save');
-		
+
 		// form validate
 		if ($this->form->validate())
 		{
-			$form_data = $this->form->as_array(FALSE);
+			$form_data = $this->form->as_array();
+			
+			$values_member['id'] = $form_data['member_id'];
+			$values_member['name'] = $form_data['member_name'];
+			$values_member['acc_type'] = $form_data['member_acc_type'];
+			$values_member['employees'] = $form_data['member_employees'];
+			$values_member['type'] = $form_data['member_type'];
+			$values_member['entrance_date'] = $form_data['member_entrance_date'];
+			$values_member['var_sym'] = $form_data['member_var_sym'];
+			$values_member['organization_identifier'] = $form_data['member_organization_identifier'];
+			$values_member['do_not_send_emails'] = $form_data['member_do_not_send_emails'];
+			$values_member['notify_owner'] = $form_data['member_notify_owner'];
+			$values_member['phone1'] = $form_data['member_phone1'];
+			$values_member['phone2'] = $form_data['member_phone2'];
+			$values_member['phone3'] = $form_data['member_phone3'];
+			$values_member['email1'] = $form_data['member_email1'];
+			$values_member['email2'] = $form_data['member_email2'];
+			$values_member['email3'] = $form_data['member_email3'];
+			$values_member['street'] = $form_data['member_street'];
+			$values_member['town'] = $form_data['member_town'];
+			$values_member['country'] = $form_data['member_country'];
+			$values_member['zip_code'] = $form_data['member_zip_code'];
+			$values_member['comment'] = $form_data['member_comment'];
+			
+			$values_user['id'] = $form_data['user_id'];
+			$values_user['name'] = $form_data['user_name'];
+			$values_user['middle_name'] = $form_data['user_middle_name'];
+			$values_user['surname'] = $form_data['user_surname'];
+			$values_user['pre_title'] = $form_data['user_pre_title'];
+			$values_user['post_title'] = $form_data['user_post_title'];
+			$values_user['member_id'] = $form_data['user_member_id'];
+			$values_user['birthday'] = $form_data['user_birthday'];
+			$values_user['do_not_call'] = $form_data['user_do_not_call'];
+			$values_user['do_not_send_emails'] = $form_data['user_do_not_send_emails'];
+			$values_user['notify_owner'] = $form_data['user_notify_owner'];
+			$values_user['phone1'] = $form_data['user_phone1'];
+			$values_user['phone2'] = $form_data['user_phone2'];
+			$values_user['phone3'] = $form_data['user_phone3'];
+			$values_user['email1'] = $form_data['user_email1'];
+			$values_user['email2'] = $form_data['user_email2'];
+			$values_user['email3'] = $form_data['user_email3'];
+			$values_user['street'] = $form_data['user_street'];
+			$values_user['town'] = $form_data['user_town'];
+			$values_user['country'] = $form_data['user_country'];
+			$values_user['zip_code'] = $form_data['user_zip_code'];
+			$values_user['comment'] = $form_data['user_comment'];
+			
 			$issaved = true;
 			
-			foreach ($form_data as $name => $value)
-			{
-				$issaved = $issaved && Settings::set($name, $value);
-			}
+			$issaved = $issaved && Settings::set('vtiger_domain', $form_data['vtiger_domain']);
+			$issaved = $issaved && Settings::set('vtiger_username', $form_data['vtiger_username']);
+			$issaved = $issaved && Settings::set('vtiger_user_access_key', $form_data['vtiger_user_access_key']);
+			$issaved = $issaved && Settings::set('vtiger_member_fields', json_encode($values_member));
+			$issaved = $issaved && Settings::set('vtiger_user_fields', json_encode($values_user));
 			
 			if ($issaved)
+			// if all action were succesfull
 			{
 				status::success('System variables have been successfully updated.');
 			}
 			else
+			// if not
 			{
 				status::error('System variables havent been successfully updated.');
 			}
 
-			url::redirect('settings/registration_export');
+			url::redirect('settings/vtiger');
 		}
-		
-		// create view for this template
-		$view = new View('main');
-		$view->title = __('Settings') . ' - ' . __('export of registration');
-		$view->content = new View('settings/main');
-		$view->content->current = 'registration_export';
-		$view->content->content = $this->form->html();
-		$view->content->headline = __('Export of registration');
 
-		// directory is not writable
-		if (!is_writable('upload'))
-		{
-			$view->content->warning = __(
-					'Directory "upload" is not writable, change access ' .
-					'rights to be able upload your own logo.'
-			);
-		}
+		$view = new View('main');
+		$view->title = __('Settings') . ' - ' . __('Vtiger integration');
+		$view->content = new View('settings/main');
+		$view->content->current = 'vtiger';
+		$view->content->content = $this->form->html();
+		$view->content->headline = __('Vtiger integration');
 		
 		$view->render(TRUE);
 	}
@@ -1533,4 +2707,41 @@ class Settings_Controller extends Controller
 		}
 	}// end of validatation function
 	
+	/**
+	 * Validates suffix
+	 * 
+	 * @param object $input
+	 */
+	public function valid_suffix($input = null)
+	{
+		// validators cannot be accessed
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
+		
+		if (!preg_match ("/^\/([A-Za-z0-9\-_]+\/)*$/", $input->value))
+		{
+			$input->add_error('required', __("Suffix has to start with slash character, has to end with slash character and contains only a-z, 0-9, - and /"));
+		}
+	}
+	
+	/**
+	 * Validates domain
+	 * 
+	 * @param object $input
+	 */
+	public function valid_domain($input = null)
+	{
+		// validators cannot be accessed
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
+		
+		if (!preg_match ("/^[A-Za-z0-9\-_\.]+$/", $input->value))
+		{
+			$input->add_error('required', __("Domain has to contain only a-z, 0-9, -, / and dot characters"));
+		}
+	}
 }

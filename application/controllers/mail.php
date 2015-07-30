@@ -53,15 +53,22 @@ class Mail_Controller extends Mail_messages_Controller
 		$mail_message_model = new Mail_message_Model();
 		
 		$total_messages = $mail_message_model->count_all_inbox_messages_by_user_id(
-				$this->session->get('user_id')
+				$this->user_id
 		);
 
+		if (is_numeric($this->input->post('record_per_page')))
+		{
+			$limit_results = (int) $this->input->post('record_per_page');
+		}
+
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_messages)
+		{
 			$sql_offset = 0;
+		}
 
 		// finds all user's inbox messages
 		$messages = $mail_message_model->get_all_inbox_messages_by_user_id(
-				$this->session->get('user_id'), $sql_offset, (int) $limit_results
+				$this->user_id, $sql_offset, (int) $limit_results
 		);
 
 		// finds ids of all messages - for javascript mark-all function
@@ -71,17 +78,42 @@ class Mail_Controller extends Mail_messages_Controller
 		{
 			$arr_ids[] = $message->id;
 		}
+		
+		// mail redirection
+		if (Settings::get('email_enabled') && $this->acl_check_edit(
+				'Users_Controller', 'additional_contacts', $this->member_id
+			))
+		{
+			$uc_model = new Users_contacts_Model();
+			$email_redirections = $uc_model->get_redirected_email_boxes_of($this->user_id);
+			$contacts_link = html::anchor('/contacts/show_by_user/' . $this->user_id, __('here'));
+
+			if (count($email_redirections))
+			{
+				$emails = '';
+				foreach ($email_redirections as $e)
+				{
+					$emails .= $e->value . ', ';
+				}
+
+				status::minfo('Your inner mail is redirected to your following e-mail '
+						. 'addresses %s you can disable this %s.', TRUE,
+						array(substr($emails, 0, -2), $contacts_link));
+			}
+			else
+			{
+				status::minfo('You can redirect your inner mail to your e-mail box '
+						. 'by editing your e-mail %s.', TRUE, array($contacts_link));
+			}
+		}
 
 		// create grid
 		$grid = new Grid('mail/inbox', '', array
 		(
 			'use_paginator'				=> true,
-			'use_selector'				=> false,
+			'use_selector'				=> true,
 			'total_items'				=>  $total_messages,
 			'current'					=> $limit_results,
-			'selector_increace'			=> 500,
-			'selector_min' 				=> 500,
-			'selector_max_multiplier'   => 20,
 			'base_url'					=> Config::get('lang') . '/mail/inbox/'
 										. $limit_results,
 			'uri_segment'				=> 'page',
@@ -89,7 +121,11 @@ class Mail_Controller extends Mail_messages_Controller
 			'style'						=> 'classic',
 			'limit_results'				=> $limit_results,
 		));
-
+		
+		$grid->add_new_button(
+			'mail/mark_inbox_read', 'Mark all messages as read'
+		);
+		
 		$grid->form_field('delete')
 				->order(false)
 				->type('checkbox');
@@ -136,52 +172,55 @@ class Mail_Controller extends Mail_messages_Controller
 			    'unread'	=> __('Mark selected messages as unread')
 			))
 		);
-
-		$grid->form_submit_value = __('Submit');
+		
+		$grid->form_submit_value = __('Perform');
 		$grid->datasource($messages);
 
 		// form is post
-		if ($_POST && count($_POST))
+		if ($_POST && count($_POST) && isset($_POST['operation']))
 		{
 			$operation = $_POST['operation'];
 			$user_id = $this->session->get('user_id');
 			$mail_message_model = new Mail_message_Model();
 			// for each checked messages
-			foreach ($_POST['delete'] as $message_id => $true)
+			if (isset($_POST['delete']) && is_array($_POST['delete']))
 			{
-				$message = $mail_message_model->where('id', $message_id)->find();
-
-				// message doesn't exist
-				if (!$message->id)
-					continue;
-
-				// deletes message
-				if ($operation == 'delete')
+				foreach ($_POST['delete'] as $message_id => $true)
 				{
-					// check if message is really from user inbox
-					if ($message->to_id == $user_id)
+					$message = $mail_message_model->where('id', $message_id)->find();
+
+					// message doesn't exist
+					if (!$message->id)
+						continue;
+
+					// deletes message
+					if ($operation == 'delete')
 					{
-						if ($message->from_deleted || $message->from_id == $user_id)
-							$message->delete();
-						else
+						// check if message is really from user inbox
+						if ($message->to_id == $user_id)
 						{
-							$message->to_deleted = 1;
-							$message->readed = 1;
-							$message->save();
+							if ($message->from_deleted || $message->from_id == $user_id)
+								$message->delete();
+							else
+							{
+								$message->to_deleted = 1;
+								$message->readed = 1;
+								$message->save();
+							}
 						}
 					}
-				}
-				// marks as read
-				else if ($operation == 'read')
-				{
-					$message->readed = 1;
-					$message->save();
-				}
-				// marks as unread
-				else if ($operation == 'unread')
-				{
-					$message->readed = 0;
-					$message->save();
+					// marks as read
+					else if ($operation == 'read')
+					{
+						$message->readed = 1;
+						$message->save();
+					}
+					// marks as unread
+					else if ($operation == 'unread')
+					{
+						$message->readed = 0;
+						$message->save();
+					}
 				}
 			}
 			url::redirect(url::base(TRUE).url::current(TRUE));
@@ -211,8 +250,15 @@ class Mail_Controller extends Mail_messages_Controller
 				$this->session->get('user_id')
 		);
 
+		if (is_numeric($this->input->post('record_per_page')))
+		{
+			$limit_results = (int) $this->input->post('record_per_page');
+		}
+
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_messages)
+		{
 			$sql_offset = 0;
+		}
 
 		// finds all user's sent messages
 		$messages = $mail_message_model->get_all_sent_messages_by_user_id(
@@ -231,12 +277,9 @@ class Mail_Controller extends Mail_messages_Controller
 		$grid = new Grid('mail/sent', '', array
 		(
 			'use_paginator'				=> true,
-			'use_selector'				=> false,
+			'use_selector'				=> true,
 			'total_items'				=> $total_messages,
 			'current'					=> $limit_results,
-			'selector_increace'			=> 500,
-			'selector_min' 				=> 500,
-			'selector_max_multiplier'   => 20,
 			'base_url'					=> Config::get('lang').'/mail/sent/'
 										. $limit_results,
 			'uri_segment'				=> 'page',
@@ -291,32 +334,35 @@ class Mail_Controller extends Mail_messages_Controller
 		$grid->datasource($messages);
 
 		// form is post
-		if ($_POST && count($_POST))
+		if ($_POST && count($_POST) && isset($_POST['operation']))
 		{
 			$operation = $_POST['operation'];
 			$user_id = $this->session->get('user_id');
 			$mail_message_model = new Mail_message_Model();
 			// for each checked messages
-			foreach ($_POST['delete'] as $message_id => $true)
+			if (isset($_POST['delete']) && is_array($_POST['delete']))
 			{
-				$message = $mail_message_model->where('id', $message_id)->find();
-
-				// message doesn't exist
-				if (!$message->id)
-					continue;
-
-				// deletes message
-				if ($operation == 'delete')
+				foreach ($_POST['delete'] as $message_id => $true)
 				{
-					// check if message is really from user inbox
-					if ($message->from_id == $user_id)
+					$message = $mail_message_model->where('id', $message_id)->find();
+
+					// message doesn't exist
+					if (!$message->id)
+						continue;
+
+					// deletes message
+					if ($operation == 'delete')
 					{
-						if ($message->to_deleted || $message->to_id == $user_id)
-							$message->delete();
-						else
+						// check if message is really from user inbox
+						if ($message->from_id == $user_id)
 						{
-							$message->from_deleted = 1;
-							$message->save();
+							if ($message->to_deleted || $message->to_id == $user_id)
+								$message->delete();
+							else
+							{
+								$message->from_deleted = 1;
+								$message->save();
+							}
 						}
 					}
 				}
@@ -414,15 +460,19 @@ class Mail_Controller extends Mail_messages_Controller
 			$origin = new Mail_message_Model($origin_id);
 
 			// message doesn't exist
-			if (!$origin->id)
+			if (!$origin->id || $origin->from_id == User_Model::ASSOCIATION)
 					Controller::error(RECORD);
 
 			// message is not from user
 			if ($origin->from_id != $this->session->get('user_id'))
-			    $to_user = new User_Model($origin->from_id);
+			{
+			    $prev_user = $to_user = new User_Model($origin->from_id);
+			}
 			else
-			// user will reply to recipient, not to himself :-)
+			{ // user will reply to recipient, not to himself :-)
 			    $to_user = new User_Model($origin->to_id);
+				$prev_user = $to_user = new User_Model($origin->from_id);
+			}
 
 			// record doesn't exist
 			if (!$to_user->id)
@@ -430,7 +480,7 @@ class Mail_Controller extends Mail_messages_Controller
 
 			$to_value = $to_user->login;
 			$subject_value = 'Re: '.$origin->subject;
-			$body_value = '<p></p><p>'.$to_user->name.' '.$to_user->surname.' '
+			$body_value = '<p></p><p>'.$prev_user->name.' '.$prev_user->surname.' '
 					. __('wrote on').' '.date::pretty($origin->time).', '
 					. __('at').' '.date::pretty_time($origin->time)
 					. ':</p> <i>'.$origin->body.'</i>';
@@ -454,7 +504,7 @@ class Mail_Controller extends Mail_messages_Controller
 		$form = new Forge(url::base(TRUE).url::current(TRUE));
 
 		$form->input('to')
-				->class('mail_to_field')
+				->class('mail_to_field autocomplete')
 				->rules('required')
 				->value($to_value)
 				->callback(array($this, 'valid_to_field'))
@@ -467,38 +517,48 @@ class Mail_Controller extends Mail_messages_Controller
 		
 		$form->html_textarea('body')
 				->label(__('Text').':')
-				->class('focus')
 				->rules('required')
 				->value($body_value);
 
-		$form->submit('Save');
+		$form->submit('Send');
 
 		// form is validate
 		if ($form->validate())
 		{
 			$form_data = $form->as_array(FALSE);
 
-			$recipients = explode(',', trim($form_data['to']));
-
+			$recipients = explode(',', trim(trim($form_data['to']), ','));
+			
 			$user_model = new User_Model();
-			// sends message fo each recipients
-			foreach ($recipients as $recipient)
+
+			try
 			{
-				$user = $user_model->where('login',trim($recipient))->find();
-
-				$mail_message = new Mail_message_Model();
-				$mail_message->from_id = $this->session->get('user_id');
-				$mail_message->to_id = $user->id;
-				$mail_message->subject = htmlspecialchars($form_data['subject']);
-				$mail_message->body = $form_data['body'];
-				$mail_message->time = date('Y-m-d H:i:s');
-				$mail_message->save();
+				$user_model->transaction_start();
+				
+				// sends message fo each recipients
+				foreach ($recipients as $recipient)
+				{
+					$user = $user_model->where('login',trim($recipient))->find();
+					
+					Mail_message_Model::create(
+							$this->user_id, $user->id,
+							htmlspecialchars($form_data['subject']),
+							$form_data['body']
+					);
+				}
+				
+				$user_model->transaction_commit();
+				status::success('Message has been successfully sent.');
+				url::redirect('mail/sent');
 			}
-
-			status::success('Message has been successfully sent.');
-			url::redirect('mail/sent');
+			catch (Exception $e)
+			{
+				$user_model->transaction_rollback();
+				status::error('Message has not been sent.', $e);
+				Log::add_exception($e);
+			}
 		}
-
+		
 		$view = new View('main');
 		$view->title = __('Write new message');
 		$view->content = new View('mail/main');
@@ -558,6 +618,19 @@ class Mail_Controller extends Mail_messages_Controller
 			url::redirect('mail/sent');
 		}
 	}
+	
+	/**
+	 * Function to mark all messages as read
+	 */
+	public function mark_inbox_read()
+	{
+		$user_id = $this->session->get('user_id');
+		$mail_message_model = new Mail_message_Model();
+		
+		$mail_message_model->mark_all_inbox_messages_as_read_by_user_id($user_id);
+		
+		$this->redirect('mail/inbox');
+	}
 
 	/* ********************* CALLBACK FUNCTION ********************************/
 
@@ -572,19 +645,26 @@ class Mail_Controller extends Mail_messages_Controller
 	{
 		if (!$item->readed)	echo '<b>';
 
+		$user_name = $item->user_name;
+		
+		if ($item->from_id == Member_Model::ASSOCIATION)
+		{
+			$user_name = __('System message');
+		}
+		
 		// access conntrol
 		if (Controller::instance()->acl_check_view(
 				'Users_Controller', 'users', $item->member_id
 			))
 		{
-			echo html::anchor('users/show/'.$item->from_id, $item->user_name, array
+			echo html::anchor('users/show/'.$item->from_id, $user_name, array
 			(
 				'title' => __('Show user')
 			));
 		}
 		else
 		{
-			echo $item->user_name;
+			echo $user_name;
 		}
 		
 		if (!$item->readed) echo '</b>';

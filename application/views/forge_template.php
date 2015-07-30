@@ -2,8 +2,14 @@
 	
     $(document).ready(function(){
 <?php foreach ($inputs as $input): ?>
-	<?php if ($input->autocomplete != ''): ?>
-		$("#<?php echo $input->name ?>").autocomplete({source: "<?php echo url_lang::base().$input->autocomplete ?>"});
+	<?php if ($input->type == 'group'): ?>
+		<?php foreach ($input->inputs AS $i): ?>
+			$("#<?php echo $i->name ?>").autocomplete({source: "<?php echo url_lang::base().$i->autocomplete ?>"});
+		<?php endforeach ?>
+	<?php else: ?>
+		<?php if ($input->autocomplete != ''): ?>
+			$("#<?php echo $input->name ?>").autocomplete({source: "<?php echo url_lang::base().$input->autocomplete ?>"});
+		<?php endif ?>
 	<?php endif ?>
 <?php endforeach ?>
 	});
@@ -69,12 +75,12 @@ foreach($sub_inputs as $input):
 		}
 ?>
 <tr<?php echo ($tr_class != '') ? " class='$tr_class'" : '' ?>>
-<th class="<?php echo $input->name(); echo (in_array('required', $input->rules())) ? ' label_required' : '' ?>"><?php if ($input->type != 'checkbox') echo $input->label().'&nbsp;'.$input->help() ?><?php echo (in_array('required', $input->rules())) ? ' *' : '' ?></th>
-<td class="<?php echo $input->name() ?>"<?php if ($input->name() == 'password'): ?> style="widht: 100%;"<?php endif ?>>
+<th class="<?php echo $input->name(); echo (in_array('required', $input->rules())) ? ' label_required' : '' ?>"><?php if ($input->type != 'checkbox') echo $input->label().'&nbsp;'.$input->help() ?></th>
+<td class="<?php echo $input->name() ?>"<?php if (mb_stripos($input->class, 'main_password') !== FALSE): ?> style="min-width: 450px"<?php endif; ?>>
 <?php
 	endif;
 
-if ($input->name() == 'password'): ?>
+if (mb_stripos($input->class, 'main_password') !== FALSE): ?>
 	<div class="password-meter" style="float:right">
 		<div class="password-meter-message">&nbsp;</div>
 		<div class="password-meter-bg">
@@ -85,7 +91,12 @@ if ($input->name() == 'password'): ?>
 	
 echo $input->html();
 
-echo $input->additional_info;
+if ($input->type == 'checkbox' && $input->help())
+{
+	echo '&nbsp;' . $input->help();
+}
+
+echo '<span class="additional-info">'.$input->additional_info.'</span>';
 
 if (strstr($input->class, 'ajax'))
 	echo html::image(array('src'=>'media/images/icons/animations/ajax-loader.gif', 'id'=>'ajax_'.$input->name, 'class'=>'ajax-loader', 'style'=>'display:none;'));
@@ -101,12 +112,12 @@ endif;
 foreach ($input->error_messages() as $error):
 
 ?>
-<p class="error"><?php echo str_replace('*','',str_replace(':','',$error)) ?></p>
+<p class="error"><?php echo (text::ends_with($error, ':') ? mb_substr($error, 0, mb_strlen($error)) : $error) ?></p>
 <?php
 
 endforeach;
 
-if (!strstr($input->class, 'join1')):
+if (!strstr($input->class, 'join1') && !strstr($input->class, 'join_multiple')):
 ?>
 </td>
 </tr>

@@ -161,12 +161,12 @@ class Bill_Data extends Object
 
     protected function set_variable_symbol($variable_symbol)
     {
-        $this->variable_symbol = intval($variable_symbol);
+        $this->variable_symbol = $variable_symbol;
     }
 
     protected function set_specific_symbol($specific_symbol)
     {
-        $this->specific_symbol = intval($specific_symbol);
+        $this->specific_symbol = $specific_symbol;
     }
 
     protected function set_total_price($total_price)

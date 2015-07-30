@@ -42,8 +42,22 @@ class Fee_Model extends ORM
 	 * @param string $order_by_direction
 	 * @return Mysql_Result object
 	 */
-	public function get_all_fees($order_by = 'from', $order_by_direction = 'asc')
+	public function get_all_fees($limit_from = 0, $limit_results = NULL,
+			$order_by = 'from', $order_by_direction = 'asc')
 	{
+		$limit = '';
+		// order by direction check
+		if (strtolower($order_by_direction) != 'desc')
+		{
+			$order_by_direction = 'asc';
+		}
+		
+		if ($limit_results !== NULL &&
+			is_numeric($limit_results))
+		{
+			$limit = "LIMIT ". intval($limit_from) . ", " . intval($limit_results);
+		}
+		
 		return $this->db->query("
 				SELECT fees.id, fees.readonly, fees.special_type_id, fees.type_id,
 					fees.fee, fees.from, fees.to, fees.name,
@@ -52,7 +66,11 @@ class Fee_Model extends ORM
 				LEFT JOIN enum_types on enum_types.id = fees.type_id
 				LEFT JOIN translations on translations.original_term = enum_types.value
 					and translations.lang = ?
-				ORDER BY fees.readonly DESC, fees.special_type_id ASC, fees.from ASC
+				GROUP BY fees.id
+				ORDER BY fees.readonly DESC,
+					fees.special_type_id ASC, "
+					. $this->db->escape_column($order_by) . " $order_by_direction
+					$limit
 		", Config::get('lang'));
 	}
 
@@ -171,6 +189,26 @@ class Fee_Model extends ORM
 			return $default_fee->fee;
 
 		return 0;
+	}
+	
+	/**
+	 * Returns regular member fee name of member in date
+	 *
+	 * @author David Raška
+	 * @param int $member_id
+	 * @param string $date
+	 * @return string|NULL
+	 */
+	public function get_regular_member_fee_name_by_member_date($member_id, $date)
+	{
+		$fee = $this->get_fee_by_member_date_type($member_id, $date, 'regular member fee');
+
+		if ($fee && $fee->id)
+		{
+			return $fee->name;
+		}
+
+		return NULL;
 	}
 	
 	/**

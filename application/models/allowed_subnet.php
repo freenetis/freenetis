@@ -136,24 +136,4 @@ class Allowed_subnet_Model extends ORM
 		return 0;
 	}
 
-	/**
-	 * Returns allowed subnet by member and ip address
-	 *
-	 * @author Michal Kliment
-	 * @param integer $member_id
-	 * @param string $ip_address
-	 * @return Mysql_Result object
-	 */
-	public function get_allowed_subnet_by_member_and_ip_address($member_id, $ip_address)
-	{
-		$result = $this->db->query("
-				SELECT a.* FROM subnets s
-				JOIN allowed_subnets a ON a.subnet_id = s.id
-				WHERE inet_aton(s.netmask) & inet_aton(?) = inet_aton(s.network_address)
-					AND a.member_id = ?
-		", array($ip_address, $member_id));
-		
-		return ($result && $result->count()) ? $result->current() : NULL;
-	}
-
 }

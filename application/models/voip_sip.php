@@ -209,22 +209,6 @@ class Voip_sip_Model extends ORM
 				$this->table_exists('voip_lbilling_payments') &&
 				$this->table_exists('voip_lbilling_users'));
 	}
-
-	/**
-	 * Check if given user has any VoIP sips
-	 *
-	 * @author Ondřej Fibich
-	 * @param integer $user_id	User
-	 * @return bool				Has?
-	 */
-	public function has_voip_sips($user_id)
-	{
-		return $this->db->query("
-			SELECT COUNT(id) AS count
-			FROM voip_sips
-			WHERE user_id = ?
-		", $user_id)->current()->count > 0;
-	}
 	
     /**
      * Function counts all records.

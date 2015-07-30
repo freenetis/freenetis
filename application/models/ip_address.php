@@ -24,8 +24,7 @@
  * @property string $ip_address
  * @property bool $dhcp	 	 	 	 	 
  * @property bool $gateway	 	 	 	 	 	 
- * @property bool $service 	 	 
- * @property integer $whitelisted
+ * @property bool $service
  * @property integer $member_id
  * @property Member_Model $member
  */
@@ -43,7 +42,7 @@ class Ip_address_Model extends ORM
 	 * IP address is in permanent whitelist - it is never redirected (useful for
 	 * special members), can be redirected only by message which ignores whitelist
 	 */
-	const PERNAMENT_WHITELIST	= 1;
+	const PERMANENT_WHITELIST	= 1;
 	
 	/**
 	 * IP address is in temporary whitelist - for limited period of time it is
@@ -60,7 +59,7 @@ class Ip_address_Model extends ORM
 	public static $whitelist_types = array
 	(
 		self::NO_WHITELIST			=> 'No whitelist',
-		self::PERNAMENT_WHITELIST	=> 'Permanent whitelist',
+		self::PERMANENT_WHITELIST	=> 'Permanent whitelist',
 		self::TEMPORARY_WHITELIST	=> 'Temporary whitelist'
 	);
 	
@@ -72,27 +71,6 @@ class Ip_address_Model extends ORM
 	public static function get_whitelist_types()
 	{
 		return array_map('__', self::$whitelist_types);
-	}
-	
-	/**
-	 * Gets translated whitelist types
-	 * 
-	 * @param integer $white_list_type
-	 * @return string
-	 */
-	public function get_whitelist_type($white_list_type = NULL)
-	{
-		if (empty($white_list_type) && $this->id)
-		{
-			$white_list_type = $this->whitelisted;
-		}
-		
-		if (array_key_exists($white_list_type, self::$whitelist_types))
-		{
-			return __(self::$whitelist_types[$white_list_type]);
-		}
-		
-		return __(self::$whitelist_types[self::NO_WHITELIST]);
 	}
 	
 	/**
@@ -154,13 +132,18 @@ class Ip_address_Model extends ORM
 			(
 				SELECT ip.*, ip.id AS ip_address_id,
 					i.name AS iface_name, s.name as subnet_name,
-					d.id AS device_id, d.name AS device_name
+					d.id AS device_id, d.name AS device_name,
+					IF(mw.id IS NULL, 0, 2-mw.permanent) AS whitelisted
 				FROM ip_addresses ip
 				LEFT JOIN ifaces i ON i.id = ip.iface_id 
 				LEFT JOIN ifaces_vlans iv ON iv.iface_id = i.id
 				LEFT JOIN devices d ON d.id = i.device_id
 				LEFT JOIN subnets s ON s.id = ip.subnet_id
+				LEFT JOIN users u ON u.id = d.user_id
+				LEFT JOIN members_whitelists mw ON mw.member_id = u.member_id
+					AND mw.since <= CURDATE() AND mw.until >= CURDATE()
 				WHERE ip.member_id IS NULL
+				GROUP BY ip.id
 			) ip
 			$where
 			ORDER BY $order_by $order_by_direction
@@ -189,12 +172,17 @@ class Ip_address_Model extends ORM
 			(
 				SELECT ip.*, ip.id AS ip_address_id,
 					i.name AS iface_name, s.name as subnet_name,
-					d.id AS device_id, d.name AS device_name
+					d.id AS device_id, d.name AS device_name,
+					IF(mw.id IS NULL, 0, 2-mw.permanent) AS whitelisted
 				FROM ip_addresses ip
 				LEFT JOIN ifaces i ON i.id = ip.iface_id 
 				LEFT JOIN ifaces_vlans iv ON iv.iface_id = i.id
 				LEFT JOIN devices d ON d.id = i.device_id
 				LEFT JOIN subnets s ON s.id = ip.subnet_id
+				LEFT JOIN users u ON u.id = d.user_id
+				LEFT JOIN members m ON m.id = u.member_id
+				LEFT JOIN members_whitelists mw ON mw.member_id = m.id AND
+					mw.since <= CURDATE() AND mw.until >= CURDATE()
 				WHERE ip.member_id IS NULL
 			) ip
 			$where
@@ -217,6 +205,23 @@ class Ip_address_Model extends ORM
 		
 		return ($result && $result->current()) ? $result->current() : FALSE;
 	}
+
+	/**
+	 * Function gets gateway of gievn subnet
+	 * 
+	 * @param string $network_address
+	 * @return Ip_address_Model
+	 */
+	public function get_dhcp_of_subnet($subnet_id)
+	{
+		$result = $this->db->query("
+			SELECT * FROM ip_addresses ip
+			WHERE dhcp = 1 AND subnet_id = ?
+			LIMIT 0,1
+		", $subnet_id);
+		
+		return ($result && $result->current()) ? $result->current() : FALSE;
+	}
 	
 	/**
 	 * Gets all allowed IP addresses.
@@ -233,18 +238,7 @@ class Ip_address_Model extends ORM
 			SELECT DISTINCT ip.ip_address
 			FROM ip_addresses ip
 			LEFT JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
-			WHERE mip.ip_address_id IS NULL OR
-			(
-				whitelisted > 0 AND ip_address NOT IN
-				(
-					SELECT DISTINCT ip.ip_address
-					FROM ip_addresses ip
-					JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
-					JOIN messages m ON m.id = mip.message_id
-					WHERE m.ignore_whitelist = 1
-				)
-			)
-			ORDER BY INET_ATON(ip_address)
+			WHERE mip.ip_address_id IS NULL
 		");
 	}
 	
@@ -258,48 +252,130 @@ class Ip_address_Model extends ORM
 	public function get_unallowed_ip_addresses()
 	{
 		return $this->db->query("
-			SELECT ip_address
+			SELECT DISTINCT ip.ip_address
 			FROM ip_addresses ip
 			JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
-			JOIN messages m ON mip.message_id = m.id
-			WHERE IFNULL(ip.whitelisted,0) = 0 OR m.ignore_whitelist = 1
-			GROUP BY ip.id
-			ORDER BY INET_ATON(ip_address)
 		");
 	}
 	
 	/**
 	 * Function gets all ip address of interfaces of devices of users of given member.
 	 * 
-	 * @param integer $member_id
+	 * @param integer|array $member_id Member ID or array of member IDs
 	 * @param integer $subnet_id
 	 * @param integer $cloud_id
+	 * @param boolean $ignore_member_notif_settings Should be member notification setting ignored?
 	 * @return Mysql_Result
 	 */
-	public function get_ip_addresses_of_member($member_id, $subnet_id = NULL, $cloud_id = NULL)
+	public function get_ip_addresses_of_member($member_id, $subnet_id = NULL,
+		$cloud_id = NULL, $ignore_member_notif_settings = TRUE)
 	{
 		$where = "";
+		$cloud_subnets = "";
+		
+		if (!is_array($member_id))
+		{
+			$where = 'IFNULL(u.member_id, ip.member_id) = ' . intval($member_id);
+		}
+		else if (count($member_id))
+		{
+			$where = 'IFNULL(u.member_id, ip.member_id) IN (' 
+					. implode(',', array_map('intval', $member_id)) . ')';
+		}
+		else // empty (non sense condition)
+		{
+			$where = '1 = 2';
+		}
+		
 		
 		if ($subnet_id)
 		{
-			$where = "AND ip.subnet_id = ".intval($subnet_id);
+			$where .= " AND ip.subnet_id = ".intval($subnet_id);
 		}
 		
 		if ($cloud_id)
 		{
 			$where .= " AND cs.cloud_id = ".intval($cloud_id);
+			$cloud_subnets = "LEFT JOIN subnets s ON ip.subnet_id = s.id "
+					. "LEFT JOIN clouds_subnets cs ON cs.subnet_id = s.id";
+		}
+		
+		/* member whitelist - member notification settings */
+		if (!$ignore_member_notif_settings)
+		{
+			$where .= " AND m.notification_by_redirection > 0 ";
 		}
 		
 		return $this->db->query("
 				SELECT ip.*, i.device_id
 				FROM ip_addresses ip
-				LEFT JOIN subnets s ON ip.subnet_id = s.id
-				LEFT JOIN clouds_subnets cs ON cs.subnet_id = s.id
+				$cloud_subnets
 				LEFT JOIN ifaces i ON i.id = ip.iface_id
 				LEFT JOIN devices d ON d.id = i.device_id
 				LEFT JOIN users u ON u.id = d.user_id
-				WHERE IFNULL(u.member_id, ip.member_id) = ? $where
-		", $member_id);
+				LEFT JOIN members m ON m.id = IFNULL(u.member_id, ip.member_id)
+				WHERE $where
+		");
+	}
+	
+	/**
+	 * Function gets all ip address of interfaces of devices of user.
+	 * 
+	 * @param integer|array $user_id User ID or array of user IDs
+	 * @param integer $subnet_id
+	 * @param integer $cloud_id
+	 * @param boolean $ignore_member_notif_settings Should be member notification setting ignored?
+	 * @return Mysql_Result
+	 */
+	public function get_ip_addresses_of_user($user_id, $subnet_id = NULL, 
+		$cloud_id = NULL, $ignore_member_notif_settings = TRUE)
+	{
+		$where = "";
+		$cloud_subnets = "";
+		
+		if (!is_array($user_id))
+		{
+			$where = 'd.user_id = ' . intval($user_id);
+		}
+		else if (count($user_id))
+		{
+			$where = 'd.user_id IN (' 
+					. implode(',', array_map('intval', $user_id)) . ')';
+		}
+		else // empty (non sense condition)
+		{
+			$where = '1 = 2';
+		}
+		
+		
+		if ($subnet_id)
+		{
+			$where .= " AND ip.subnet_id = ".intval($subnet_id);
+		}
+		
+		if ($cloud_id)
+		{
+			$where .= " AND cs.cloud_id = ".intval($cloud_id);
+			$cloud_subnets = "LEFT JOIN subnets s ON ip.subnet_id = s.id "
+					. "LEFT JOIN clouds_subnets cs ON cs.subnet_id = s.id";
+		}
+		
+		/* member whitelist - member notification settings */
+		if (!$ignore_member_notif_settings)
+		{
+			$where .= " AND m.notification_by_redirection > 0 ";
+		}
+		
+		return $this->db->query("
+				SELECT ip.*, i.device_id
+				FROM ip_addresses ip
+				$cloud_subnets
+				LEFT JOIN ifaces i ON i.id = ip.iface_id
+				LEFT JOIN devices d ON d.id = i.device_id
+				LEFT JOIN users u ON u.id = d.user_id
+				LEFT JOIN members m ON m.id = IFNULL(u.member_id, ip.member_id)
+				WHERE $where
+		");
 	}
 	
 	/**
@@ -318,6 +394,7 @@ class Ip_address_Model extends ORM
 					s.name AS subnet_name,
 					32-log2((~inet_aton(netmask) & 0xffffffff) + 1) AS subnet_range,
 					s.network_address AS subnet_network,
+					s.netmask AS subnet_netmask,
 					i.name AS iface_name
 				FROM ip_addresses ip
 				LEFT JOIN subnets s ON s.id = ip.subnet_id
@@ -339,9 +416,12 @@ class Ip_address_Model extends ORM
 				SELECT ip.id, ip.id AS ip_address_id, ip.ip_address,
 					ip.gateway, d.name AS device_name, d.id AS device_id,
 					m.name AS member_name, m.id AS member_id, a.balance,
-					u.name AS user_name, u.surname AS user_surname, i.mac
+					u.name AS user_name, u.surname AS user_surname,
+					IFNULL(i.mac, pi.mac) AS mac
 				FROM ip_addresses ip
 				LEFT JOIN ifaces i ON ip.iface_id = i.id
+				LEFT JOIN ifaces_relationships ir ON ir.iface_id = i.id
+				LEFT JOIN ifaces pi ON ir.parent_iface_id = pi.id
 				LEFT JOIN devices d ON i.device_id = d.id
 				LEFT JOIN users u ON d.user_id = u.id
 				LEFT JOIN members m ON u.member_id = m.id
@@ -349,38 +429,6 @@ class Ip_address_Model extends ORM
 				WHERE ip.subnet_id = ? AND ip.member_id IS NULL
 				ORDER BY inet_aton(ip.ip_address)
 		", Account_attribute_Model::CREDIT, $subnet_id);
-	}
-	
-	/**
-	 * Gets all IDs of IP addresses of member who have currently interrupted
-	 * membership. These IP addresses are redirected.
-	 * 
-	 * @author Jiri Svitak
-	 * @return Mysql_Result
-	 */
-	public function get_ip_addresses_with_interrupted_membership()
-	{
-		return $this->db->query("
-			SELECT ip.id
-			FROM
-			(
-				SELECT ip.id, ip.ip_address, ip.whitelisted,
-					s.name AS subnet_name,
-					IFNULL(u.member_id, ip.member_id) AS member_id
-				FROM ip_addresses ip
-				LEFT JOIN ifaces i ON ip.iface_id = i.id
-				LEFT JOIN subnets s ON s.id = ip.subnet_id
-				LEFT JOIN devices d ON d.id = i.device_id
-				LEFT JOIN users u ON u.id = d.user_id
-			) ip
-			JOIN members m ON m.id = ip.member_id
-			JOIN membership_interrupts mi ON mi.member_id = m.id
-			JOIN members_fees mf ON mi.members_fee_id = mf.id
-			JOIN fees f ON f.id = mf.fee_id
-			JOIN accounts a ON a.member_id = m.id
-			WHERE mf.activation_date <= CURDATE() AND f.special_type_id = ? AND
-				CURDATE() <= mf.deactivation_date
-		", Fee_Model::MEMBERSHIP_INTERRUPT);
 	}
 	
 	/**
@@ -412,90 +460,26 @@ class Ip_address_Model extends ORM
 	}
 	
 	/**
-	 * Gets all IP addresses of members who have credit negative credit status.
+	 * Returns all IDs of IP addresses with expired connection test
 	 * 
-	 * @author Jiri Svitak
-	 * @param duble $debtor_boundary
+	 * @author Ondrej Fibich
 	 * @return Mysql_Result
 	 */
-	public function get_ip_addresses_of_debtors($debtor_boundary)
+	public function get_ip_addresses_with_expired_connection_test()
 	{
 		return $this->db->query("
-			SELECT ip.id, ip.ip_address, ip.whitelisted, subnet_name,
-				m.name AS member_name, a.balance,
-				(
-					SELECT GROUP_CONCAT(vs.variable_symbol) AS variable_symbol
-					FROM variable_symbols vs
-					LEFT JOIN accounts a ON a.id = vs.account_id
-					WHERE a.member_id = m.id
-				) AS variable_symbol
-			FROM
-			(
-				SELECT ip.id, ip.ip_address, ip.whitelisted, s.name AS subnet_name,
-					IFNULL(u.member_id, ip.member_id) AS member_id
-				FROM ip_addresses ip
-				LEFT JOIN ifaces i ON ip.iface_id = i.id
-				JOIN subnets s ON s.id = ip.subnet_id
-				LEFT JOIN devices d ON d.id = i.device_id
-				LEFT JOIN users u ON u.id = d.user_id
-			) ip
-			JOIN members m ON m.id = ip.member_id
-			JOIN accounts a ON a.member_id = m.id AND m.id <> ?
-			WHERE a.balance < ?
-			AND DATEDIFF(CURDATE(), m.entrance_date) >= ?
-			AND (ip.whitelisted IS NULL OR ip.whitelisted = 0)
+			SELECT ip.id, ip.ip_address
+			FROM ip_addresses ip
+			LEFT JOIN ifaces i ON ip.iface_id = i.id
+			LEFT JOIN devices d ON i.device_id = d.id
+			LEFT JOIN users u ON d.user_id = u.id
+			JOIN members m ON m.id = ip.member_id OR m.id = u.member_id
+			WHERE m.type = ? AND m.registration = 0
+				AND DATEDIFF(NOW(), m.applicant_connected_from) > ?
 		", array
 		(
-			Member_Model::ASSOCIATION, $debtor_boundary,
-			Settings::get('initial_debtor_immunity')
-		));
-	}
-
-	/**
-	 * Gets all IP addresses of members who have low credit and should pay
-	 * in short time.
-	 * 
-	 * @author Jiri Svitak
-	 * @param double $payment_notice_boundary
-	 * @param double $debtor_boundary
-	 * @return Mysql_Result
-	 */
-	public function get_ip_addresses_of_almostdebtors($payment_notice_boundary, $debtor_boundary)
-	{
-		return $this->db->query("
-				SELECT ip.id, ip.ip_address, ip.whitelisted, subnet_name,
-					m.name AS member_name, a.balance,
-					(
-						SELECT GROUP_CONCAT(vs.variable_symbol) AS variable_symbol
-						FROM variable_symbols vs
-						LEFT JOIN accounts a ON a.id = vs.account_id
-						WHERE a.member_id = m.id
-					) AS variable_symbol
-				FROM
-				(
-					SELECT ip.id, ip.ip_address, ip.whitelisted,
-					s.name AS subnet_name,
-					IFNULL(u.member_id, ip.member_id) AS member_id
-					FROM ip_addresses ip
-					LEFT JOIN ifaces i ON ip.iface_id = i.id
-					JOIN subnets s ON s.id = ip.subnet_id
-					LEFT JOIN devices d ON d.id = i.device_id
-					LEFT JOIN users u ON u.id = d.user_id
-				) ip
-				JOIN members m ON m.id = ip.member_id
-				JOIN accounts a ON a.member_id = m.id AND m.id <> ?
-				WHERE (
-					DATEDIFF(CURDATE(), m.entrance_date) >= ? AND
-					a.balance >= ? OR DATEDIFF(CURDATE(), m.entrance_date) < ? AND
-					DATEDIFF(CURDATE(), m.entrance_date) >= ?
-				)
-				AND a.balance < ?
-				AND (ip.whitelisted IS NULL OR ip.whitelisted = 0)
-		", array
-		(
-			Member_Model::ASSOCIATION, Settings::get('initial_debtor_immunity'),
-			$debtor_boundary, Settings::get('initial_debtor_immunity'),
-			Settings::get('initial_immunity'), $payment_notice_boundary
+			Member_Model::TYPE_APPLICANT,
+			Settings::get('applicant_connection_test_duration')
 		));
 	}
 
@@ -558,20 +542,24 @@ class Ip_address_Model extends ORM
 		
 		
 		return $this->db->query("
-			SELECT ip.id AS ip_address_id, ip.ip_address, ip.whitelisted,
-				m.id AS message_id, m.name AS message, m.type, ? AS member_id,
-				mip.datetime AS active_redir_datetime
+			SELECT ip.id AS ip_address_id, ip.ip_address, m.id AS message_id,
+				m.name AS message, m.type, ? AS member_id,
+				mip.datetime AS active_redir_datetime,
+				IF(mw.id IS NULL, 0, 2 - mw.permanent) AS whitelisted
 			FROM ip_addresses ip
 			LEFT JOIN ifaces i ON ip.iface_id = i.id
 			LEFT JOIN devices d ON i.device_id = d.id
 			LEFT JOIN users u ON d.user_id = u.id
+			LEFT JOIN members_whitelists mw ON (mw.member_id = u.member_id OR mw.member_id = ip.member_id)
+				AND (? BETWEEN mw.since AND mw.until)
 			LEFT JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
 			LEFT JOIN messages m ON m.id = mip.message_id
 			WHERE u.member_id = ? OR ip.member_id = ?
+			GROUP BY ip.id
 			ORDER BY $order_by $order_by_direction,
 				m.self_cancel DESC, mip.datetime ASC
 			LIMIT " . intval($sql_offset) . ", " . intval($limit_results) . "
-		", $member_id, $member_id, $member_id);
+		", $member_id, date('Y-m-d'), $member_id, $member_id);
 	}
 	
 	/**
@@ -585,15 +573,14 @@ class Ip_address_Model extends ORM
 	public function count_ips_and_redirections_of_member($member_id)
 	{
 		return $this->db->query("
-			SELECT COUNT(*) AS total
+			SELECT COUNT(DISTINCT ip.id) AS total
 			FROM ip_addresses ip
 			LEFT JOIN ifaces i ON ip.iface_id = i.id
 			LEFT JOIN devices d ON i.device_id = d.id
 			LEFT JOIN users u ON d.user_id = u.id
 			LEFT JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
-			LEFT JOIN messages m ON m.id = mip.message_id
 			WHERE u.member_id = ? OR ip.member_id = ?
-		", $member_id, $member_id, $member_id)->current()->total;
+		", $member_id, $member_id)->current()->total;
 	}
 
 	/**
@@ -607,7 +594,7 @@ class Ip_address_Model extends ORM
 	public function count_all_ip_addresses_by_member_and_subnet($member_id, $subnet_id)
 	{
 		return $this->db->query("
-			SELECT COUNT(*) AS count
+			SELECT COUNT(DISTINCT ip.id) AS count
 			FROM ip_addresses ip
 			JOIN ifaces i ON ip.iface_id = i.id
 			JOIN devices d ON i.device_id = d.id
@@ -617,37 +604,27 @@ class Ip_address_Model extends ORM
 	}
 	
 	/**
-	 * Returns all ip addresses of iface
+	 * Returns all ip addresses of iface (optional: and with its children ifaces)
 	 * 
 	 * @author Michal Kliment
 	 * @param integer $iface_id
+	 * @param type $with_child
 	 * @return Mysql_Result 
 	 */
-	public function get_all_ip_addresses_of_iface($iface_id)
+	public function get_all_ip_addresses_of_iface($iface_id, $with_children = FALSE)
 	{
+		if ($with_children)
+			$where = 'OR ip.iface_id IN (SELECT iface_id FROM ifaces_relationships WHERE parent_iface_id = '.intval($iface_id).')';
+		else
+			$where = '';
+		
 		return $this->db->query("
 			SELECT ip.id, ip.ip_address, s.name AS subnet_name, s.id AS subnet_id
 			FROM ip_addresses ip
 			LEFT JOIN subnets s ON s.id = ip.subnet_id
-			WHERE ip.iface_id = ?
+			WHERE ip.iface_id = ? $where
 			ORDER BY id ASC
 		", array($iface_id));
-	}
-
-	/**
-	 * Removes all IP addresses from temporary whitelist. Used when bank statement
-	 * is imported, then all whitelisted whould have payed their fees, so they are
-	 * no longer protected from redirection.
-	 * 
-	 * @author Jiri Svitak
-	 */
-	public function clean_temporary_whitelist()
-	{
-		$this->db->query("
-			UPDATE ip_addresses
-			SET whitelisted = ?
-			WHERE whitelisted = ? 
-		", self::NO_WHITELIST, self::TEMPORARY_WHITELIST);
 	}
 	
 	/**
@@ -710,25 +687,6 @@ class Ip_address_Model extends ORM
 	}
 	
 	/**
-	 * Sets whitelist
-	 *
-	 * @param ineteger $whitelist
-	 * @param integer $ip_address_id
-	 * @return boolean
-	 */
-	public function set_whitelist($whitelist, $ip_address_id = NULL)
-	{
-		if (!$ip_address_id && isset($this))
-			$ip_address_id = $this->id;
-		
-		return $this->db->query("
-			UPDATE ip_addresses ip
-			SET whitelisted = ?
-			WHERE id = ?
-		", array($whitelist, $ip_address_id));
-	}
-	
-	/**
 	 * Returns ip addresses of members with set-up qos ceil or rate
 	 * 
 	 * @author Michal Kliment
@@ -746,7 +704,7 @@ class Ip_address_Model extends ORM
 				LEFT JOIN devices d ON i.device_id = d.id
 				LEFT JOIN users u ON d.user_id = u.id
 			) ip
-			JOIN members m ON ip.member_id = m.id AND (m.qos_ceil OR m.qos_rate)
+			JOIN members m ON ip.member_id = m.id AND m.speed_class_id IS NOT NULL
 			ORDER BY m.id
 		");
 	}
@@ -822,4 +780,79 @@ class Ip_address_Model extends ORM
 	    
 		return ($result && $result->current()) ? $result->current() : FALSE;
 	}
+	
+	/**
+	 * Returns all free IP addresses similar to given IP address
+	 * 
+	 * @author Michal Kliment
+	 * @param type $ip_address_like
+	 * @return type
+	 */
+	public function get_free_ip_addresses($ip_address_like)
+	{		
+		$arr_ip_addresses = array();
+		
+		$subnet_model = new Subnet_Model();
+		
+		// split IP address
+		$ips = explode('.', $ip_address_like);
+		
+		// returns only if last number of IP address is missing
+		if (count($ips) < 4)
+			return array();
+		
+		// take only first 3 numbers
+		$ips = array_slice($ips, 0, 3);
+		
+		// join back to IP address
+		$network_address = implode('.', $ips);
+		
+		$subnets = $subnet_model
+			->like('network_address', $network_address)
+			->find_all();
+		
+		$ip_queries = array();
+		
+		foreach ($subnets as $subnet)
+		{
+			$network = ip2long($subnet->network_address);
+			$total_available = (~ip2long($subnet->netmask) & 0xffffffff)-1;
+                
+			if ($total_available > 1)
+			{
+				for ($i = 1; $i <= $total_available; $i++)
+					$ip_queries[] = "SELECT '".long2ip($network+$i)."' AS ip_address";
+			}
+			// for special 1-host subnet (mask /32) add only 1 IP address with network address (#507)
+			else
+			{
+				$ip_queries[] = "SELECT '".long2ip($network)."' AS ip_address";
+			}
+		}
+		
+		if (!count($ip_queries))
+			return array();
+		
+		$ip_query = implode("\nUNION\n", $ip_queries);
+			
+		$ips = $this->db->query("
+			SELECT ip_address
+			FROM
+			(
+				$ip_query
+			) AS ip
+			WHERE ip_address NOT IN
+			(
+				SELECT ip_address
+				FROM ip_addresses
+			)
+			AND ip_address LIKE '%$ip_address_like%'
+		", $this->id);
+		
+		foreach ($ips as $ip)
+			$arr_ip_addresses[] = $ip->ip_address;
+		
+		return $arr_ip_addresses;
+	}
+	
 }

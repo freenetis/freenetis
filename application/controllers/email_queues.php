@@ -21,6 +21,19 @@
 class Email_queues_Controller extends Controller
 {
 	/**
+	 * Constructor, only test if email is enabled
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		if (!Settings::get('email_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Index redirects to show unset
 	 */
 	public function index()
@@ -43,11 +56,11 @@ class Email_queues_Controller extends Controller
 			$order_by_direction = 'DESC', $page_word = null, $page = 1)
 	{
 		// access check
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Email_queues_Controller', 'email_queue'))
 			Controller::error(ACCESS);
 		
 		// filter form
-		$filter_form = new Filter_form('eq');
+		$filter_form = new Filter_form();
 		
 		$filter_form->add('from_user_name')
 			->label(__('User From'))
@@ -67,15 +80,13 @@ class Email_queues_Controller extends Controller
 		
 		$filter_form->add('subject');
 		
-		$filter_form->add('body');
-		
 		$filter_form->add('access_time')
 			->type('date')
 			->label(__('Time'));
 		
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array
@@ -133,9 +144,16 @@ class Email_queues_Controller extends Controller
 				'email_queues/show_all_sent', __('Show all sent e-mails')
 		);
 		
-		$grid->add_new_button(
-				'email_queues/delete_unsended', __('Delete all unsended e-mails')
-		);
+		if ($this->acl_check_delete('Email_queues_Controller', 'email_queue'))
+		{
+			$grid->add_new_button(
+					'email_queues/delete_unsent', __('Delete all unsended e-mails'),
+					array
+					(
+						'class' => 'delete_link'
+					)
+			);
+		}
 		
 		// database columns
 		
@@ -161,14 +179,24 @@ class Email_queues_Controller extends Controller
 		$actions = $grid->grouped_action_field();
 		
 		$actions->add_action()
-				->icon_action('mail_send')
-				->label('Send again')
-				->url('email_queues/send');
+				->icon_action('show')
+				->url('email/show');
 		
-		$actions->add_action()
-				->icon_action('delete')
-				->url('email_queues/delete')
-				->class('delete_link');
+		if ($this->acl_check_new('Email_queues_Controller', 'email_queue'))
+		{
+			$actions->add_action()
+					->icon_action('mail_send')
+					->label('Send again')
+					->url('email_queues/send');
+		}
+		
+		if ($this->acl_check_delete('Email_queues_Controller', 'email_queue'))
+		{
+			$actions->add_action()
+					->icon_action('delete')
+					->url('email_queues/delete')
+					->class('delete_link');
+		}
 		
 		// load data
 		$grid->datasource($emails);
@@ -197,39 +225,37 @@ class Email_queues_Controller extends Controller
 			$order_by_direction = 'DESC', $page_word = null, $page = 1)
 	{
 		// access check
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Email_queues_Controller', 'email_queue'))
 			Controller::error(ACCESS);
 		
 		// filter form
-		$filter_form = new Filter_form('eq');
+		$filter_form = new Filter_form();
 		
 		$filter_form->add('from_user_name')
-			->label(__('User From'))
+			->label('User From')
 			->callback('json/user_fullname');
 		
 		$filter_form->add('from')
-			->label(__('E-mail From'))
+			->label('E-mail From')
 			->callback('json/user_email');
 		
 		$filter_form->add('to_user_name')
-			->label(__('User To'))
+			->label('User To')
 			->callback('json/user_fullname');
 		
 		$filter_form->add('to')
-			->label(__('E-mail To'))
+			->label('E-mail To')
 			->callback('json/user_email');
 		
 		$filter_form->add('subject');
 		
-		$filter_form->add('body');
-		
 		$filter_form->add('access_time')
 			->type('date')
-			->label(__('Time'));
+			->label('Time');
 		
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array
@@ -247,17 +273,40 @@ class Email_queues_Controller extends Controller
 		
 		$email_queue_model = new Email_queue_Model();
 		
-		// counts all sent e-mail
-		$total_emails = $email_queue_model->count_all_sent_emails($filter_form->as_sql());
+		// hide grid on its first load (#442)
+		$hide_grid = Settings::get('grid_hide_on_first_load') && $filter_form->is_first_load();
 		
-		// limit check
-		if (($sql_offset = ($page - 1) * $limit_results) > $total_emails)
-			$sql_offset = 0;
-		
-		$emails = $email_queue_model->get_all_sent_emails(
-			$sql_offset, (int)$limit_results, $order_by, $order_by_direction,
-			$filter_form->as_sql()
-		);
+		if (!$hide_grid)
+		{
+			try
+			{
+				// counts all sent e-mail
+				$total_emails = $email_queue_model->count_all_sent_emails($filter_form->as_sql());
+
+				// limit check
+				if (($sql_offset = ($page - 1) * $limit_results) > $total_emails)
+					$sql_offset = 0;
+
+				$emails = $email_queue_model->get_all_sent_emails(
+					$sql_offset, (int)$limit_results, $order_by, $order_by_direction,
+					$filter_form->as_sql()
+				);
+			}
+			catch (Exception $e)
+			{
+				if ($filter_form->is_loaded_from_saved_query())
+				{
+					status::error('Invalid saved query');
+					// disable default query (loop protection)
+					if ($filter_form->is_loaded_from_default_saved_query())
+					{
+						ORM::factory('filter_query')->remove_default($filter_form->get_base_url());
+					}
+					$this->redirect(url_lang::current());
+				}
+				throw $e;
+			}
+		}
 
 		// headline
 		$headline = __('List of all sent e-mails');
@@ -274,7 +323,7 @@ class Email_queues_Controller extends Controller
 			'selector_max_multiplier'   => 20,
 			'base_url'					=> $path,
 			'uri_segment'				=> 'page',
-			'total_items'				=> $total_emails,
+			'total_items'				=> isset($total_emails) ? $total_emails : 0,
 			'items_per_page' 			=> $limit_results,
 			'style'		  				=> 'classic',
 			'order_by'					=> $order_by,
@@ -287,8 +336,24 @@ class Email_queues_Controller extends Controller
 				'email_queues/show_all_unsent', __('Show all unsent e-mails')
 		);
 		
+		if (!$hide_grid && $this->acl_check_delete('Email_queues_Controller', 'email_queue'))
+		{
+			$grid->add_new_button(
+					'email_queues/delete_sent' . server::query_string(),
+					__('Delete all filtered e-mails'), array
+					(
+						'class' => 'delete_link'
+					)
+			);
+		}
+		
 		$grid->add_new_button(
-				'email_queues/delete_unsended', __('Delete all unsended e-mails')
+				'export/csv/email_queue_sent' . server::query_string(),
+				'Export to CSV', array
+				(
+					'title' => __('Export to CSV'),
+					'class' => 'popup_link'
+				)
 		);
 		
 		// database columns
@@ -314,13 +379,19 @@ class Email_queues_Controller extends Controller
 				->icon_action('show')
 				->url('email/show');
 		
-		$actions->add_action()
-				->icon_action('mail_send')
-				->label('Send again')
-				->url('email_queues/send');
+		if ($this->acl_check_new('Email_queues_Controller', 'email_queue'))
+		{
+			$actions->add_action()
+					->icon_action('mail_send')
+					->label('Send again')
+					->url('email_queues/send');
+		}
 		
-		// load data
-		$grid->datasource($emails);
+		if (!$hide_grid)
+		{
+			// load data
+			$grid->datasource($emails);
+		}
 		
 		$view = new View('main');
 		$view->breadcrumbs = __('Sent e-mails');
@@ -340,7 +411,7 @@ class Email_queues_Controller extends Controller
 	public function send($email_queue_id = NULL)
 	{
 		// access check
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_new('Email_queues_Controller', 'email_queue'))
 			Controller::error(ACCESS);
 		
 		// bad parameter
@@ -399,7 +470,7 @@ class Email_queues_Controller extends Controller
 	public function delete($email_queue_id = NULL)
 	{
 		// access check
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_delete('Email_queues_Controller', 'email_queue'))
 			Controller::error(ACCESS);
 		
 		// bad parameter
@@ -428,10 +499,10 @@ class Email_queues_Controller extends Controller
 	 * 
 	 * @author Ondřej Fibich
 	 */
-	public function delete_unsended()
+	public function delete_unsent()
 	{
 		// access
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_delete('Email_queues_Controller', 'email_queue'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -453,6 +524,47 @@ class Email_queues_Controller extends Controller
 		
 		// send notification
 		status::success('%d unsended e-mails has been deleted.', TRUE, $count);
+		// redirects
+		url::redirect('email_queues/show_all_unsent');
+	}
+	
+	/**
+	 * Deletes filtered sent emails
+	 * 
+	 * @author Ondřej Fibich
+	 */
+	public function delete_sent()
+	{
+		// access
+		if (!$this->acl_check_delete('Email_queues_Controller', 'email_queue'))
+		{
+			Controller::error(ACCESS);
+		}
+		
+		// filter load
+		$f = new Filter_form();
+		$f->autoload();
+		$fsql = $f->as_sql();
+		
+		// model
+		$eq_model = new Email_queue_Model();
+		
+		// count first
+		$count = $eq_model->count_all_sent_emails($fsql);
+		
+		// delete all
+		if ($eq_model->count_all() == $count)
+		{
+			$eq_model->truncate();
+		}
+		// delete filtered
+		else
+		{
+			$eq_model->delete_sent_emails($fsql);			
+		}
+		
+		// send notification
+		status::success('%d sended e-mails has been deleted.', TRUE, $count);
 		// redirects
 		url::redirect('email_queues/show_all_sent');
 	}

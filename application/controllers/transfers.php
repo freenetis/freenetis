@@ -20,7 +20,17 @@
  */
 class Transfers_Controller extends Controller
 {
-
+	/**
+	 * Constructor, only test if finance is enabled
+	 */
+	public function __construct()
+	{		
+		parent::__construct();
+		
+		if (!Settings::get('finance_enabled'))
+			Controller::error (ACCESS);
+	}
+	
 	/**
 	 * By default, it redirects user to day book - list of all double-entry transfers.
 	 * 
@@ -48,8 +58,8 @@ class Transfers_Controller extends Controller
 			Controller::error(ACCESS);
 		
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array
@@ -65,40 +75,51 @@ class Transfers_Controller extends Controller
 			$order_by_direction = 'desc';
 		
 		// there are two groups of transfers
-		$arr_groups[Transfer_Model::ALL_TRANSFERS] = __('All transfers');
-		$arr_groups[Transfer_Model::WITHOUT_INNER] = __('Without inner transfers');
-		// creates fields for filtering
-		$filter = new Table_Form(
-				url_lang::base() . "transfers/show_all", "get", array
-		(
-			new Table_Form_Item('text', 'oa_name', 'Origin account'),
-			new Table_Form_Item('text', 'datetime', 'Date and time'),
-			"tr",
-			new Table_Form_Item('text', 'da_name', 'Destination account'),
-			new Table_Form_Item('text', 'amount', 'Amount'),
-			"tr",
-			new Table_Form_Item('text', 'text', 'Text'),
-			new Table_Form_Item('select', 'group', 'Group', $arr_groups),
-			"tr",
-			"td", new Table_Form_Item('submit', 'submit', 'Filter')
-		));
+		$arr_groups[Transfer_Model::OUTER_TRANSFERS] = __('Outer transfers');
+		$arr_groups[Transfer_Model::INNER_TRANSFERS] = __('Inner transfers');
 		
-		$arr_gets = array();
-		foreach ($this->input->get() as $key => $value)
-			$arr_gets[] = $key . '=' . $value;
+		// Create filter form
+		$filter_form = new Filter_form();
 		
-		$query_string = '?' . implode('&', $arr_gets);
+		$filter_form->add('oa_name')
+				->label('Origin account')
+				->callback('json/bank_account_name');
+		
+		$filter_form->add('datetime')
+				->label('Date and time')
+				->type('date')
+				->default(Filter_form::OPER_GREATER_OR_EQUAL, date('Y-m-d', time() - 3600*24*7));
+		
+		$filter_form->add('da_name')
+				->label('Destination account')
+				->callback('json/bank_account_name');
+		
+		$filter_form->add('amount')
+				->label('Amount')
+				->type('number');
+		
+		$filter_form->add('text');
+		
+		$filter_form->add('transfer')
+				->label('Group')
+				->type('select')
+				->values($arr_groups);
 		
 		// model
 		$model_transfer = new Transfer_Model();
-		$total_transfers = $model_transfer->count_all_transfers($filter->values());
+		$total_transfers = $model_transfer->count_all_transfers(
+				$filter_form->as_sql(array('datetime', 'amount', 'text')),
+				$filter_form->as_sql(array('oa_name', 'da_name', 'transfer'))
+		);
 		
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_transfers)
 			$sql_offset = 0;
 		
 		$alltransfers = $model_transfer->get_all_transfers(
 				$sql_offset, (int) $limit_results, $order_by,
-				$order_by_direction, $filter->values()
+				$order_by_direction,
+				$filter_form->as_sql(array('datetime', 'amount', 'text')),
+				$filter_form->as_sql(array('oa_name', 'da_name', 'transfer'))
 		);
 		
 		$headline = __('Day book');
@@ -120,37 +141,48 @@ class Transfers_Controller extends Controller
 			'order_by'					=> $order_by,
 			'order_by_direction'		=> $order_by_direction,
 			'limit_results'				=> $limit_results,
-			'query_string'				=> $query_string,
-			'filter'					=> $filter->view
+			'filter'					=> $filter_form
 		));
 		
 		if ($this->acl_check_edit('Accounts_Controller', 'transfers'))
 		{
+			$deduct_day = (Settings::get('deduct_day') + 1) % 32;
+			$link_opt = array();
+			
+			// automaticall deduction
+			if (Settings::get('deduct_fees_automatically_enabled'))
+			{
+				$auto_m = 'Automatically deduction is enabled, this operation ' .
+						'should be use only if automatical deduction has failed.';
+				$link_opt = array
+				(
+					'title'	=> __($auto_m),
+					'class'	=> 'deprecated help'
+				);
+			}
+			
 			$grid->add_new_button(
 					'transfers/add', __('Add new transfer'),
 					array(), help::hint('add_new_transfer')
 			);
 			
 			$grid->add_new_button(
-					'transfers/deduct_fees', __('Deduction of member fees'),
-					array(), help::hint('deduct_member_fees')
+					'transfers/deduct_member_fees', __('Deduction of member fees'),
+					$link_opt + array('class' => 'popup_link'),
+					help::hint('deduct_member_fees', $deduct_day)
 			);
-			
-			$m = __('Are you sure you want to deduct all entrance fees');
 			
 			$grid->add_new_button(
 					'transfers/deduct_entrance_fees',
 					__('Deduction of entrance fees'),
-					array('onclick' => 'return window.confirm(\'' . $m . '?\')'),
-					help::hint('deduct_entrance_fees')
+					$link_opt + array('class' => 'popup_link'),
+					help::hint('deduct_entrance_fees', $deduct_day)
 			);
-			
-			$m = __('Are you sure you want to deduct all device repayments');
 			
 			$grid->add_new_button(
 					'transfers/deduct_device_fees',
 					__('Deduction of device repayments'),
-					array('onclick' => 'return window.confirm(\'' . $m . '?\')'),
+					$link_opt + array('class' => 'popup_link'),
 					help::hint('deduct_device_repayments')
 			);
 		}
@@ -197,7 +229,7 @@ class Transfers_Controller extends Controller
 		$view->title = $headline;
 		$view->breadcrumbs = $headline;
 		$view->content = new View('show_all');
-		$view->content->headline = $headline . '&nbsp;' . help::hint('day_book');
+		$view->content->headline = $headline . '&nbsp;' . help::hint('day_book');		
 		$view->content->table = $grid;
 		$view->render(TRUE);
 	}
@@ -242,8 +274,8 @@ class Transfers_Controller extends Controller
 		}
 		
 		// gets grid settings
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// allowed order type array
 		$allowed_order_type = array
@@ -258,44 +290,53 @@ class Transfers_Controller extends Controller
 			$order_by_direction = 'desc';
 		
 		// creates fields for filtering
-		$arr_types[Transfer_Model::INBOUND_AND_OUTBOUND] = __('All transfers');
 		$arr_types[Transfer_Model::INBOUND] = __('Inbound');
 		$arr_types[Transfer_Model::OUTBOUND] = __('Outbound');
 		
-		$filter = new Table_Form(
-				url_lang::base() . "transfers/show_by_account/$account_id", "get", array
-		(
-			new Table_Form_Item('text', 'name', 'Counteraccount'),
-			new Table_Form_Item('text', 'datetime', 'Date and time'),
-			"tr",
-			new Table_Form_Item('text', 'text', 'Text'),
-			new Table_Form_Item('text', 'amount', 'Amount'),
-			"tr",
-			new Table_Form_Item('select', 'type', 'Type', $arr_types),
-			"td", new Table_Form_Item('submit', 'submit', 'Filter')
-		));
+		// Create filter form
+		$filter_form = new Filter_form('t');
 		
-		$arr_gets = array();
-		foreach ($this->input->get() as $key => $value)
-			$arr_gets[] = $key . '=' . $value;
-		$query_string = '?' . implode('&', $arr_gets);
+		$filter_form->add('name')
+				->table('a')
+				->label('Counteraccount')
+				->callback('json/bank_account_name');
 		
-		// all types of transfers are shown by default
-		$filter_values = $filter->values();
-		if (count($filter_values) == 0)
-			$filter_values['type'] = Transfer_Model::INBOUND_AND_OUTBOUND;
+		$filter_form->add('datetime')
+				->label('Date and time')
+				->type('date');
+		
+		$filter_form->add('amount')
+				->label('Amount')
+				->type('number');
+		
+		$filter_form->add('text');
+		
+		$filter_form->add('type')
+				->type('select')
+				->values($arr_types);
 		
 		// transfers on account
 		$transfer_model = new Transfer_Model();
-		$total_transfers = $transfer_model->count_transfers($account_id, $filter_values);
+		$total_transfers = $transfer_model->count_transfers($account_id,
+				$filter_form->as_sql(array
+					(
+						'name', 'datetime', 'amount', 'text'
+					)),
+				$filter_form->as_array()
+		);
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_transfers)
 			$sql_offset = 0;
 		
 		$transfers = $transfer_model->get_transfers(
 				$account_id, $sql_offset, (int) $limit_results, $order_by,
-				$order_by_direction, $filter_values
+				$order_by_direction,
+				$filter_form->as_sql(array
+					(
+						'name', 'datetime', 'amount', 'text'
+					)),
+				$filter_form->as_array()
 		);
-		
+
 		// total amount of inbound and outbound transfers and total balance
 		$balance = $inbound = $outbound = 0;
 		if (count($transfers) > 0)
@@ -327,8 +368,7 @@ class Transfers_Controller extends Controller
 			'limit_results'				=> $limit_results,
 			'variables'					=> $account_id . '/',
 			'url_array_ofset'			=> 1,
-			'query_string'				=> $query_string,
-			'filter'					=> $filter->view
+			'filter'					=> $filter_form
 		));
 
 		// payment cash link
@@ -362,38 +402,12 @@ class Transfers_Controller extends Controller
 		if ($account->account_attribute_id == Account_attribute_Model::CREDIT)
 		{
 			if ($this->acl_check_edit('Accounts_Controller', 'transfers'))
-			{
-				$m = __('Are you sure you want to recount fees of this member');
-				
+			{	
 				$transfers_grid->add_new_button(
-						'transfers/recalculate_fees/' . $account->id,
-						__('Recount of member fees'),
-						array('onclick' => 'return window.confirm(\'' . $m . '?\')'),
+						'accounts/recalculate_fees/' . $account->id,
+						__('Recount of fees'),
+						array(),
 						help::hint('recalculate_fees')
-				);
-			}
-			
-			if ($this->acl_check_edit('Accounts_Controller', 'transfers'))
-			{
-				$m = __('Are you sure you want to recount entrance fees of this member');
-				
-				$transfers_grid->add_new_button(
-						'transfers/recalculate_entrance_fees/' .
-						$account->id, __('Recount of entrance fees'),
-						array('onclick' => 'return window.confirm(\'' . $m . '?\')'),
-						help::hint('recalculate_entrance_fees')
-				);
-			}
-			
-			if ($this->acl_check_edit('Accounts_Controller', 'transfers'))
-			{
-				$m = __('Are you sure you want to recount device repayments of this member');
-				
-				$transfers_grid->add_new_button(
-						'transfers/recalculate_device_fees/' .
-						$account->id, __('Recount of device repayments'),
-						array('onclick' => 'return window.confirm(\'' . $m . '?\')'),
-						help::hint('recalculate_device_fees')
 				);
 			}
 		}
@@ -495,7 +509,13 @@ class Transfers_Controller extends Controller
 		$view->content->inbound = $inbound;
 		$view->content->outbound = $outbound;
 		$view->content->variable_symbols = $variable_symbols;
-		$view->content->expiration_date = Members_Controller::get_expiration_date($account);
+		
+		if ($account->member->type != Member_Model::TYPE_APPLICANT &&
+			$account->member->type != Member_Model::TYPE_FORMER)
+		{
+			$view->content->expiration_date = Members_Controller::get_expiration_date($account);
+		}
+		
 		$view->content->transfers_grid = $transfers_grid;
 		
 		if ($this->acl_check_view('Members_Controller', 'comment', $account->member_id))
@@ -690,7 +710,7 @@ class Transfers_Controller extends Controller
 			{
 				$db->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cannot add new transfer.');
+				status::error('Error - cannot add new transfer.', $e);
 			}
 			url::redirect('transfers/show_by_account/' . $origin_account_id);
 		}
@@ -963,7 +983,7 @@ class Transfers_Controller extends Controller
 				__('Back to transfers of account')
 		);
 		
-		$headline = __('Charge VoIP credit');
+		$headline = __('Add new VoIP transfer');
 		$info[] = __('Information') . ' : ' . __('Transfer will be effected within 15 minutes.');
 		$view = new View('main');
 		$view->title = $headline;
@@ -1028,7 +1048,7 @@ class Transfers_Controller extends Controller
 			{
 				$transfer->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cant update transfer.');
+				status::error('Error - cant update transfer.', $e);
 				url::redirect('transfers/show/' . $transfer_id);
 			}
 		}
@@ -1048,11 +1068,10 @@ class Transfers_Controller extends Controller
 	 * Deducts fees of all members in one month. If deduct transfer for one month and
 	 * account is found, then it is ignored and skipped.
 	 * 
-	 * @todo rewrite SQL to models
 	 * @author Jiri Svitak
 	 * @return unknown_type
 	 */
-	public function deduct_fees()
+	public function deduct_member_fees()
 	{
 		// access rights
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
@@ -1064,19 +1083,24 @@ class Transfers_Controller extends Controller
 		
 		$current_month = (int) date('n');
 		
+		// association
+		$association = new Member_Model(Member_Model::ASSOCIATION);
+		
 		// content of dropdown for years
-		$year_from = date('Y') - 20;
+		$year_from = date('Y', strtotime($association->entrance_date));
 		
-		for ($i = 1; $i <= 20; $i++)
-			$arr_years[$year_from + $i] = $year_from + $i;
+		for ($i = $year_from; $i <= date('Y'); $i++)
+		{
+			$arr_years[$i] = $i;
+		}
 		
-		$form = new Forge('transfers/deduct_fees');
+		$form = new Forge();
 		
 		$form->dropdown('year')
 				->rules('required')
 				->options($arr_years)
 				->style('width:200px')
-				->selected($year_from + 20);
+				->selected(date('Y'));
 		
 		$form->dropdown('month')
 				->rules('required')
@@ -1086,289 +1110,58 @@ class Transfers_Controller extends Controller
 				->callback(array($this, 'valid_default_fee'));
 		
 		$form->submit('Deduct');
+		
 		// form validation
 		if ($form->validate())
 		{
-			// access rights
-			if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-				Controller::error(ACCESS);
-			
 			$form_data = $form->as_array();
 			
 			// preparation
-			$created_transfers_count = 0;
-			$total_amount = 0;
-			$date = date('Y-m-d', mktime(
-					0, 0, 0, $form_data['month'], 15, $arr_years[$form_data['year']]
-			));
-			$creation_datetime = date('Y-m-d H:i:s');
+			$month = $form_data['month'];
+			$year = $arr_years[$form_data['year']];
 			$user_id = $this->session->get('user_id');
-			// finds default fee
-			$fee_model = new Fee_Model();
-			$fee = $fee_model->get_default_fee_by_date_type($date, 'regular member fee');
 			
-			if ($fee && $fee->id)
-			{
-				$default_fee = $fee->fee;
-			}
-			else
-			{
-				status::error('Fees have not been set!');
-				url::redirect('transfers/show_all');
-			}
-			
-			$operating = ORM::factory('account')->where(
-					'account_attribute_id', Account_attribute_Model::OPERATING
-			)->find();
-			
-			$database = Database::instance();
-			$account_model = new Account_Model();
-			$accounts = $account_model->get_accounts_to_deduct($date);
-			
+			// perform deduction
 			try
 			{
-				$db = new Transfer_Model();
-				$db->transaction_start();
-				// first sql for inserting transfers
-				$sql_insert = "INSERT INTO transfers (origin_id, destination_id, ".
-						"previous_transfer_id, member_id, user_id, type, datetime, ".
-						"creation_datetime, text, amount) VALUES ";
-				$values = array();
-				// second sql for updating accounts
-				$sql_update = "UPDATE accounts SET balance = CASE id ";
-				$ids = array();
-				// main cycle
-				foreach ($accounts as $account)
-				{
-					// no deduct transfer for this date and account generated? then create one
-					if ($account->transfer_id == 0)
-					{
-						$text = __('Deduction of member fee');
-						if ($account->fee_is_set)
-						{
-							$amount = $account->fee;
-							$text = ($account->fee_readonly) ? $text . ' - ' .
-									__('' . $account->fee_name) : $text . ' - ' .
-									$account->fee_name;
-						}
-						else
-						{
-							$amount = $default_fee;
-						}
-						// is amount bigger than zero?
-						if ($amount > 0)
-						{
-							// insert
-							$values[] = "($account->id, $operating->id, NULL, NULL, " .
-									"$user_id, " . Transfer_Model::DEDUCT_MEMBER_FEE .
-									", '$date', '$creation_datetime', '$text', $amount)";
-							// update
-							$sql_update .= "WHEN $account->id THEN " . num::decimal_point($account->balance - $amount) . " ";
-							$ids[] = $account->id;
-							$total_amount += $amount;
-							$created_transfers_count++;
-						}
-					}
-				}
-				if ($created_transfers_count > 0)
-				{
-					// single query for inserting transfers
-					$sql_insert .= implode(",", $values);
-					
-					if (!$database->query($sql_insert))
-						throw new Exception();
-					
-					// single query for updating credit account balances
-					$ids_with_commas = implode(",", $ids);
-					$sql_update .= "END WHERE id IN ($ids_with_commas)";
-					
-					if (!$database->query($sql_update))
-						throw new Exception();
-					
-					// update also balance of operating account
-					if (!$account_model->recalculate_account_balance_of_account($operating->id))
-						throw new Exception();
-				}
-				$db->transaction_commit();
+				$count = self::worker_deduct_members_fees($month, $year, $user_id);
 				
 				status::success(
 						'Fees have been successfully deducted, %d new transfers created.',
-						TRUE, array($created_transfers_count)
+						TRUE, array($count)
 				);
 			}
 			catch (Exception $e)
 			{
-				$db->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - some fees have not been deducted.');
+				status::error('Error - some fees have not been deducted.', $e);
+				url::redirect('transfers/show_all');
 			}
-			url::redirect('transfers/show_all');
-		}
-		
-		$breadcrumbs = breadcrumbs::add()
-				->link('transfers/show_all', 'Day book')
-				->text('Deduction of member fees');
 			
-		$view = new View('main');
-		$view->title = __('Deduction of member fees');
-		$view->breadcrumbs = $breadcrumbs->html();
-		$view->content = new View('form');
-		$view->content->headline = __('Deduction of member fees');
-		$view->content->form = $form->html();
-		$view->render(TRUE);
-	}
-
-	/**
-	 * Function recalculates wrong deducted fees of given account of member.
-	 * 
-	 * @author Jiri Svitak
-	 */
-	public function recalculate_fees($account_id = 0)
-	{
-		// access control
-		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-			Controller::error(ACCESS);
-		
-		$account = new Account_Model($account_id);
-		
-		// account doesn't exist
-		if (!$account->id)
-			Controller::error(RECORD);
-		
-		// finds default fee
-		$fee_model = new Fee_Model();
-		
-		// finds member's entrance date
-		$entrance_date = date_parse($account->member->entrance_date);
-		$year = $entrance_date['year'];
-		$month = $entrance_date['month'];
-		$day = $entrance_date['day'];
-		// round entrance date
-		if ($day > 15)
-		{
-			$month++;
-			if ($month > 12)
-			{
-				$year++;
-				$month = 1;
-			}
-		}
-		// finds member's leaving date
-		if ($account->member->leaving_date != '0000-00-00')
-		{
-			$max_date = date_parse($account->member->leaving_date);
+			// end
+			$this->redirect('transfers/show_all');		
 		}
 		else
 		{
-			// find datetime of last deduct fee
-			$transfer_model = new Transfer_Model();
-			$last_datetime = $transfer_model->find_last_transfer_datetime_by_type(
-					Transfer_Model::DEDUCT_MEMBER_FEE
-			);
-			
-			if ($last_datetime)
-				$max_date = date_parse($last_datetime);
-			else
-				$max_date = date_parse(date('Y-m-d'));
-		}
-		$max_day = $max_date['day'];
-		$max_month = $max_date['month'];
-		$max_year = $max_date['year'];
-		// round max date
-		if ($max_day < 15)
-		{
-			$max_month--;
-			if ($max_month == 0)
+			if (Settings::get('deduct_fees_automatically_enabled'))
 			{
-				$max_year--;
-				$max_month = 12;
+				$m = 'Automatically deduction is enabled, this operation should be ' .
+						'use only if automatical deduction has failed';
+				status::mwarning($m);
 			}
+
+			$breadcrumbs = breadcrumbs::add()
+					->link('transfers/show_all', 'Day book')
+					->text('Deduction of member fees');
+
+			$view = new View('main');
+			$view->title = __('Deduction of member fees');
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('form');
+			$view->content->headline = __('Deduction of member fees');
+			$view->content->form = $form->html();		
+			$view->render(TRUE);
 		}
-		// finds operating account
-		$operating = ORM::factory('account')->where(
-				'account_attribute_id', Account_attribute_Model::OPERATING
-		)->find();
-		// creation datetime of transfers
-		$creation_datetime = date('Y-m-d H:i:s');
-		
-		// status message
-		$message = '';
-		
-		try
-		{
-			$db = new Transfer_Model();
-			$db->transaction_start();
-			// deleting old deduct transfer of member
-			$deleted_transfers_count = $account->delete_deduct_transfers_of_account($account_id);
-			$created_transfers_count = 0;
-			$max_date = date('Y-m-d', mktime(0, 0, 0, $max_month, 15, $max_year));
-			
-			while (($date = date('Y-m-d', mktime(0, 0, 0, $month, 15, $year))) <= $max_date)
-			{
-				$text = __('Deduction of member fee');
-				// finds default regular member fee for this month
-				$fee = $fee_model->get_default_fee_by_date_type($date, 'regular member fee');
-				if ($fee && $fee->id)
-					$default_fee = $fee->fee;
-				else
-				{
-					$message = __('Error').': '.url_lang::lang('texts.Default fee for date %s have not been set!', $date);
-					throw new Exception($message);
-				}
-				// finds regular member fee for this member and this month
-				$fee = $fee_model->get_fee_by_member_date_type(
-						$account->member_id, $date, 'regular member fee'
-				);
-				// it exists
-				if ($fee && $fee->id)
-				{
-					$amount = $fee->fee;
-					// translate only read-only fee names
-					$text = ($fee->readonly) ? $text . ' - ' . __(''
-							. $fee->name) : $text . ' - ' . $fee->name;
-				}
-				// it doesn't exist - uses default fee
-				else
-				{
-					$amount = $default_fee;
-				}
-				if ($amount > 0)
-				{
-					$created_transfers_count++;
-					Transfer_Model::insert_transfer(
-							$account->id, $operating->id, null, null,
-							$this->session->get('user_id'),
-							Transfer_Model::DEDUCT_MEMBER_FEE, $date,
-							$creation_datetime, $text, $amount
-					);
-				}
-				// iterate to next month
-				$month++;
-				if ($month == 13)
-				{
-					$month = 1;
-					$year++;
-				}
-			}
-			$db->transaction_commit();
-			
-			status::success(
-					'Fees have been successfully recalculated, %d deleted '.
-					'transfers, %d created new transfers.',
-					TRUE, array
-					(
-						0 => $deleted_transfers_count,
-						1 => $created_transfers_count
-					)
-			);
-		}
-		catch (Exception $e)
-		{
-			$db->transaction_rollback();
-			Log::add_exception($e);
-			status::error($message);
-		}
-		url::redirect('transfers/show_by_account/' . $account_id);
 	}
 
 	/**
@@ -1376,7 +1169,7 @@ class Transfers_Controller extends Controller
 	 * It checks each member if his fee was deducted, and if it is not, then
 	 * the fee is deducted.
 	 * 
-	 * @author Jiri Svitak
+	 * @author Michal Kliment
 	 */
 	public function deduct_entrance_fees()
 	{
@@ -1384,253 +1177,92 @@ class Transfers_Controller extends Controller
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
 			Controller::error(ACCESS);
 		
-		// preparation
-		$created_transfers_count = 0;
-		$creation_datetime = date('Y-m-d H:i:s');
-		//$current_date = date::get_middle_of_month(date('Y-m-d'));
-		$current_date = date('Y-m-d');
-		$infrastructure = ORM::factory('account')->where(
-				'account_attribute_id', Account_attribute_Model::INFRASTRUCTURE
-		)->find();
+		// content of dropdown for months
+		for ($i = 1; $i <= 12; $i++)
+			$arr_months[$i] = $i;
 		
-		$account_model = new Account_Model();
-		$transfer_model = new Transfer_Model();
-		// gets all credit accounts, tries to find also existing transfer
-		$credit_accounts = $account_model->get_accounts_to_deduct_entrance_fees();
-		try
+		$current_month = (int) date('n');
+		
+		// association
+		$association = new Member_Model(Member_Model::ASSOCIATION);
+		
+		// content of dropdown for years
+		$year_from = date('Y', strtotime($association->entrance_date));
+		
+		for ($i = $year_from; $i <= date('Y'); $i++)
 		{
-			$db = new Transfer_Model();
-			$db->transaction_start();
-			foreach ($credit_accounts as $ca)
-			{
-				// if member is not member yet, then no deduct is made (fixes #324)
-				if (empty($ca->entrance_date) || ($ca->entrance_date == '0000-00-00'))
-					continue;
-				// if member's entrance fee is 0, then no transfer is generated
-				if ($ca->entrance_fee == 0)
-					continue;
-				// are there some deduct transfers?
-				if (empty($ca->transfer_id))
-				{
-					// no deduct entrance fee transfer means that nothing is already paid
-					$already_paid = 0;
-					$latest_date = '0001-01-01';
-				}
-				else
-				{
-					// some transfers already exist, then their total amount is calculated
-					$eftransfers = $transfer_model->get_entrance_fee_transfers_of_account($ca->id);
-					$already_paid = $eftransfers->current()->total_amount;
-					$latest_date = $eftransfers->current()->datetime;
-					$latest_date = substr($latest_date, 0, strpos($latest_date, ' '));
-				}
-				// is already whole entrance fee paid?
-				if ($already_paid >= $ca->entrance_fee)
-					continue;
-				// entrance fee is not wholy paid, calculate debt
-				$debt = $ca->entrance_fee - $already_paid;
-				// entrance date of current member
-				$entrance = date_parse($ca->entrance_date);
-				$eyear = $entrance['year'];
-				$emonth = $entrance['month'];
-				$eday = $entrance['day'];
-				if ($eday > 15)
-					$emonth++;
-				if ($emonth == 13)
-				{
-					$emonth = 1;
-					$eyear++;
-				}
-				// getting boundary date - 15th day in the month
-				$date = date('Y-m-d', mktime(0, 0, 0, $emonth, 15, $eyear));
-				// while debt is greater than zero and date of instalment is lower than current date
-				while ($debt > 0 && $date < $current_date)
-				{
-					// is debt still greater than one monthly instalment?
-					if ($debt > $ca->debt_payment_rate)
-					{
-						// one monthly instalment is deducted
-						$amount = $ca->debt_payment_rate;
-						// if debt pay rate is zero, then whole amount of debt is deducted
-						if ($amount <= 0)
-							$amount = $debt;
-					}
-					else
-					{
-						// rest of the debt is deducted
-						$amount = $debt;
-					}
-					// only one transfer per month - older transfers cannot be duplicated
-					if ($date > $latest_date)
-					{
-						// decrease amount of debt due to size of one instalment
-						$debt -= $amount;
-						// create new transfer
-						Transfer_Model::insert_transfer(
-								$ca->id, $infrastructure->id, null, null,
-								$this->session->get('user_id'),
-								Transfer_Model::DEDUCT_ENTRANCE_FEE, $date,
-								$creation_datetime, __('Entrance fee'), $amount
-						);
-						$created_transfers_count++;
-					}
-					// iterate to next month
-					$emonth++;
-					if ($emonth == 13)
-					{
-						$emonth = 1;
-						$eyear++;
-					}
-					// getting boundary date - 15th day in the month
-					$date = date('Y-m-d', mktime(0, 0, 0, $emonth, 15, $eyear));
-				}
-			}
-			$db->transaction_commit();
-			status::success(
-					'Entrance fees have been successfully deducted, '.
-					'%d new transfers created.', TRUE, $created_transfers_count
-			);
-		}
-		catch (Exception $e)
-		{
-			$db->transaction_rollback();
-			Log::add_exception($e);
-			status::error('Error - cant deduct entrance fee.');
-		}
-		url::redirect('transfers/show_all');
-	}
-
-	/**
-	 * Recounts transfer of one member credit account.
-	 * Used only in special cases, like changing entrance date.
-	 * 
-	 * @author Jiri Svitak
-	 * @param integer $account_id
-	 */
-	public function recalculate_entrance_fees($account_id = NULL)
-	{
-		if (!$account_id || !is_numeric($account_id))
-			Controller::warning(PARAMETER);
-		
-		// access rights
-		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-			Controller::error(ACCESS);
-		
-		$account_model = new Account_Model($account_id);
-		
-		if ($account_model->id == 0)
-			Controller::error(RECORD);
-		
-		// first of all is necessary to delete previous entrance fee transfers
-		// user can change debt payment rate, this means that existing transfers are useless
-		$deleted_transfers_count = $account_model->delete_entrance_deduct_transfers_of_account($account_id);
-		// preparation
-		$created_transfers_count = 0;
-		$creation_datetime = date('Y-m-d H:i:s');
-		$infrastructure = ORM::factory('account')->where(
-				'account_attribute_id', Account_attribute_Model::INFRASTRUCTURE
-		)->find();
-		
-		$account_model = new Account_Model();
-		// gets credit account including its transfers, tries to find also existing transfer
-		$credit_account = $account_model->get_account_to_recalculate_entrance_fees($account_id);
-		$ca = $credit_account->current();
-		// if member's entrance fee is 0, then no transfer is generated
-		if ($ca->entrance_fee == 0)
-		{
-			status::success(
-					'Entrance fees have been successfully recalculated, ' .
-					'%d transfers deleted, %d new transfers created.',
-					TRUE, array
-					(
-						1 => $deleted_transfers_count,
-						2 => $created_transfers_count
-					)
-			);
-			url::redirect('transfers/show_by_account/' . $account_id);
-		}
-		// entrance fee is not wholy paid, calculate debt
-		$debt = $ca->entrance_fee;
-		// entrance date of current member
-		$entrance = date_parse($ca->entrance_date);
-		$eyear = $entrance['year'];
-		$emonth = $entrance['month'];
-		$eday = $entrance['day'];
-		
-		if ($eday > 15)
-			$emonth++;
-		
-		if ($emonth == 13)
-		{
-			$emonth = 1;
-			$eyear++;
+			$arr_years[$i] = $i;
 		}
 		
-		// getting boundary date - 15th day in the month
-		$date = date('Y-m-d', mktime(0, 0, 0, $emonth, 15, $eyear));
-		try
+		$form = new Forge();
+		
+		$form->dropdown('year')
+				->rules('required')
+				->options($arr_years)
+				->style('width:200px')
+				->selected(date('Y'));
+		
+		$form->dropdown('month')
+				->rules('required')
+				->options($arr_months)
+				->selected($current_month)
+				->style('width:200px')
+				->callback(array($this, 'valid_default_fee'));
+		
+		$form->submit('Deduct');
+		
+		// form validation
+		if ($form->validate())
 		{
-			$db = new Transfer_Model();
-			$db->transaction_start();
-			// while debt is greater than zero and date of instalment is lower than current date
-			while ($debt > 0 && $date < date('Y-m-d'))
-			{
-				// is debt still greater than one monthly instalment?
-				if ($debt > $ca->debt_payment_rate)
-				{
-					// one monthly instalment is deducted
-					$amount = $ca->debt_payment_rate;
-					// if debt pay rate is zero, then whole amount of debt is deducted
-					if ($amount <= 0)
-						$amount = $debt;
-				}
-				else
-				{
-					$amount = $debt;
-				}
-				// decrease amount of debt due to size of one instalment
-				$debt -= $amount;
-				// create new transfer
-				if ($amount > 0)
-				{
-					$created_transfers_count++;
-					Transfer_Model::insert_transfer(
-							$ca->id, $infrastructure->id, null, null,
-							$this->session->get('user_id'),
-							Transfer_Model::DEDUCT_ENTRANCE_FEE,
-							$date, $creation_datetime, __('Entrance fee'),
-							$amount
-					);
-				}
-				// iterate to next month
-				$emonth++;
-				if ($emonth == 13)
-				{
-					$emonth = 1;
-					$eyear++;
-				}
-				// getting boundary date - 15th day in the month
-				$date = date('Y-m-d', mktime(0, 0, 0, $emonth, 15, $eyear));
-			}
-			$db->transaction_commit();
+			$form_data = $form->as_array();
 			
-			status::success(
-					'Entrance fees have been successfully recalculated, ' .
-					'%d transfers deleted, %d new transfers created.',
-					TRUE, array
-					(
-						1 => $deleted_transfers_count,
-						2 => $created_transfers_count
-					)
-			);
+			// preparation
+			$month = $form_data['month'];
+			$year = $arr_years[$form_data['year']];
+			$user_id = $this->session->get('user_id');
+			
+			// perform deduction
+			try
+			{
+				$count = self::worker_deduct_entrance_fees($month, $year, $user_id);
+				
+				status::success(
+						'Entrance fees have been successfully deducted, %d new transfers created.',
+						TRUE, array($count)
+				);
+			}
+			catch (Exception $e)
+			{
+				Log::add_exception($e);
+				status::error('Error - some fees have not been deducted.', $e);
+			}
+			
+			// end
+			$this->redirect('transfers/show_all');			
 		}
-		catch (Exception $e)
+		else
 		{
-			$db->transaction_rollback();
-			Log::add_exception($e);
-			status::error('Error - cant deduct entrance fee.');
+			if (Settings::get('deduct_fees_automatically_enabled'))
+			{
+				$m = 'Automatically deduction is enabled, this operation should be ' .
+						'use only if automatical deduction has failed';
+				status::mwarning($m);
+			}
+
+			$title = __('Deduction of entrance fees');
+
+			$breadcrumbs = breadcrumbs::add()
+					->link('transfers/show_all', 'Day book')
+					->text($title);
+
+			$view = new View('main');
+			$view->title = $title;
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('form');
+			$view->content->headline = $title;
+			$view->content->form = $form->html();		
+			$view->render(TRUE);
 		}
-		url::redirect('transfers/show_by_account/' . $account_id);
 	}
 
 	/**
@@ -1642,252 +1274,104 @@ class Transfers_Controller extends Controller
 	 * @author Jiri Svitak
 	 */
 	public function deduct_device_fees()
-	{
-		// access rights
-		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-			Controller::error(ACCESS);
-		// preparation
-		$created_transfers_count = 0;
-		$creation_datetime = date('Y-m-d H:i:s');
-		$operating = ORM::factory('account')->where(
-				'account_attribute_id', Account_attribute_Model::OPERATING
-		)->find();
-		
-		$account_model = new Account_Model();
-		// gets all credit accounts
-		$credit_accounts = $account_model->get_accounts_to_deduct_device_fees();
-		try
-		{
-			$db = new Transfer_Model();
-			$db->transaction_start();
-			foreach ($credit_accounts as $ca)
-			{
-				// total amount of already repaied transfers
-				$already_paid = $account_model->get_amount_of_device_fees($ca->id);
-				// is all device repayments already paid?
-				if ($already_paid >= $ca->total_price)
-					continue;
-				// device repayment is not wholy paid, calculate debt
-				$debt = $ca->total_price - $already_paid;
-				// gets all devices including their buy dates and payment rates
-				$devices = $account_model->get_devices_of_account($ca->id);
-				// gets buy date of the first device
-				$buy_date = date_parse($devices->current()->buy_date);
-				$year = $buy_date['year'];
-				$month = $buy_date['month'];
-				// getting boundary date - 15th day in the month
-				$date = date('Y-m-d', mktime(0, 0, 0, $month, 15, $year));
-				// while debt is greater than zero and date of instalment is lower than current date
-				while ($debt > 0 && $date < date('Y-m-d'))
-				{
-					//echo "date $date<br>";
-					// calculate total payment rate for current month
-					$payment_rate = 0;
-					foreach ($devices as $device)
-					{
-						// find finishing date of repayments for given device
-						$bd = date_parse($device->buy_date);
-						$y = $bd['year'];
-						$m = $bd['month'];
-						$d = date('Y-m-d', mktime(0, 0, 0, $m, 15, $y));
-						// payments
-						$payments = 0;
-						while ($device->price > $payments)
-						{
-							$payments += $device->payment_rate;
-							// iterate to next month
-							$m++;
-							if ($m == 13)
-							{
-								$m = 1;
-								$y++;
-							}
-							// getting boundary date - 15th day in the month
-							$d = date('Y-m-d', mktime(0, 0, 0, $m, 15, $y));
-							//echo "payments $payments<br>";
-						}
-						//echo "buy date $device->buy_date, current date $date, end date $d<br>";
-						// is current date between buying of device and date of its full repayment?
-						if ($device->buy_date <= $date && $date <= $d)
-							$payment_rate += $device->payment_rate;
-						//echo "payment rate $payment_rate<br>";
-					}
-					// is debt still greater than one monthly instalment?
-					if ($debt > $payment_rate)
-					{
-						$amount = $payment_rate;
-					}
-					else
-					{
-						$amount = $debt;
-					}
-					//echo "<strong>date $date, amount $amount</strong><br>";
-					// decrease amount of debt due to size of one instalment
-					$debt -= $amount;
-					$transfers = $db->get_device_fee_transfers_of_account_and_date($ca, $date);
-					if ($amount > 0 && count($transfers) == 0)
-					{
-						Transfer_Model::insert_transfer(
-								$ca->id, $operating->id, null, null,
-								$this->session->get('user_id'),
-								Transfer_Model::DEDUCT_DEVICE_FEE, $date,
-								$creation_datetime, __('Device repayments'),
-								$amount
-						);
-						$created_transfers_count++;
-					}
-					// iterate to next month
-					$month++;
-					if ($month == 13)
-					{
-						$month = 1;
-						$year++;
-					}
-					// getting boundary date - 15th day in the month
-					$date = date('Y-m-d', mktime(0, 0, 0, $month, 15, $year));
-				}
-			}
-			$db->transaction_commit();
-			
-			status::success(
-					'Device fees have been successfully deducted, %d '.
-					'new transfers created.', TRUE, $created_transfers_count
-			);
-		}
-		catch (Exception $e)
-		{
-			$db->transaction_rollback();
-			Log::add_exception($e);
-			status::error('Error - cant deduct device fee.');
-		}
-		url::redirect('transfers/show_all');
-	}
-	
-	/**
-	 * Recalculates device repayments of member by given account
-	 * 
-	 * @author Michal Kliment
-	 * @param integer $account_id 
-	 */
-	public function recalculate_device_fees($account_id = NULL)
-	{
-		// bad parameter
-		if (!$account_id || !is_numeric($account_id))
-			Controller::warning (PARAMETER);
-		
+	{	
 		// access rights
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
 			Controller::error(ACCESS);
 		
-		$account = new Account_Model($account_id);
+		// content of dropdown for months
+		for ($i = 1; $i <= 12; $i++)
+			$arr_months[$i] = $i;
 		
-		// record doesn't exist
-		if (!$account->id)
-			Controller::error (RECORD);
+		$current_month = (int) date('n');
 		
-		$operating = ORM::factory('account')->where(
-				'account_attribute_id', Account_attribute_Model::OPERATING
-		)->find();
+		// association
+		$association = new Member_Model(Member_Model::ASSOCIATION);
 		
-		$created_transfers_count = 0;
+		// content of dropdown for years
+		$year_from = date('Y', strtotime($association->entrance_date));
 		
-		$current_date = date('Y-m-d');
-		
-		$creation_datetime = date('Y-m-d H:i:s');
-		
-		$payments = array();
-		
-		$deleted_transfers_count = $account->delete_device_deduct_transfers_of_account($account->id);
-		
-		// finds all member's devices with debt payments
-		$devices = ORM::factory('device')->get_member_devices_with_debt_payments($account->member_id);
-		
-		$debt = 0;
-		
-		// no device with debt payments
-		if (!count($devices))
+		for ($i = $year_from; $i <= date('Y'); $i++)
 		{
-			status::success(
-					'Device repayments have been successfully recalculated, ' .
-					'%d transfers deleted, %d new transfers created.',
-					TRUE, array
-					(
-						1 => $deleted_transfers_count,
-						2 => $created_transfers_count
-					)
-			);
-			url::redirect('transfers/show_by_account/' . $account_id);
+			$arr_years[$i] = $i;
 		}
 		
-		foreach ($devices as $device)
+		$form = new Forge();
+		
+		$form->dropdown('year')
+				->rules('required')
+				->options($arr_years)
+				->style('width:200px')
+				->selected(date('Y'));
+		
+		$form->dropdown('month')
+				->rules('required')
+				->options($arr_months)
+				->selected($current_month)
+				->style('width:200px')
+				->callback(array($this, 'valid_default_fee'));
+		
+		$form->submit('Deduct');
+		
+		// form validation
+		if ($form->validate())
 		{
-			// finds buy date of this device
-			$buy_date = date_parse(date::get_middle_of_month($device->buy_date));
+			$form_data = $form->as_array();
 			
-			$debt += $device->price;
-
-			// finds all debt payments of this device
-			money::find_debt_payments(
-					$payments, $buy_date['month'], $buy_date['year'],
-					$device->price, $device->payment_rate
-			);
-		}
-		
-		$year = min(array_keys($payments));
-		$month = min(array_keys($payments[$year]));
-		
-		$date = date::create(15, $month, $year);
-		
-		try
-		{
-			$account->transaction_start();
-
-			while ($debt > 0 && $date < $current_date)
+			// preparation
+			$month = $form_data['month'];
+			$year = $arr_years[$form_data['year']];
+			$user_id = $this->session->get('user_id');
+			
+			$deduct_day = date::get_deduct_day_to($month, $year);
+			$date = date('Y-m-d', mktime(0, 0, 0, $month, $deduct_day, $year));
+			
+			// perform deduction
+			try
 			{
-				if (isset($payments[$year][$month]))
+				$count = self::worker_deduct_devices_fees($month, $year, $user_id);
+				
+				status::success(
+							'Fees have been successfully deducted, %d new transfers created.',
+						TRUE, array($count)
+				);
+				
+				if (Settings::get('last_deduct_device_fees') < $date)
 				{
-					$debt -= $payments[$year][$month];
-			
-					// create new transfer
-					Transfer_Model::insert_transfer(
-							$account->id, $operating->id, null, null,
-							$this->session->get('user_id'),
-							Transfer_Model::DEDUCT_DEVICE_FEE, $date,
-							$creation_datetime, __('Device repayments'),
-							$payments[$year][$month]
-					);
-					$created_transfers_count++;
+					Settings::set('last_deduct_device_fees', $date);
 				}
-			
-				$month++;
-				if ($month == 13)
-				{
-					$month = 1;
-					$year++;
-				}
-			
-				$date = date::create(15, $month, $year);
+			}
+			catch (Exception $e)
+			{
+				Log::add_exception($e);
+				status::error('Error - some fees have not been deducted.', $e);
+				url::redirect('transfers/show_all');
 			}
 			
-			$account->transaction_commit();
-			
-			status::success(
-					'Device repayments have been successfully recalculated, ' .
-					'%d transfers deleted, %d new transfers created.',
-					TRUE, array
-					(
-						1 => $deleted_transfers_count,
-						2 => $created_transfers_count
-					)
-			);
+			// end
+			$this->redirect('transfers/show_all');			
 		}
-		catch (Exception $e)
+		else
 		{
-			$account->transaction_rollback();
-			Log::add_exception($e);
-			status::error('Error - cant recalculate device repayments.');
+			if (Settings::get('deduct_fees_automatically_enabled'))
+			{
+				$m = 'Automatically deduction is enabled, this operation should be ' .
+						'use only if automatical deduction has failed';
+				status::mwarning($m);
+			}
+
+			$breadcrumbs = breadcrumbs::add()
+					->link('transfers/show_all', 'Day book')
+					->text('Deduction of device repayments');
+
+			$view = new View('main');
+			$view->title = __('Deduction of device repayments');
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('form');
+			$view->content->headline = __('Deduction of device repayments');
+			$view->content->form = $form->html();		
+			$view->render(TRUE);
 		}
-		url::redirect('transfers/show_by_account/' . $account_id);
 	}
 
 	/**
@@ -2027,7 +1511,7 @@ class Transfers_Controller extends Controller
 			{
 				$db->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cant add new transfer.');
+				status::error('Error - cant add new transfer.', $e);
 			}
 			$this->redirect(Path::instance()->previous());
 		}
@@ -2104,7 +1588,7 @@ class Transfers_Controller extends Controller
 		foreach ($devices as $device)
 		{
 			// finds buy date of this device
-			$buy_date = date_parse(date::get_middle_of_month($device->buy_date));
+			$buy_date = date_parse(date::get_closses_deduct_date_to($device->buy_date));
 			
 			$devices_fee += $device->price;
 
@@ -2114,7 +1598,7 @@ class Transfers_Controller extends Controller
 					$device->price, $device->payment_rate
 			);
 		}
-		$date = date_parse(date::get_middle_of_month(date('Y-m-d')));
+		$date = date_parse(date::get_closses_deduct_date_to(date('Y-m-d')));
 		
 		if (isset($payments[$date['year']][$date['month']]))
 			$devices_fee_payment_rate = $payments[$date['year']][$date['month']];
@@ -2124,7 +1608,7 @@ class Transfers_Controller extends Controller
 		$devices_fee_paid = $transfer_model->sum_device_fee_transfers_of_account($account_id);
 		$devices_fee_left = $devices_fee - $devices_fee_paid;
 		
-		$entrance_pd = date_parse(date::get_middle_of_month($entrance_date));
+		$entrance_pd = date_parse(date::get_closses_deduct_date_to($entrance_date));
 		
 		if (!$entrance_fee_payment_rate)
 			$entrance_fee_payment_rate = $entrance_fee;
@@ -2151,7 +1635,8 @@ class Transfers_Controller extends Controller
 		
 		$form->input('amount')
 			->rules('valid_numeric')
-			->callback(array($this, 'valid_calculator_item'));
+			->callback(array($this, 'valid_calculator_item'))
+			->maxlength('4');
 		
 		$form->input('expiration_date')
 			->label('Payed to')
@@ -2221,7 +1706,9 @@ class Transfers_Controller extends Controller
 					{
 						foreach ($year_payments as $month => $payment)
 						{
-							$date = date::create(15, $month, $year);
+							$day = date::get_deduct_day_to($month, $year);
+							
+							$date = date::create($day, $month, $year);
 							
 							if ($date <= $expiration_date)
 								$amount += $payment;
@@ -2375,7 +1862,10 @@ class Transfers_Controller extends Controller
 		
 		$year = $this->input->post('year');
 		$month = $this->input->post('month');
-		$date = date('Y-m-d', mktime(0, 0, 0, $month, 15, $year));
+		
+		$day = date::get_deduct_day_to($month, $year);
+		
+		$date = date('Y-m-d', mktime(0, 0, 0, $month, $day, $year));
 
 		// finds default fee
 		$fee_model = new Fee_Model();
@@ -2387,6 +1877,226 @@ class Transfers_Controller extends Controller
 			$input->add_error('required', __(
 					'For this month and year is not set default fee.'
 			));
+		}
+	}
+	
+	/**
+	 * Deduct member fees in given year and month if not deducted already.
+	 * 
+	 * @author Jiri Svitak, Ondrej Fibich
+	 * @param integer $month Month of deduction
+	 * @param integer $year Year of deduction
+	 * @param integer $user_id Who is deducting
+	 * @return integer Created transfers count
+	 * @throws Exception On any error
+	 */
+	public static function worker_deduct_members_fees($month, $year, $user_id)
+	{
+		$deduct_day = date::get_deduct_day_to($month, $year);
+
+		$created_transfers_count = 0;
+		$total_amount = 0;
+		$date = date('Y-m-d', mktime(0, 0, 0, $month, $deduct_day, $year));
+		$creation_datetime = date('Y-m-d H:i:s');
+		// finds default fee
+		$fee_model = new Fee_Model();
+		$fee = $fee_model->get_default_fee_by_date_type($date, 'regular member fee');
+
+		if ($fee && $fee->id)
+		{
+			$default_fee = $fee->fee;
+		}
+		else
+		{
+			throw new Exception('Fees have not been set!');
+		}
+
+		$operating = ORM::factory('account')->where(
+				'account_attribute_id', Account_attribute_Model::OPERATING
+		)->find();
+
+		$database = Database::instance();
+		$account_model = new Account_Model();
+		$accounts = $account_model->get_accounts_to_deduct($date);
+
+		try
+		{
+			$db = new Transfer_Model();
+			$db->transaction_start();
+			// first sql for inserting transfers
+			$sql_insert = "INSERT INTO transfers (origin_id, destination_id, ".
+					"previous_transfer_id, member_id, user_id, type, datetime, ".
+					"creation_datetime, text, amount) VALUES ";
+			$values = array();
+			// second sql for updating accounts
+			$sql_update = "UPDATE accounts SET balance = CASE id ";
+			$ids = array();
+			// main cycle
+			foreach ($accounts as $account)
+			{
+				// no deduct transfer for this date and account generated? then create one
+				if ($account->transfer_id == 0)
+				{
+					$text = __('Deduction of member fee');
+					if ($account->fee_is_set)
+					{
+						$amount = $account->fee;
+						$text = ($account->fee_readonly) ? $text . ' - ' .
+								__('' . $account->fee_name) : $text . ' - ' .
+								$account->fee_name;
+					}
+					else
+					{
+						$amount = $default_fee;
+					}
+					// is amount bigger than zero?
+					if ($amount > 0)
+					{
+						// insert
+						$values[] = "($account->id, $operating->id, NULL, NULL, " .
+								"$user_id, " . Transfer_Model::DEDUCT_MEMBER_FEE .
+								", '$date', '$creation_datetime', '$text', $amount)";
+						// update
+						$sql_update .= "WHEN $account->id THEN " 
+								. num::decimal_point($account->balance - $amount)
+								. " ";
+						$ids[] = $account->id;
+						$total_amount += $amount;
+						$created_transfers_count++;
+					}
+				}
+			}
+			
+			if ($created_transfers_count > 0)
+			{
+				// single query for inserting transfers
+				$sql_insert .= implode(",", $values);
+
+				if (!$database->query($sql_insert))
+					throw new Exception();
+
+				// single query for updating credit account balances
+				$ids_with_commas = implode(",", $ids);
+				$sql_update .= "END WHERE id IN ($ids_with_commas)";
+
+				if (!$database->query($sql_update))
+					throw new Exception();
+
+				// update also balance of operating account
+				if (!$account_model->recalculate_account_balance_of_account($operating->id))
+					throw new Exception();
+			}
+			
+			$db->transaction_commit();
+		}
+		catch (Exception $e)
+		{
+			$db->transaction_rollback();
+			throw $e;
+		}
+		
+		return $created_transfers_count;
+	}
+	
+	/**
+	 * Deduct entrance fees.
+	 * 
+	 * @author Jiri Svitak, Ondrej Fibich
+	 * @param integer $user_id Who is deducting
+	 * @param integer $date Date of deduction [optional - default NOW]
+	 * @return integer Created transfers count
+	 * @throws Exception On any error
+	 */
+	public static function worker_deduct_entrance_fees($month, $year, $user_id)
+	{
+		$deduct_day = date::get_deduct_day_to($month, $year);
+	
+		$created_transfers_count = 0;
+		$date = date('Y-m-d', mktime(0, 0, 0, $month, $deduct_day, $year));
+		$creation_datetime = date('Y-m-d H:i:s');
+		
+		$infrastructure = ORM::factory('account')->where(
+				'account_attribute_id', Account_attribute_Model::INFRASTRUCTURE
+		)->find();
+		
+		$account_model = new Account_Model();
+		$accounts = $account_model->get_accounts_to_deduct_entrance_fees(
+			$date
+		);
+		
+		try
+		{
+			$account_model->transaction_start();
+			
+			foreach ($accounts as $account)
+			{
+				Transfer_Model::insert_transfer(
+						$account->id, $infrastructure->id, null, null,
+						$user_id, Transfer_Model::DEDUCT_ENTRANCE_FEE, $date,
+						$creation_datetime, __('Entrance fee'), $account->amount
+				);
+				$created_transfers_count++;
+			}
+			
+			$account_model->transaction_commit();
+			
+			return $created_transfers_count;
+		}
+		catch (Exception $e)
+		{
+			$account_model->transaction_rollback();
+			throw $e;
+		}
+	}
+	
+	/**
+	 * Deduct device fees.
+	 * 
+	 * @author Michal Kliment
+	 * @param integer $user_id Who is deducting
+	 * @return integer Created transfers count
+	 * @throws Exception On any error
+	 */
+	public static function worker_deduct_devices_fees($month, $year, $user_id)
+	{
+		$deduct_day = date::get_deduct_day_to($month, $year);
+	
+		$created_transfers_count = 0;
+		$date = date('Y-m-d', mktime(0, 0, 0, $month, $deduct_day, $year));
+		$creation_datetime = date('Y-m-d H:i:s');
+		
+		$operating = ORM::factory('account')->where(
+				'account_attribute_id', Account_attribute_Model::OPERATING
+		)->find();
+		
+		$account_model = new Account_Model();
+		$accounts = $account_model->get_accounts_to_deduct_device_fees(
+			$date
+		);
+		
+		try
+		{
+			$account_model->transaction_start();
+			
+			foreach ($accounts as $account)
+			{
+				Transfer_Model::insert_transfer(
+						$account->id, $operating->id, null, null,
+						$user_id, Transfer_Model::DEDUCT_DEVICE_FEE, $date,
+						$creation_datetime, __('Device repayments'),
+						$account->amount
+				);
+				$created_transfers_count++;
+			}
+			
+			$account_model->transaction_commit();
+			
+			return $created_transfers_count;
+		}
+		catch (Exception $e)
+		{
+			$account_model->transaction_rollback();
+			throw $e;
 		}
 	}
 

@@ -62,9 +62,8 @@ class Filter_query_Model extends ORM
 	 * Repair default flag - disable it for other items
 	 * 
 	 * @author Michal Kliment
-	 * @param type $filter_query_id
-	 * @param type $url
-	 * @return type 
+	 * @param integer $filter_query_id
+	 * @param string $url
 	 */
 	public function repair_default ($filter_query_id = NULL, $url = '')
 	{
@@ -75,11 +74,25 @@ class Filter_query_Model extends ORM
 			$url = $this->url;
 		}
 		
-		return $this->db->query("
+		$this->db->query("
 			UPDATE filter_queries
 			SET `default` = 0
 			WHERE url LIKE ? AND id <> ?
 		", array($url, $filter_query_id));
+	}
+	
+	/**
+	 * Removes default flag from queries from the given URL.
+	 * 
+	 * @param string $url
+	 */
+	public function remove_default ($url)
+	{
+		$this->db->query("
+			UPDATE filter_queries
+			SET `default` = 0
+			WHERE url LIKE ?
+		", $url);
 	}
 	
 	/**
@@ -96,5 +109,3 @@ class Filter_query_Model extends ORM
 				->find();
 	}
 }
-
-?>

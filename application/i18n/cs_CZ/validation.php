@@ -21,7 +21,9 @@ $lang = array
 	'unknown_error' => 'Unknown validation error while validating the %s field.',
 	'required'      => 'Pole %s musí být vyplněno.',
 	'min_length'    => 'Pole %s musí obsahovat min. %d znaků.',
+	'min_value'     => 'Pole %s musí mít hodnotu minimálně %d.',
 	'max_length'    => 'Pole %s musí obsahovat max. %d znaků.',
+	'max_value'     => 'Pole %s musí mít hodnotu maximálně %d.',
 	'exact_length'  => 'Pole %s musí obsahovat přesně %d znaků.',
 	'in_array'      => 'Pole %s musí být vybráno ze seznamu.',
 	'matches'       => 'Pole %s se musí shodovat s polem %s.',
@@ -45,9 +47,11 @@ $lang = array
 	// Field types
 	'alpha'         => 'písmena abecedy',
 	'alpha_dash'    => 'alphabetical, dash, and underscore',
+	'date_interval'	=> 'Datum není v platném intervalu',
 	'digit'         => 'číslice',
 	'numeric'       => 'číslo',
 	'gps'			=> 'Chybný formát GPS souřadnice',
+	'preg_regex'	=> 'Chybný formát regulárního výrazu',
 
 	'phone'   => 'číslo ve středoevropském tvaru',
 	'suffix' => 'příponu',

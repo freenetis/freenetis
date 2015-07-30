@@ -50,7 +50,60 @@ class Sms_message_Model extends ORM
 	/** State of sended SMS: SMS sent failed */
 	const SENT_FAILED = 2;
 	
+	/**
+	 * Type names array
+	 *
+	 * @var array
+	 */
+	private static $types = array
+	(
+		self::RECEIVED	=> 'Received',
+		self::SENT		=> 'Sent',
+	);
+	
+	/**
+	 * State names array
+	 *
+	 * @var array
+	 */
+	public static $states = array
+	(
+		self::SENT_OK			=> 'Sent',
+		self::SENT_UNSENT		=> 'Unsent',
+		self::SENT_FAILED		=> 'Failed',
+	);
+	
 	protected $belongs_to = array('user', 'sms_message_id' => 'sms_message');
+	
+	/**
+	 * Gets type names array
+	 * 
+	 * @param bool $translate
+	 * @return array
+	 */
+	public static function get_types($translate = TRUE)
+	{
+		if ($translate)
+		{
+			return array_map('__', self::$types);
+		}
+		return self::$types;
+	}
+	
+	/**
+	 * Gets state names array
+	 * 
+	 * @param bool $translate
+	 * @return array
+	 */
+	public static function get_states($translate = TRUE)
+	{
+		if ($translate)
+		{
+			return array_map('__', self::$states);
+		}
+		return self::$states;
+	}
 	
 	/**
 	 * Gets all SMS messages
@@ -79,46 +132,28 @@ class Sms_message_Model extends ORM
 		}
 		// query
 		return $this->db->query("
-				SELECT
-					sms.*, IFNULL(s.sender_id,0) AS sender_id, sender_name, sender_type,
-					r.*
-				FROM sms_messages sms
-				LEFT JOIN
-				(
-					SELECT
-						CONCAT(cu.country_code,c.value) AS value,
-						u.id AS sender_id,
-						CONCAT(u.surname,' ',u.name) AS sender_name,
-						IFNULL(e.value, m.type) AS sender_type
-						FROM contacts c
-						JOIN contacts_countries cc ON cc.contact_id = c.id
-						JOIN countries cu ON cc.country_id = cu.id
-						JOIN users_contacts uc ON uc.contact_id = c.id
-						JOIN users u ON uc.user_id = u.id
-						JOIN members m ON u.member_id = m.id
-						LEFT JOIN enum_types e ON m.type = e.id AND read_only = 0
-					WHERE c.type = ?
-				) s ON sms.sender LIKE s.value
-				LEFT JOIN
-				(
-					SELECT
-						CONCAT(cu.country_code,c.value) AS value,
-						u.id AS receiver_id,
-						CONCAT(u.surname,' ',u.name) AS receiver_name,
-						IFNULL(e.value, m.type) AS receiver_type
-						FROM contacts c
-						JOIN contacts_countries cc ON cc.contact_id = c.id
-						JOIN countries cu ON cc.country_id = cu.id
-						JOIN users_contacts uc ON uc.contact_id = c.id
-						JOIN users u ON uc.user_id = u.id
-						JOIN members m ON u.member_id = m.id
-						LEFT JOIN enum_types e ON m.type = e.id AND read_only = 0
-					WHERE c.type = ?
-				) r ON sms.receiver LIKE r.value
-				$where
-				GROUP BY sms.id
-				ORDER BY $order_by $order_by_direction
-				LIMIT ".intval($limit_from).", ".intval($limit_results)."
+			SELECT
+				sms.*,
+				u_s.id AS sender_id, u_r.id AS receiver_id,
+				CONCAT(u_s.surname, ' ', u_s.name) AS sender_name,
+				CONCAT(u_r.surname, ' ', u_r.name) AS receiver_name,
+				IFNULL(e_s.value, m_s.type) AS sender_type,
+				IFNULL(e_r.value, m_r.type) AS receiver_type
+			FROM sms_messages sms
+			LEFT JOIN contacts c_s ON c_s.type = ? AND INSTR(sms.sender, c_s.value) > 0
+			LEFT JOIN users_contacts uc_s ON uc_s.contact_id = c_s.id
+			LEFT JOIN users u_s ON uc_s.user_id = u_s.id
+			LEFT JOIN members m_s ON u_s.member_id = m_s.id
+			LEFT JOIN enum_types e_s ON m_s.type = e_s.id AND e_s.read_only = 0
+			LEFT JOIN contacts c_r ON c_r.type = ? AND INSTR(sms.receiver, c_r.value) > 0
+			LEFT JOIN users_contacts uc_r ON uc_r.contact_id = c_r.id
+			LEFT JOIN users u_r ON uc_r.user_id = u_r.id
+			LEFT JOIN members m_r ON u_r.member_id = m_r.id
+			LEFT JOIN enum_types e_r ON m_r.type = e_r.id AND e_r.read_only = 0
+			$where
+			GROUP BY sms.id
+			ORDER BY $order_by $order_by_direction
+			LIMIT ".intval($limit_from).", ".intval($limit_results)."
 		", array(Contact_Model::TYPE_PHONE, Contact_Model::TYPE_PHONE));
 	}
 
@@ -194,11 +229,11 @@ class Sms_message_Model extends ORM
 			$where = 'WHERE ' . $filter_sql;
 		}
 		// Return the total number of records in a table
-		return $this->db->query("
-			SELECT COUNT(*) AS total
-			FROM sms_messages sms
-			$where
-		")->current()->total;
-	}
+			return $this->db->query("
+				SELECT COUNT(*) AS total
+				FROM sms_messages sms
+				$where
+			")->current()->total;
+		}
 
 }

@@ -190,12 +190,12 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 
 		var b = [];
 
-		b.push('<tr');
+		b.push('<tr><td');
 
 		if (is_weekend)
-			b.push(' style="background: #f1f1f1"');
+			b.push(' style="background: #e3e3e3"');
 
-		b.push('><td><input type="text" name="work_date[');
+		b.push('><input type="text" name="work_date[');
 		b.push(index);
 		b.push(']" value="');
 		b.push(date);
@@ -206,16 +206,36 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 		else
 			b.push(' class="date"');
 
-		b.push(' /></td><td><textarea name="work_description[');
+		b.push(' /></td><td');
+
+		if (is_weekend)
+			b.push(' style="background: #e3e3e3"');
+
+		b.push('><textarea name="work_description[');
 		b.push(index);
 		b.push(']" class="one_row_textarea" style="width: 450px"></textarea></td>');
-		b.push('<td><input type="text" name="work_hours[');
+		b.push('<td');
+
+		if (is_weekend)
+			b.push(' style="background: #e3e3e3"');
+
+		b.push('><input type="text" name="work_hours[');
 		b.push(index);
 		b.push(']" value="" maxlength="5" style="width: 30px" /></td>');
-		b.push('<td><input type="text" name="work_km[');
+		b.push('<td');
+
+		if (is_weekend)
+			b.push(' style="background: #e3e3e3"');
+
+		b.push('><input type="text" name="work_km[');
 		b.push(index);
 		b.push(']" value="" maxlength="6" style="width: 30px" /></td>');
-		b.push('<td>');
+		b.push('<td');
+
+		if (is_weekend)
+			b.push(' style="background: #e3e3e3"');
+
+		b.push('>');
 
 		if (!date)
 		{

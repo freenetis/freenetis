@@ -138,7 +138,7 @@ class Address_point_Model extends ORM
 		}
 		else
 		{
-			$where .= " AND gps IS NULL";
+			$where .= " AND (gps IS NULL OR gps LIKE '')";
 		}
 		
 		// query
@@ -490,6 +490,40 @@ class Address_point_Model extends ORM
 			SELECT
 				ap.*, CONCAT(X(ap.gps), ' ', Y(ap.gps)) AS gps
 			FROM address_points ap
+			WHERE CONCAT(X(ap.gps), ' ', Y(ap.gps)) IS NOT NULL
+			$where
+		");
+		
+		if ($result && $result->count() >= 1)
+			return $result->current();
+		else
+			return NULL;
+	}
+	
+	public function get_address_point_with_gps_by_country_id_town_district_street_zip(
+		$country_id, $town, $district, $street, $number, $zip)
+	{
+		$where = " AND country_id = '".intval($country_id).
+				"' AND town LIKE '".mysql_real_escape_string($town)."'".
+				" AND street LIKE '".mysql_real_escape_string($street)."'".
+				" AND street_number LIKE '".mysql_real_escape_string($number)."'".
+				" AND t.zip_code LIKE '".mysql_real_escape_string($zip)."'";
+		
+		if ($district)
+		{
+			$where .= " AND quarter LIKE '".mysql_real_escape_string($district)."'";
+		}
+		else
+		{
+			$where .= " AND quarter IS NULL";
+		}
+		
+		$result = $this->db->query("
+			SELECT
+				ap.*, CONCAT(X(ap.gps), ' ', Y(ap.gps)) AS gps
+			FROM address_points ap
+			LEFT JOIN towns t ON t.id = ap.town_id
+			LEFT JOIN streets s ON s.id = ap.street_id
 			WHERE CONCAT(X(ap.gps), ' ', Y(ap.gps)) IS NOT NULL
 			$where
 		");

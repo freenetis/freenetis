@@ -38,6 +38,11 @@ class Filter_queries_Controller extends Controller
 			$limit_results = 100, $order_by = 'id',
 			$order_by_direction = 'ASC', $page_word = 'page', $page = 1)
 	{
+		if (!$this->acl_check_view('Filter_queries_Controller', 'filter_queries'))
+		{
+			Controller::error(ACCESS);
+		}
+		
 		$filter_query_model = new Filter_query_Model();
 		
 		$filter_queries = $filter_query_model->get_all_queries();
@@ -77,16 +82,20 @@ class Filter_queries_Controller extends Controller
 		$grid->order_callback_field('default')
 				->callback(
 					'callback::enabled_field',
-					'filter_queries/set_default/'
+					$this->acl_check_edit('Filter_queries_Controller', 'filter_queries') ?
+						'filter_queries/set_default/' : NULL
 				)->class('center');
 		
 		$actions = $grid->grouped_action_field();
 		
-		$actions->add_action('id')
-				->icon_action('delete')
-				->url('filter_queries/delete')
-				->label('Delete')
-				->class('delete_link');
+		if ($this->acl_check_delete('Filter_queries_Controller', 'filter_queries'))
+		{
+			$actions->add_action('id')
+					->icon_action('delete')
+					->url('filter_queries/delete')
+					->label('Delete')
+					->class('delete_link');
+		}
 		
 		$grid->datasource($filter_queries);
 		
@@ -174,7 +183,7 @@ class Filter_queries_Controller extends Controller
 			{
 				$filter_query->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cannot add new filter query.');
+				status::error('Error - cannot add new filter query.', $e);
 				
 				$this->redirect($url);
 			}
@@ -203,6 +212,11 @@ class Filter_queries_Controller extends Controller
 		// bad paremeter
 		if (!$filter_query_id || !is_numeric($filter_query_id))
 			Controller::warning (PARAMETER);
+		
+		if (!$this->acl_check_edit('Filter_queries_Controller', 'filter_queries'))
+		{
+			Controller::error(ACCESS);
+		}
 		
 		$filter_query = new Filter_query_Model($filter_query_id);
 		
@@ -235,9 +249,9 @@ class Filter_queries_Controller extends Controller
 			$filter_query->transaction_rollback();
 			Log::add_exception($e);
 			if ($is_default)
-				status::error('Error - Cannot unset filter query as default.');
+				status::error('Error - Cannot unset filter query as default.', $e);
 			else
-				status::error('Error - Cannot set filter query as default.');
+				status::error('Error - Cannot set filter query as default.', $e);
 		}
 		
 		url::redirect($this->url('show_all'));
@@ -251,6 +265,11 @@ class Filter_queries_Controller extends Controller
 	 */
 	public function delete($filter_query_id = NULL)
 	{
+		if (!$this->acl_check_delete('Filter_queries_Controller', 'filter_queries'))
+		{
+			Controller::error(ACCESS);
+		}
+		
 		// bad paremeter
 		if (!$filter_query_id || !is_numeric($filter_query_id))
 			Controller::warning (PARAMETER);
@@ -270,11 +289,10 @@ class Filter_queries_Controller extends Controller
 		}
 		catch (Exception $e)
 		{
-			status::error('Error - Cannot delete filter query.');
+			Log::add_exception($e);
+			status::error('Error - Cannot delete filter query.', $e);
 		}
 		
 		url::redirect($this->url('show_all'));
 	}
 }
-
-?>

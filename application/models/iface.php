@@ -50,8 +50,7 @@ class Iface_Model extends ORM
 	protected $has_many = array
 	(
 		'ifaces_vlans', 'ip_addresses',
-		'parents'	=> 'ifaces_relationships',
-		'childrens'	=> 'ifaces_relationships'
+		'ifaces_relationships',
 	);
 	
 	/** Wireless type of iface */
@@ -87,6 +86,11 @@ class Iface_Model extends ORM
 	const PORT_MODE_TRUNK = 2;
 	/** Const for mode hybrid */
 	const PORT_MODE_HYBRID = 3;
+	
+	/** Const for type tagged */
+	const PORT_VLAN_TAGGED = 1;
+	/** Const for type untagged */
+	const PORT_VLAN_UNTAGGED = 2;
 	
 	/**
 	 * Name of iface types
@@ -153,6 +157,17 @@ class Iface_Model extends ORM
 		self::PORT_MODE_ACCESS	=> 'Access',
 		self::PORT_MODE_TRUNK	=> 'Trunk',
 		self::PORT_MODE_HYBRID	=> 'Hybrid'
+	);
+	
+	/**
+	 * Human format for port VLAN types
+	 * 
+	 * @var array 
+	 */
+	private static $port_vlan_types = array
+	(
+		self::PORT_VLAN_TAGGED		=> 'Tagged',
+		self::PORT_VLAN_UNTAGGED	=> 'Untagged'
 	);
 	
 	/**
@@ -531,7 +546,7 @@ class Iface_Model extends ORM
 	 */
 	public function get_wireless_mode($mode = NULL)
 	{
-		if (!$mode && isset($this) && $this->id)
+		if (!$mode && isset($this) && get_class($this) == __CLASS__ && $this->id)
 		{
 			$mode = $this->wireless_mode;
 		}
@@ -614,6 +629,57 @@ class Iface_Model extends ORM
 	public static function get_port_modes()
 	{
 		return array_map('__', self::$port_modes);
+	}
+	
+	/**
+	 * Return human format for port VLAN types
+	 * 
+	 * @author Michal Kliment
+	 * @return array
+	 */
+	public static function get_port_vlan_types()
+	{
+		return array_map('__', self::$port_vlan_types);
+	}
+	
+	/**
+	 * Checks whether the given new MAC of the given iface is unique in all
+	 * subnets that are in relation with the iface over his IP addresses. 
+	 * 
+	 * This function should not be use during adding of an iface!
+	 * 
+	 * @param int $iface_id
+	 * @param string $mac
+	 * @return bool
+	 */
+	public function is_mac_unique($iface_id, $mac)
+	{
+		$iface = new Iface_Model($iface_id);
+		
+		if ($iface->id)
+		{
+			if ($iface->mac == $mac)
+			{
+				return TRUE; // edit with same MAC
+			}
+
+			return $this->db->query("
+				SELECT COUNT(*)	AS count
+				FROM subnets s
+				JOIN ip_addresses ip ON ip.subnet_id = s.id
+				JOIN ifaces i ON ip.iface_id = i.id
+				WHERE s.id IN (
+					SELECT s2.id FROM subnets s2
+					JOIN ip_addresses ip2 ON ip2.subnet_id = s2.id
+					JOIN ifaces i2 ON i2.id = ip2.iface_id
+					WHERE i2.id = ? 
+				) AND i.mac = ?
+			", $iface_id, $mac)->current()->count <= 0;
+		}
+		else
+		{
+			return TRUE;
+		}
 	}
 
 	/**
@@ -733,12 +799,14 @@ class Iface_Model extends ORM
 			SELECT
 				i.id, i.id AS iface_id, i.link_id, l.name AS link_name,
 				i.mac, i.name, i.comment, i.type, i.number, i.port_mode, l.bitrate,
+				ci.id AS connected_to_iface_id, ci.name AS connected_to_iface_name,
 				cd.id AS connected_to_device_id, cd.name AS connected_to_device_name,
 				COUNT(DISTINCT cd.id) AS connected_to_devices_count,
 				GROUP_CONCAT(DISTINCT cd.name SEPARATOR ', \\n') AS connected_to_devices,
 				l.wireless_norm, l.wireless_frequency, i.wireless_mode,
 				l.wireless_channel_width, l.wireless_ssid, ir.parent_iface_id,
-				pi.name AS parent_name, v.tag_802_1q
+				pi.name AS parent_name, v.tag_802_1q, l.medium,
+				v.tag_802_1q AS port_vlan_tag_802_1q, pv.name AS port_vlan
 			FROM ifaces i
 			LEFT JOIN ifaces_relationships ir ON ir.iface_id = i.id
 			LEFT JOIN ifaces pi ON ir.parent_iface_id = pi.id
@@ -756,6 +824,9 @@ class Iface_Model extends ORM
 			LEFT JOIN devices cd ON ci.device_id = cd.id
 			LEFT JOIN ifaces_vlans iv ON iv.iface_id = i.id
 			LEFT JOIN vlans v ON iv.vlan_id = v.id
+			LEFT JOIN ifaces_vlans piv ON piv.iface_id = i.id
+				AND piv.port_vlan IS NOT NULL AND piv.port_vlan = 1
+			LEFT JOIN vlans pv ON piv.vlan_id = pv.id
 			WHERE i.device_id = ? $where
 			GROUP BY i.id
 			ORDER BY i.number, i.type, i.name
@@ -807,6 +878,7 @@ class Iface_Model extends ORM
 				wi.id, wi.name, wi.mac, wi.link_id, l.name AS link_name,
 				l.wireless_ssid, wi.wireless_mode, wi.type,
 				cd.id AS connected_to_device_id, cd.name AS connected_to_device_name,
+				ci.id AS connected_to_iface_id, ci.name AS connected_to_iface_name,
 				COUNT(*) AS connected_to_devices_count,
 				GROUP_CONCAT(cd.name SEPARATOR ', \\n') AS connected_to_devices
 			FROM ifaces wi
@@ -955,6 +1027,43 @@ class Iface_Model extends ORM
 		}
 			
 		return NULL;
+	}
+	
+	/**
+	 * Gets all interfaces connected to interface via link.
+	 *
+	 * @param Iface_Model $iface
+	 * @return Iface_Model
+	 */
+	public function get_ifaces_connected_to_iface($iface = NULL)
+	{
+		if ($iface === NULL)
+		{
+			$iface = $this;
+		}
+		
+		$ifaces = array();
+		
+		if ($iface && $iface->id)
+		{
+			$can_connect = self::get_can_connect_to($iface->type); 
+			
+			foreach ($iface->link->ifaces as $connected_iface)
+			{
+				// only if can connect to this type, is not self and if wlan then
+				// prserve rules AP -> client, client -> AP
+				if ($connected_iface->id != $iface->id &&
+					in_array($connected_iface->type, $can_connect) && (
+							$iface->type != self::TYPE_WIRELESS ||
+							$iface->wireless_mode != $connected_iface->wireless_mode
+					))
+				{
+					$ifaces[] = $connected_iface;
+				}
+			}
+		}
+			
+		return $ifaces;
 	}
 	
 	/**
@@ -1123,6 +1232,61 @@ class Iface_Model extends ORM
 		}
 		
 		return NULL;
+	}
+	
+	/**
+	 * Checks whether VLAN exists on ports or VLAN ifaces
+	 * 
+	 * @author Michal Kliment
+	 * @param type $vlan_id
+	 * @return boolean
+	 */
+	public function vlan_exists($vlan_id)
+	{		
+		foreach ($this->ifaces_vlans as $ifaces_vlan)
+		{
+			if ($ifaces_vlan->vlan_id == $vlan_id)
+				return TRUE;
+		}
+		
+		return FALSE;
+	}
+	
+	/**
+	 * Returns untagged VLAN of port (if exists)
+	 * 
+	 * @author Michal Kliment
+	 * @return null
+	 */
+	public function get_untagged_vlan()
+	{
+		foreach ($this->ifaces_vlans as $ifaces_vlan)
+		{
+			if (!is_null($ifaces_vlan->tagged) && $ifaces_vlan->tagged == 0 &&
+				!is_null($ifaces_vlan->vlan) && $ifaces_vlan->vlan)
+			{
+				return $ifaces_vlan->vlan;
+			}
+		}
+		
+		return NULL;
+	}
+	
+	/**
+	 * Checks whether iface is in bridge
+	 * 
+	 * @author Michal Kliment
+	 * @return boolean
+	 */
+	public function is_in_bridge()
+	{
+		foreach ($this->ifaces_relationships as $ifaces_relationship)
+		{
+			if ($ifaces_relationship->parent_iface->type == Iface_Model::TYPE_BRIDGE)
+				return TRUE;
+		}
+		
+		return FALSE;
 	}
 	
 }

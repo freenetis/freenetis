@@ -46,10 +46,10 @@ class Transfer_Model extends ORM
 	/** Special type of transfer: deduct device fee */
 	const DEDUCT_DEVICE_FEE						= 5;
 	
-	/** Group of transfers: all */
-	const ALL_TRANSFERS							= 1;
-	/** Group of transfers: without inner */
-	const WITHOUT_INNER							= 2;
+	/** Group of transfers: outer */
+	const OUTER_TRANSFERS						= 1;
+	/** Group of transfers: inner */
+	const INNER_TRANSFERS						= 2;
 	
 	/** Inbound ans outbound type of transfers */
 	const INBOUND_AND_OUTBOUND					= 1;
@@ -95,71 +95,44 @@ class Transfer_Model extends ORM
 	public function get_all_transfers(
 			$limit_from = 0, $limit_results = 20,
 			$order_by = 'id', $order_by_direction = 'desc',
-			$filter_values = array())
+			$filter_sql = '', $filter_name_sql = '')
 	{
 		$where = '';
+		$where_name = '';
 		// order by direction check
 		if (strtolower($order_by_direction) != 'desc')
 		{
 			$order_by_direction = 'asc';
 		}
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach($filter_values as $key => $value)
-			{
-				if ($key != 'submit' && $key != 'group')
-				{
-					if ($where == '')
-						$where = 'WHERE ';
-					else
-						$where .= ' AND ';
-
-					if ($key == 'oa_name')
-						$where .= "oa.name LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-					if ($key == 'da_name')
-						$where .= "da.name LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-					if ($key == 'text')
-						$where .= "t.text LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-					if ($key == 'datetime')
-						$where .= "t.datetime LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-					if ($key == 'amount')
-						$where .= "t.amount LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-				}
-
-				if ($key == 'group')
-				{
-					if ($value == self::WITHOUT_INNER)
-					{
-						if ($where == '')
-							$where = 'WHERE ';
-						else
-							$where .= ' AND ';
-						$where .= "oa.account_attribute_id <> da.account_attribute_id";
-					}	
-				}
-
-			}
+			$where = "WHERE $filter_sql";
+		}
+		if (!empty($filter_name_sql))
+		{
+			$where_name = "WHERE $filter_name_sql";
 		}
 		// query
 		return $this->db->query("
-				SELECT t.id, oa.id AS oa_id, oa.name AS oa_name,
-					oa.account_attribute_id AS oa_attribute,
-					da.id AS da_id, da.name AS da_name,
-					da.account_attribute_id AS da_attribute,
-					t.text, t.amount AS daybook_amount, t.datetime
-				FROM transfers t
-				LEFT JOIN accounts oa ON oa.id = t.origin_id
-				LEFT JOIN accounts da ON da.id = t.destination_id
-				$where
+				SELECT *
+				FROM
+				(
+					SELECT t.id, oa.id AS oa_id, oa.name AS oa_name,
+						oa.account_attribute_id AS oa_attribute,
+						da.id AS da_id, da.name AS da_name,
+						da.account_attribute_id AS da_attribute,
+						t.text, t.amount AS daybook_amount, t.datetime,
+						IF (oa.account_attribute_id <> da.account_attribute_id, ?, ?) AS transfer
+					FROM transfers t
+					LEFT JOIN accounts oa ON oa.id = t.origin_id
+					LEFT JOIN accounts da ON da.id = t.destination_id
+					$where
+				) q
+				$where_name
 				ORDER BY " . $this->db->escape_column($order_by) . " $order_by_direction
 				LIMIT ".intval($limit_from).", ".intval($limit_results)."
-		");
+		", Transfer_Model::OUTER_TRANSFERS, Transfer_Model::INNER_TRANSFERS);
 	}	
 
 	/**
@@ -167,67 +140,35 @@ class Transfer_Model extends ORM
 	 * 
 	 * @return integer
 	 */
-	public function count_all_transfers($filter_values = array())
+	public function count_all_transfers($filter_sql = '', $filter_name_sql = '')
 	{
 		$where = '';
+		$where_name = '';
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach($filter_values as $key => $value)
-			{
-				if ($key == 'group')
-				{
-					if ($value == self::WITHOUT_INNER)
-					{
-						$where .= (empty($where)) ? 'WHERE ' : ' AND ';
-						$where .= "oa.account_attribute_id <> da.account_attribute_id";
-					}	
-				}
-				else if ($key != 'submit')
-				{
-					$where .= (empty($where)) ? 'WHERE ' : ' AND ';
-					
-					if ($key == 'oa_name')
-					{
-						$where .= "oa.name LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-					}
-					else if ($key == 'da_name')
-					{
-						$where .= "da.name LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-						
-					}
-					else if ($key == 'text')
-					{
-						$where .= "t.text LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-					}
-					else if ($key == 'datetime')
-					{
-						$where .= "t.datetime LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-					}
-					else if ($key == 'amount')
-					{
-						$where .= "t.amount LIKE " . $this->db->escape("%$value%")
-							. " COLLATE utf8_general_ci";
-					}
-					else if ($where == 'WHERE ')
-					{
-						$where = '';
-					}
-				}
-			}
+			$where = "WHERE $filter_sql";
+		}
+		// filter
+		if (!empty($filter_name_sql))
+		{
+			$where_name = "WHERE $filter_name_sql";
 		}
 		// query
 		return $this->db->query("
 				SELECT COUNT(*) AS total
-				FROM transfers t
-				LEFT JOIN accounts oa ON oa.id = t.origin_id
-				LEFT JOIN accounts da ON da.id = t.destination_id
-				$where		
-		")->current()->total;
+				FROM
+				(
+					SELECT oa.name AS oa_name, da.name AS da_name,
+						t.text, t.amount AS daybook_amount, t.datetime,
+						IF (oa.account_attribute_id <> da.account_attribute_id, ?, ?) AS transfer
+					FROM transfers t
+					LEFT JOIN accounts oa ON oa.id = t.origin_id
+					LEFT JOIN accounts da ON da.id = t.destination_id
+					$where
+				) q
+				$where_name
+		", Transfer_Model::OUTER_TRANSFERS, Transfer_Model::INNER_TRANSFERS)->current()->total;
 	}	
 	
 	/**
@@ -241,36 +182,48 @@ class Transfer_Model extends ORM
 	 */
 	public function get_transfers($account_id = null, $limit_from = 0,
 			$limit_results = 20, $order_by = 't.id', $order_by_direction = 'ASC',
-			$filter_values = array())
+			$filter_sql = '', $filter_array = NULL)
 	{
 		$account_id = intval($account_id);
 		// filter
-		if (is_array($filter_values))
+		$where = '';
+		$cond = "(t.origin_id = $account_id OR t.destination_id = $account_id)";;
+		// filter
+		if (!empty($filter_sql))
 		{
-			if ($filter_values['type'] == self::INBOUND)
-				$where = "WHERE (t.destination_id = $account_id)";
-			elseif ($filter_values['type'] == self::OUTBOUND)
-				$where = "WHERE (t.origin_id = $account_id)";
-			else
-				$where = "WHERE (t.origin_id = $account_id OR t.destination_id = $account_id)";
-			
-			foreach($filter_values as $key => $value)
-			{
-				if ($key != 'submit' && $key != 'type')
-					$where .= ' AND ';
-				if ($key == 'name')
-					$where .= "a.name LIKE " . $this->db->escape("%$value%")
-						. " COLLATE utf8_general_ci";
-				if ($key == 'text')
-					$where .= "t.text LIKE " . $this->db->escape("%$value%")
-						. " COLLATE utf8_general_ci";
-				if ($key == 'datetime')
-					$where .= "t.datetime LIKE " . $this->db->escape("%$value%");
-				if ($key == 'amount')
-					$where .= "t.amount LIKE " . $this->db->escape("%$value%")
-						. " COLLATE utf8_general_ci";
-			}
+			$where = "WHERE $filter_sql";
 		}
+		if (is_array($filter_array))
+		{
+			foreach ($filter_array as $filter)
+			{
+				if (isset($filter['key']) &&
+					$filter['key'] = 'type')
+				{
+					foreach ($filter['value'] as $v)
+					{
+						if ($v == Transfer_Model::INBOUND)		//inbound
+						{
+							$cond = "(t.destination_id = $account_id)";
+						}
+						else if ($v == Transfer_Model::OUTBOUND)	//outbound
+						{
+							$cond = "(t.origin_id = $account_id)";
+						}
+					}
+				}
+			}		
+		}
+		
+		if (empty($where))
+		{
+			$cond = "WHERE $cond";
+		}
+		else
+		{
+			$cond = "AND $cond";
+		}
+		
 		// order by check
 		if ($order_by == 'amount')
 		{
@@ -307,7 +260,7 @@ class Transfer_Model extends ORM
 				LEFT JOIN accounts a ON a.id = IF(t.origin_id = $account_id, t.destination_id, t.origin_id)
 				LEFT JOIN transfers pt ON pt.id = t.previous_transfer_id
 				LEFT JOIN bank_transfers bt ON pt.id = bt.transfer_id
-				$where
+				$where $cond
 				ORDER BY $order_by $order_by_direction
 				LIMIT ".intval($limit_from).", ".intval($limit_results)."
 		");
@@ -323,53 +276,57 @@ class Transfer_Model extends ORM
 	 * @param $order_by_direction
 	 * @return integer
 	 */
-	public function count_transfers($account_id = null, $filter_values = array())
+	public function count_transfers($account_id = null, $filter_sql = '', $filter_array = NULL)
 	{
 		$account_id = intval($account_id);
-		$where = '';
 		// filter
-		if (is_array($filter_values))
+		$where = '';
+		$cond = "(t.origin_id = $account_id OR t.destination_id = $account_id)";
+		// filter
+		if (!empty($filter_sql))
 		{
-			$where = "WHERE (t.origin_id = $account_id OR t.destination_id = $account_id)";
-			if (array_key_exists('type', $filter_values))
+			$where = "WHERE $filter_sql";
+		}
+		if (is_array($filter_array) && !count($filter_array))
+		{
+			foreach ($filter_array as $filter)
 			{
-				if ($filter_values['type'] == self::INBOUND)
-					$where = "WHERE (t.destination_id = $account_id)";
-				else if ($filter_values['type'] == self::OUTBOUND)
-					$where = "WHERE (t.origin_id = $account_id)";
-			}
-			
-			foreach($filter_values as $key => $value)
-			{
-				if ($key == 'name')
+				if (isset($filter['key']) &&
+					$filter['key'] = 'type')
 				{
-					$where .= " AND a.name LIKE " . $this->db->escape("%$value%")
-						. " COLLATE utf8_general_ci";
-				}
-				else if ($key == 'text')
-				{
-					$where .= " AND t.text LIKE " . $this->db->escape("%$value%")
-						. " COLLATE utf8_general_ci";
-				}
-				else if ($key == 'datetime')
-				{
-					$where .= " AND t.datetime LIKE " . $this->db->escape("%$value%")
-						. " COLLATE utf8_general_ci";
-				}
-				else if ($key == 'amount')
-				{
-					$where .= " AND t.amount LIKE " . $this->db->escape("%$value%")
-						. " COLLATE utf8_general_ci";
+					foreach ($filter['value'] as $v)
+					{
+						if ($v == Transfer_Model::INBOUND)		//inbound
+						{
+							$cond = "(t.destination_id = $account_id)";
+						}
+						else if ($v == Transfer_Model::OUTBOUND)	//outbound
+						{
+							$cond = "(t.origin_id = $account_id)";
+						}
+					}
 				}
 			}
 		}
+		
+		if (empty($where))
+		{
+			$cond = "WHERE $cond";
+		}
+		else
+		{
+			$cond = "AND $cond";
+		}
+		
 		// query
 		return $this->db->query("
-				SELECT COUNT(*) AS total
+				SELECT COUNT(*) AS total	
 				FROM transfers t
-				LEFT JOIN accounts a ON a.id = IF(t.origin_id = ?, t.destination_id, t.origin_id)
-				$where
-		", $account_id)->current()->total;
+				LEFT JOIN accounts a ON a.id = IF(t.origin_id = $account_id, t.destination_id, t.origin_id)
+				LEFT JOIN transfers pt ON pt.id = t.previous_transfer_id
+				LEFT JOIN bank_transfers bt ON pt.id = bt.transfer_id
+				$where $cond
+		")->current()->total;
 	}
 	
 	/**
@@ -419,18 +376,18 @@ class Transfer_Model extends ORM
 	 * Gets "entrance fee" transfers of given account.
 	 * 
 	 * @author Jiri Svitak
-	 * @param $account_id
+	 * @param integer $account_id
 	 * @return Mysql_Result
 	 */
 	public function get_entrance_fee_transfers_of_account($account_id)
 	{
 		return $this->db->query("
 				SELECT t.id, t.datetime, amount,
-				(
-					SELECT SUM(t.amount) AS total_amount
-					FROM transfers t
-					WHERE t.origin_id = ? AND t.type = ?
-				) AS total_amount
+					(
+						SELECT SUM(t.amount) AS total_amount
+						FROM transfers t
+						WHERE t.origin_id = ? AND t.type = ?
+					) AS total_amount
 				FROM transfers t
 				WHERE t.origin_id = ? AND t.type = ?
 				GROUP BY t.id, t.datetime, t.amount
@@ -558,6 +515,27 @@ class Transfer_Model extends ORM
 			Account_attribute_Model::MEMBER_FEES, Account_attribute_Model::CASH,
 			Member_Model::ASSOCIATION, Account_attribute_Model::BANK
 		));
+	}
+
+	/**
+	 * Gets amount of all member fees grouped by month for stats
+	 * 
+	 * @author Ondřej Fibich
+	 * @return MySQL_Result object
+	 */
+	public function get_grouped_monthly_member_fees()
+	{
+		$operating = ORM::factory('account')->where(
+				'account_attribute_id', Account_attribute_Model::OPERATING
+		)->find();
+		
+		return $this->db->query("
+				SELECT SUBSTR(datetime, 1, 7) AS date, SUBSTR(datetime, 1, 4) AS year,
+					SUBSTR(datetime, 6, 2) AS month, SUM(amount) AS amount
+				FROM transfers t
+				WHERE type = ? AND destination_id = ?
+				GROUP BY year, month
+		", self::DEDUCT_MEMBER_FEE, $operating->id);
 	}
 
 	/**
@@ -726,5 +704,28 @@ class Transfer_Model extends ORM
 		
 		// delete transfer
 		$transfer->delete_throwable();
+	}
+	
+	public static function insert_transfer_for_work_approve($member_id, $amount)
+	{
+		// creates new transfer
+		$account_model = new Account_Model();
+
+		$operating_id = $account_model->where(
+				'account_attribute_id', Account_attribute_Model::OPERATING
+		)->find()->id;
+
+		$credit_id = $account_model->where('member_id', $member_id)
+				->where('account_attribute_id', Account_attribute_Model::CREDIT)
+				->find()->id;
+
+		$transfer_id = Transfer_Model::insert_transfer(
+			$operating_id, $credit_id, null, null,
+			Session::instance()->get('user_id'),
+			null, date('Y-m-d'), date('Y-m-d H:i:s'),
+			__('Work approval'), $amount
+		);
+		
+		return $transfer_id;
 	}
 }

@@ -27,6 +27,18 @@ class Links_Controller extends Controller
 	private $link_id = NULL;
 	
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Redirects to show all
 	 */
 	public function index()
@@ -47,12 +59,12 @@ class Links_Controller extends Controller
 			$order_by_direction = 'asc', $page_word = null, $page = 1)
 	{
 		
-		if (!$this->acl_check_view('Devices_Controller', 'segment'))
+		if (!$this->acl_check_view('Links_Controller', 'link'))
 			Controller::error(ACCESS);
 		
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-				$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+				$limit_results = (int) $this->input->post('record_per_page');
 		
 		$link_model = new Link_Model();
 		
@@ -116,7 +128,7 @@ class Links_Controller extends Controller
 			'filter'					=> $filter_form
 		)); 
 
-		if ($this->acl_check_new('Devices_Controller', 'segment'))
+		if ($this->acl_check_new('Links_Controller', 'link'))
 		{
 			$grid->add_new_button('links/add', 'Add new link'); 
 		}
@@ -148,21 +160,21 @@ class Links_Controller extends Controller
 		
 		$actions = $grid->grouped_action_field();
 		
-		if ($this->acl_check_view('Devices_Controller', 'segment'))
+		if ($this->acl_check_view('Links_Controller', 'link'))
 		{
 			$actions->add_action()
 					->icon_action('show')
 					->url('links/show');
 		}
 		
-		if ($this->acl_check_edit('Devices_Controller', 'segment'))
+		if ($this->acl_check_edit('Links_Controller', 'link'))
 		{
 			$actions->add_action()
 					->icon_action('edit')
 					->url('links/edit');
 		}
 		
-		if ($this->acl_check_delete('Devices_Controller', 'segment'))
+		if ($this->acl_check_delete('Links_Controller', 'link'))
 		{
 			$actions->add_action()
 					->icon_action('delete')
@@ -196,7 +208,7 @@ class Links_Controller extends Controller
 		if (!$link || !$link->id)
 			Controller::error(RECORD);
 		
-		if (!$this->acl_check_view('Devices_Controller', 'segment'))
+		if (!$this->acl_check_view('Links_Controller', 'link'))
 			Controller::error(ACCESS);
 		
 		$duplex_value = arr::rbool();
@@ -218,7 +230,7 @@ class Links_Controller extends Controller
 		));
 		
 		if ($link->medium == Link_Model::MEDIUM_ROAMING &&
-			$this->acl_check_edit('Devices_Controller', 'iface'))
+			$this->acl_check_edit('Ifaces_Controller', 'iface'))
 		{
 			$grid->add_new_button(
 					'ifaces/add_iface_to_link/' . $link->id,
@@ -258,21 +270,21 @@ class Links_Controller extends Controller
 		
 		$actions = $grid->grouped_action_field();
 		
-		if ($this->acl_check_view('Devices_Controller', 'segment'))
+		if ($this->acl_check_view('Ifaces_Controller', 'iface'))
 		{
 			$actions->add_action()
 					->icon_action('show')
 					->url('ifaces/show');
 		}
 		
-		if ($this->acl_check_edit('Devices_Controller', 'segment'))
+		if ($this->acl_check_edit('Ifaces_Controller', 'iface'))
 		{
 			$actions->add_action()
 					->icon_action('edit')
 					->url('ifaces/edit');
 		}
 		
-		if ($this->acl_check_delete('Devices_Controller', 'segment'))
+		if ($this->acl_check_edit('Ifaces_Controller', 'link'))
 		{
 			$actions->add_action()
 					->icon_action('delete')
@@ -286,18 +298,18 @@ class Links_Controller extends Controller
 
 		$breadcrumbs = breadcrumbs::add()
 				->link('links/show_all', 'Links',
-						$this->acl_check_view('Devices_Controller', 'segment'))
+						$this->acl_check_view('Links_Controller', 'link'))
 				->disable_translation()
 				->text($link->name . ' (' . $link->id . ')');
 
 		$links = array();
 		
-		if($this->acl_check_edit('Devices_Controller', 'segment'))
+		if($this->acl_check_edit('Links_Controller', 'link'))
 		{
 			$links[] = html::anchor('links/edit/'.$link->id, __('Edit'));
 		}
 		
-		if($this->acl_check_delete('Devices_Controller', 'segment'))
+		if($this->acl_check_delete('Links_Controller', 'link'))
 		{
 			$links[] = html::anchor(
 					'links/delete/'.$link->id, __('Delete'),
@@ -327,7 +339,7 @@ class Links_Controller extends Controller
 	 */
 	public function add($iface_type = NULL) 
 	{
-		if(!$this->acl_check_new('Devices_Controller', 'segment'))
+		if(!$this->acl_check_new('Links_Controller', 'link'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -482,7 +494,7 @@ class Links_Controller extends Controller
 			
 			$breadcrumbs = breadcrumbs::add()
 					->link('links/show_all', 'Links',
-							$this->acl_check_view('Devices_Controller', 'segment'))
+							$this->acl_check_view('Links_Controller', 'link'))
 					->text($headline);
 
 			$view = new View('main');
@@ -511,7 +523,7 @@ class Links_Controller extends Controller
 		if (!$link || !$link->id)
 			Controller::warning(ACCESS);
 		
-		if(!$this->acl_check_edit('Devices_Controller', 'segment'))
+		if(!$this->acl_check_edit('Links_Controller', 'link'))
 			Controller::error(ACCESS);
 		
 		$this->link_id = $link_id;
@@ -656,10 +668,10 @@ class Links_Controller extends Controller
 		
 		$breadcrumbs = breadcrumbs::add()
 				->link('links/show_all', 'Links',
-						$this->acl_check_view('Devices_Controller', 'segment'))
+						$this->acl_check_view('Links_Controller', 'link'))
 				->link('links/show/' . $link->id,
 						$link->name . ' (' . $link->id . ')',
-						$this->acl_check_view('Devices_Controller', 'segment'))
+						$this->acl_check_view('Links_Controller', 'link'))
 				->text('Edit');
 
 		$headline = __('Edit link') . ' - ' . $link->name;
@@ -682,7 +694,7 @@ class Links_Controller extends Controller
 	public function delete($link_id = NULL)
 	{
 		// access control
-		if (!$this->acl_check_delete('Devices_Controller', 'segment'))
+		if (!$this->acl_check_delete('Links_Controller', 'link'))
 			Controller::error(ACCESS);
 
 		// bad parameter

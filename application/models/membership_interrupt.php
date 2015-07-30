@@ -87,6 +87,26 @@ class Membership_interrupt_Model extends ORM
 					? BETWEEN mf.activation_date AND mf.deactivation_date
 		", array($member_id, $date))->current()->count;
 	}
+	
+	/**
+	 * Checks if member has membership interrupt with membership end in given date
+	 *
+	 * @author David Raška
+	 * @param integer $member_id
+	 * @param string $date
+	 * @return bool
+	 */
+	public function has_member_end_after_interrupt_end_in_date($member_id, $date)
+	{
+		return (bool) $this->db->query("
+				SELECT COUNT(*) AS count
+				FROM membership_interrupts mi
+				JOIN members_fees mf ON mi.members_fee_id = mf.id
+				WHERE mi.member_id = ? AND
+					? BETWEEN mf.activation_date AND mf.deactivation_date AND
+					mi.end_after_interrupt_end = 1
+		", array($member_id, $date))->current()->count;
+	}
 
 	/**
 	 * Returns all membership interrupts belongs to member
@@ -99,7 +119,8 @@ class Membership_interrupt_Model extends ORM
 	{
 		return $this->db->query("
 				SELECT mi.id, mi.member_id, mf.activation_date AS 'from',
-					mf.deactivation_date AS 'to', mi.comment
+					mf.deactivation_date AS 'to', mi.comment,
+					mi.end_after_interrupt_end
 				FROM membership_interrupts mi
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id
 				WHERE mi.member_id = ?
@@ -136,7 +157,7 @@ class Membership_interrupt_Model extends ORM
 		return $this->db->query("
 				SELECT mi.id, mi.member_id, m.name AS member_name,
 					mf.activation_date AS `from`, mf.deactivation_date AS `to`,
-					mi.comment
+					mi.comment, mi.end_after_interrupt_end
 				FROM membership_interrupts mi
 				JOIN members m ON mi.member_id = m.id
 				JOIN members_fees mf ON mi.members_fee_id = mf.id

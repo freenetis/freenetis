@@ -33,6 +33,82 @@
 class Mail_message_Model extends ORM
 {
 	protected $belongs_to = array('from' => 'user', 'to' => 'user');
+	
+	/**
+	 * Creates a new mail and also redirect it to receiver's e-mail box if he
+	 * enabled it.
+	 * 
+	 * @param type $from_id Sender user ID
+	 * @param type $to_id Receiver User ID
+	 * @param type $subject Subject of the message
+	 * @param type $body Body of the message
+	 * @param type $from_deleted Mark as deleted in the sender side? [optional]
+	 * @param type $to_deleted Mark as deleted in the receiver side? [optional]
+	 * @param type $time Time of sending [optional]
+	 * @param type $readed Mark as readed? [optional]
+	 */
+	public static function create($from_id, $to_id, $subject, $body,
+			$from_deleted = 0, $to_deleted = 0, $time = NULL, $readed = 0)
+	{
+		if (empty($time))
+		{
+			$time = date('Y-m-d H:i:s');
+		}
+		// mail
+		$mail_message = new Mail_message_Model();
+		$mail_message->from_id = $from_id;
+		$mail_message->to_id = $to_id;
+		$mail_message->subject = $subject;
+		$mail_message->body = $body;
+		$mail_message->from_deleted = $from_deleted;
+		$mail_message->to_deleted = $to_deleted;
+		$mail_message->time = $time;
+		$mail_message->readed = $readed;
+		$mail_message->save_throwable();
+		
+		// redirection
+		$uc_model = new Users_contacts_Model();
+		$email_queue = new Email_queue_Model();
+		$redir_emails = $uc_model->get_redirected_email_boxes_of($to_id);
+		
+		$from = Settings::get('email_default_email');
+		$fn_link = html::anchor('/mail/inbox');
+		$reply_link = html::anchor('/mail/write_message/0/' . $mail_message->id, __('here'));
+		$subject_prefix = Settings::get('title');
+		$header = 'This message was redirected to you from your account at %s.';
+		$footer = '';
+		
+		// do not reply to system message
+		if ($mail_message->from->member_id != Member_Model::ASSOCIATION)
+		{
+			$footer = __('You can reply to this message %s.', $reply_link);
+		}
+		
+		// formated subject
+		if (mail_message::is_formated($subject))
+		{
+			$subject = mail_message::printf($subject);
+		}
+		
+		// formated body
+		if (mail_message::is_formated($body))
+		{
+			$body = mail_message::printf($body);
+		}
+		
+		if (Settings::get('email_enabled') && count($redir_emails))
+		{
+			foreach ($redir_emails as $e)
+			{
+				// subject
+				$email_subject = $subject_prefix . ': ' . $subject; 
+				// append header and footer
+				$email_body = __($header, $fn_link) . '<hr>' . $body . '<hr>' . $footer; 
+				// send
+				$email_queue->push($from, $e->value, $email_subject, $email_body);
+			}
+		}
+	}
 
 	/**
 	 * Returns all inbox messages of user
@@ -73,22 +149,19 @@ class Mail_message_Model extends ORM
 				WHERE to_id = ? AND to_deleted = 0
 		', $user_id)->current()->count;
 	}
-
+	
 	/**
-	 * Returns count of all unread inbox messages of user
-	 * 
-	 * @author Michal Kliment
+	 * Marks all user's messages as read
 	 * @param number $user_id
-	 * @return number
+	 * @return Mysql_Result object
 	 */
-	public function count_all_unread_inbox_messages_by_user_id($user_id)
+	public function mark_all_inbox_messages_as_read_by_user_id($user_id)
 	{
 		return $this->db->query('
-				SELECT COUNT(*) AS count
-				FROM mail_messages m
-				LEFT JOIN users u ON m.from_id = u.id
-				WHERE to_id = ? AND to_deleted = 0 AND readed = 0
-		', $user_id)->current()->count;
+				UPDATE mail_messages
+				SET readed = 1
+				WHERE to_id = ? AND to_deleted = 0
+			', $user_id);
 	}
 
 	/**
@@ -129,5 +202,31 @@ class Mail_message_Model extends ORM
 				LEFT JOIN users u ON m.to_id = u.id
 				WHERE from_id = ? AND from_deleted = 0
 		', $user_id)->current()->count;
+	}
+	
+	/**
+	 * Send system message to item watchers
+	 * 
+	 * @author Michal Kliment
+	 * @param string $subject
+	 * @param string $body
+	 * @param integer $type
+	 * @param integer $fk_id
+	 */
+	public static function send_system_message_to_item_watchers ($subject, $body, $type, $fk_id)
+	{	
+		$watcher_model = new Watcher_Model();
+		
+		$watchers = $watcher_model
+			->get_watchers_by_object($type, $fk_id);
+		
+		foreach ($watchers as $watcher)
+		{
+			// sends message						
+			self::create(
+				Member_Model::ASSOCIATION, $watcher,
+				$subject, $body, 1
+			);
+		}
 	}
 }

@@ -20,6 +20,20 @@
 class Phone_operators_Controller extends Controller
 {
 	/**
+	 * Contruct checks if SMS are enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+	    // sms is not enabled, quit
+	    if (!Settings::get('sms_enabled'))
+		{
+			Controller::error(ACCESS);
+		}
+	}
+	
+	/**
 	 * Index redirects to show all
 	 */
 	public function index()
@@ -33,7 +47,7 @@ class Phone_operators_Controller extends Controller
 	public function show_all()
 	{
 		// access check
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Phone_operators_Controller', 'phone_operators'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -51,7 +65,7 @@ class Phone_operators_Controller extends Controller
 				'use_selector'	=> false
 		));
 
-		if ($this->acl_check_new('Settings_Controller', 'system'))
+		if ($this->acl_check_new('Phone_operators_Controller', 'phone_operators'))
 		{
 			$grid->add_new_button('phone_operators/add', __('Add new phone operator'));
 		}
@@ -75,14 +89,14 @@ class Phone_operators_Controller extends Controller
 		
 		$actions = $grid->grouped_action_field();
 		
-		if ($this->acl_check_edit('Settings_Controller', 'system'))
+		if ($this->acl_check_edit('Phone_operators_Controller', 'phone_operators'))
 		{
 			$actions->add_action()
 					->icon_action('edit')
 					->url('phone_operators/edit');
 		}
 		
-		if ($this->acl_check_delete('Settings_Controller', 'system'))
+		if ($this->acl_check_delete('Phone_operators_Controller', 'phone_operators'))
 		{			
 			$actions->add_action()
 					->icon_action('delete')
@@ -114,13 +128,13 @@ class Phone_operators_Controller extends Controller
 	public function add()
 	{
 		// check access
-		if (!$this->acl_check_new('Settings_Controller', 'system'))
+		if (!$this->acl_check_new('Phone_operators_Controller', 'phone_operators'))
 		{
 			Controller::error(ACCESS);
 		}
 		
 		// gets all countries to dropdown
-		$countries = ORM::factory('country')->select_list('id', 'country_name');
+		$countries = ORM::factory('country')->where('enabled', 1)->select_list('id', 'country_name');
 
 		// form
 		$form = new Forge('phone_operators/add');
@@ -205,7 +219,7 @@ class Phone_operators_Controller extends Controller
 				$phone_operator_model->transaction_rollback();
 				Log::add_exception($e);
 				// message
-				status::error('Error - cannot add phone operator');
+				status::error('Error - cannot add phone operator', $e);
 			}
 		}
 		
@@ -243,7 +257,7 @@ class Phone_operators_Controller extends Controller
 		}
 		
 		// check access
-		if (!$this->acl_check_delete('Settings_Controller', 'system'))
+		if (!$this->acl_check_edit('Phone_operators_Controller', 'phone_operators'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -261,7 +275,7 @@ class Phone_operators_Controller extends Controller
 		$this->_phone_operator_id = $phone_operator_model->id;
 		
 		// gets all countries to dropdown
-		$countries = ORM::factory('country')->select_list('id', 'country_name');
+		$countries = ORM::factory('country')->where('enabled', 1)->select_list('id', 'country_name');
 
 		// form
 		$form = new Forge('phone_operators/edit/' . $phone_operator_id);
@@ -354,7 +368,7 @@ class Phone_operators_Controller extends Controller
 				$phone_operator_model->transaction_rollback();
 				Log::add_exception($e);
 				// message
-				status::error('Error - cant edit phone operator');
+				status::error('Error - cant edit phone operator', $e);
 			}
 		}
 		
@@ -394,7 +408,7 @@ class Phone_operators_Controller extends Controller
 		}
 		
 		// check access
-		if (!$this->acl_check_delete('Settings_Controller', 'system'))
+		if (!$this->acl_check_delete('Phone_operators_Controller', 'phone_operators'))
 		{
 			Controller::error(ACCESS);
 		}

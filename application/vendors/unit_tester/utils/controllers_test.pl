@@ -141,7 +141,7 @@ for (my $i = 0; $i < $readed_items->getLength; $i++)
 				{
 					my $fcontent = join("", <$file>);
 
-					if ($fcontent =~ /Loaded in (\d+\.\d+) seconds, using (\d+\.\d+)MB of memory. Revision: \d+/)
+					if ($fcontent =~ /Loaded in (\d+\.\d+) seconds, using (\d+\.\d+)MB of memory. Version:/)
 					{
 						`echo "$1\t$2\t$url\t$data" >> curl/cstats`;
 					}

@@ -33,7 +33,7 @@ class form {
 		if (empty($action) OR ! is_string($action))
 		{
 			// Use the current URL as the default action
-			$action = url::site(Router::$current_uri);
+			$action = url::base().url::current(TRUE);
 		}
 		elseif (strpos($action, '://') === FALSE)
 		{

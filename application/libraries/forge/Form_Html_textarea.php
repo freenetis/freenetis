@@ -18,21 +18,63 @@ class Form_Html_textarea extends Form_Input {
 
 	protected $data = array
 	(
-		'class' => 'wysiwyg',
 		'value' => '',
 	);
 
 	protected $protect = array('type');
+	
+	public function __construct($name)
+	{
+		parent::__construct($name);
+		
+		$this->mode('advanced');
+	}
 
+	/**
+	 * Set mode of the HTML test area - simple (only few tools) or advanced (default)
+	 * 
+	 * @param string $mode
+	 * @return Form_Html_textarea
+	 */
+	public function mode($mode)
+	{
+		if ($mode == 'advanced' || $mode == 'simple')
+		{
+			$this->data['mode'] = $mode;
+			
+			if ($mode == 'advanced')
+			{
+				$this->class('wysiwyg');
+			}
+			else
+			{
+				$this->class('wysiwyg_simple');
+			}
+		}
+		
+		return $this;
+	}
+	
 	protected function html_element()
 	{
 		$data = $this->data;
 
 		$te = new TextEditor();
-		$te->setWidth(656);
-		$te->setHeight(480);
+		
+		if ($data['mode'] == 'advanced')
+		{
+			$te->setWidth(656);
+			$te->setHeight(480);
+		}
+		else
+		{
+			$te->setWidth(400);
+			$te->setHeight(150);
+		}
+		
 		$te->setFieldName($data['name']);
 		$te->setContent($data['value']);
+		$te->setClass($data['class']);
 
 		return $te->getHtml();
 	}

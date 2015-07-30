@@ -46,7 +46,7 @@ class Users_Controller extends Controller
 		if (!$this->acl_check_view(get_class($this), 'users'))
 			Controller::error(ACCESS);
 
-		$filter_form = new Filter_form('u');
+		$filter_form = new Filter_form();
 		
 		$filter_form->add('id')
 				->type('number');
@@ -90,8 +90,8 @@ class Users_Controller extends Controller
 				->type('date');
 
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array
@@ -106,16 +106,39 @@ class Users_Controller extends Controller
 			$order_by_direction = 'asc';
 		
 		$model_users = new User_Model();
-	   		
-		$total_users = $model_users->count_all_users($filter_form->as_sql());
+		
+		// hide grid on its first load (#442)
+		$hide_grid = Settings::get('grid_hide_on_first_load') && $filter_form->is_first_load();
+		
+		if (!$hide_grid)
+		{
+			try
+			{
+				$total_users = $model_users->count_all_users($filter_form->as_sql());
 
-		if (($sql_offset = ($page - 1) * $limit_results) > $total_users)
-			$sql_offset = 0;
+				if (($sql_offset = ($page - 1) * $limit_results) > $total_users)
+					$sql_offset = 0;
 
-		$query = $model_users->get_all_users(
-				$sql_offset, (int)$limit_results, $order_by,
-				$order_by_direction, $filter_form->as_sql()
-		);
+				$query = $model_users->get_all_users(
+					$sql_offset, (int)$limit_results, $order_by,
+					$order_by_direction, $filter_form->as_sql()
+				);
+			}
+			catch (Exception $e)
+			{
+				if ($filter_form->is_loaded_from_saved_query())
+				{
+					status::error('Invalid saved query', $e);
+					// disable default query (loop protection)
+					if ($filter_form->is_loaded_from_default_saved_query())
+					{
+						ORM::factory('filter_query')->remove_default($filter_form->get_base_url());
+					}
+					$this->redirect(url_lang::current());
+				}
+				throw $e;
+			}
+		}
 
 		$grid = new Grid('users', __('List of all users'), array
 		(
@@ -126,7 +149,7 @@ class Users_Controller extends Controller
 			'base_url'					=> Config::get('lang').'/users/show_all/'
 										. $limit_results.'/'.$order_by.'/'.$order_by_direction ,
 			'uri_segment'				=> 'page',
-			'total_items'				=>  $total_users,
+			'total_items'				=>  isset($total_users) ? $total_users : 0,
 			'items_per_page' 			=> $limit_results,
 			'style'		  				=> 'classic',
 			'order_by'					=> $order_by,
@@ -134,6 +157,19 @@ class Users_Controller extends Controller
 			'limit_results'				=> $limit_results,
 			'filter'					=> $filter_form
 		));
+		
+		if (!$hide_grid)
+		{
+			// export contacts
+			$grid->add_new_button(
+					'export/vcard/users' . server::query_string(),
+					'Export contacts', array
+						(
+							'title' => __('Export contacts'),
+							'class' => 'popup_link'
+						)
+			);
+		}
 
 		$grid->order_field('id')
 				->label('ID');
@@ -168,7 +204,7 @@ class Users_Controller extends Controller
 					->url('devices/show_by_user')
 					->label('Show devices');
 		}
-		if ($this->acl_check_view('Users_Controller', 'work'))
+		if (Settings::get('works_enabled') && $this->acl_check_view('Works_Controller', 'work'))
 		{
 			$actions->add_action('id')
 					->icon_action('work')
@@ -176,7 +212,8 @@ class Users_Controller extends Controller
 					->label('Show works');
 		}
 		
-		$grid->datasource($query);
+		if (!$hide_grid)
+			$grid->datasource($query);
 			
 		$view = new View('main');
 		$view->breadcrumbs = __('Users');
@@ -215,8 +252,8 @@ class Users_Controller extends Controller
 			Controller::error(ACCESS);
 
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		// parameters control
 		$allowed_order_type = array
@@ -558,90 +595,99 @@ class Users_Controller extends Controller
 			$arr_contact_types[$i] = $enum_type_model->get_value($contact->type);
 		}
 		
-		$voip_sip = new Voip_sip_Model();
-		$voip = $voip_sip->get_record_by_user_limited($user_id);
-		
-		if ($voip->count() == 0)
+		// voip is enabled
+		if (Settings::get('voip_enabled'))
 		{
-			$voip = '<span style="color:red;">'.__('Nonactive').'</span>  - '
-					.html::anchor('voip/add/'.$user_id, __('Activate'));
-		}
-		else
-		{
-			$voip = html::anchor(
-					'voip/show/'.$voip->current()->user_id,
-					$voip->current()->name
-			);
+		    $voip_sip = new Voip_sip_Model();
+		    $voip = $voip_sip->get_record_by_user_limited($user_id);
+
+		    if ($voip->count() == 0)
+		    {
+			    $voip = '<span style="color:red;">'.__('Nonactive').'</span>  - '
+					    .html::anchor('voip/add/'.$user_id, __('Activate'));
+		    }
+		    else
+		    {
+			    $voip = html::anchor(
+					    'voip/show/'.$voip->current()->user_id,
+					    $voip->current()->name
+			    );
+		    }
 		}
 		
 		$aro_groups = $user->get_aro_groups_of_user($user_id);
 		
-		// grid with lis of users
-		$admin_devices_grid = new Grid('members', null, array
-		(
-			'separator'		   		=> '<br /><br />',
-			'use_paginator'	   		=> false,
-			'use_selector'	   		=> false,
-		));
 		
-		if ($this->acl_check_new('Devices_Controller', 'admin'))
+		if (Settings::get('networks_enabled') &&
+			$this->acl_check_view('Devices_Controller', 'admin'))
 		{
-			$admin_devices_grid->add_new_button(
-					'device_admins/edit_user/'.$user_id, __('Edit')
+			// grid with lis of users
+			$admin_devices_grid = new Grid('members', null, array
+			(
+				'separator'		   		=> '<br /><br />',
+				'use_paginator'	   		=> false,
+				'use_selector'	   		=> false,
+			));
+
+			if ($this->acl_check_new('Devices_Controller', 'admin'))
+			{
+				$admin_devices_grid->add_new_button(
+						'device_admins/edit_user/'.$user_id, __('Edit')
+				);
+			}
+
+			$admin_devices_grid->callback_field('device_id')
+					->label(__('Device'))
+					->callback('callback::device_field');
+
+			$admin_devices_grid->link_field('user_id')
+					->link('users/show', 'user_name')
+					->label('User');
+
+			if ($this->acl_check_delete('Devices_Controller', 'admin'))
+			{
+				$admin_devices_grid->grouped_action_field()
+						->add_action()
+						->icon_action('delete')
+						->url('device_admins/delete')
+						->label('Remove')
+						->class('delete_link');
+			}
+
+			$admin_devices_grid->datasource(
+					ORM::factory('device_admin')->get_all_devices_by_admin($user->id)
+			);
+
+			// grid with lis of users
+			$engineer_devices_grid = new Grid(url_lang::base().'members', null, array
+			(
+				'separator'		   		=> '<br /><br />',
+				'use_paginator'	   		=> false,
+				'use_selector'	   		=> false,
+			));
+
+			$engineer_devices_grid->callback_field('device_id')
+					->label(__('Device'))
+					->callback('callback::device_field');
+
+			$engineer_devices_grid->link_field('user_id')
+					->link('users/show', 'user_name')
+					->label('User');
+
+			if ($this->acl_check_delete('Devices_Controller', 'admin'))
+			{
+				$engineer_devices_grid->grouped_action_field()
+						->add_action()
+						->icon_action('delete')
+						->url('device_engineers/delete')
+						->label('Remove')
+						->class('delete_link');
+			}
+
+			$engineer_devices_grid->datasource(
+					ORM::factory('device_engineer')->get_all_devices_by_engineer($user->id)
 			);
 		}
-		
-		$admin_devices_grid->callback_field('device_id')
-				->label(__('Device'))
-				->callback('callback::device_field');
-		
-		$admin_devices_grid->link_field('user_id')
-				->link('users/show', 'user_name')
-				->label('User');
-		
-		if ($this->acl_check_delete('Devices_Controller', 'admin'))
-		{
-			$admin_devices_grid->grouped_action_field()
-					->add_action()
-					->icon_action('delete')
-					->url('device_admins/delete')
-					->label('Remove')
-					->class('delete_link');
-		}
-		
-		$admin_devices_grid->datasource(
-				ORM::factory('device_admin')->get_all_devices_by_admin($user->id)
-		);
-		
-		// grid with lis of users
-		$engineer_devices_grid = new Grid(url_lang::base().'members', null, array
-		(
-			'separator'		   		=> '<br /><br />',
-			'use_paginator'	   		=> false,
-			'use_selector'	   		=> false,
-		));
-		
-		$engineer_devices_grid->callback_field('device_id')
-				->label(__('Device'))
-				->callback('callback::device_field');
-		
-		$engineer_devices_grid->link_field('user_id')
-				->link('users/show', 'user_name')
-				->label('User');
-		
-		if ($this->acl_check_delete('Devices_Controller', 'admin'))
-		{
-			$engineer_devices_grid->grouped_action_field()
-					->add_action()
-					->icon_action('delete')
-					->url('device_engineers/delete')
-					->label('Remove')
-					->class('delete_link');
-		}
-		
-		$engineer_devices_grid->datasource(
-				ORM::factory('device_engineer')->get_all_devices_by_engineer($user->id)
-		);
 		
 		// grid with lis of users
 		$comments_grid = new Grid('members', null, array
@@ -700,15 +746,16 @@ class Users_Controller extends Controller
 		$view = new View('main');
 		$view->title = __('Display user');
 		$view->breadcrumbs = $breadcrumbs->html();
+		$view->action_logs = action_logs::object_last_modif($user, $user_id);
 		$view->content = new View('users/show');
 		$view->content->user_data = $user;
 		$view->content->contacts = $contacts;
 		$view->content->contact_types = $arr_contact_types;
-		$view->content->voip = $voip;
+		$view->content->voip = Settings::get('voip_enabled') ? $voip : '';
 		$view->content->aro_groups = $aro_groups;
-		$view->content->admin_devices_grid = $admin_devices_grid;
-		$view->content->engineer_devices_grid = $engineer_devices_grid;
-		$view->content->comments_grid = $comments_grid;
+		$view->content->admin_devices_grid = @$admin_devices_grid;
+		$view->content->engineer_devices_grid = @$engineer_devices_grid;
+		$view->content->comments_grid = @$comments_grid;
 		$view->render(TRUE);
 	} // end of show function
 	
@@ -754,13 +801,15 @@ class Users_Controller extends Controller
 				->rules('length[3,30]');
 
 		$form->group('Password');
-
+		
+		$pass_min_len = Settings::get('security_password_length');
+		
 		$form->password('password')
-				->rules('required|length[3,50]')
-				->class('password');
+				->rules('required|length['.$pass_min_len.',50]')
+				->class('main_password');
 
 		$form->password('confirm_password')
-				->rules('required|length[3,50]')
+				->rules('required|length['.$pass_min_len.',50]')
 				->matches($form->password);
 
 		$form->group('Additional information');
@@ -814,14 +863,11 @@ class Users_Controller extends Controller
 			if ($saved)
 			{
 				// send welcome message to user
-				$mail_message = new Mail_message_Model();
-				$mail_message->from_id = 1;
-				$mail_message->to_id = $user_data->id;
-				$mail_message->subject = mail_message::format('welcome_subject');
-				$mail_message->body = mail_message::format('welcome');
-				$mail_message->time = date('Y-m-d H:i:s');
-				$mail_message->from_deleted = 1;
-				$mail_message->save();
+				Mail_message_Model::create(
+						Member_Model::ASSOCIATION, $user_data->id,
+						mail_message::format('welcome_subject'),
+						mail_message::format('welcome'), 1
+				);
 
 				status::success('User has been successfully added.');
 			}
@@ -863,7 +909,7 @@ class Users_Controller extends Controller
 	} // end of add function
 
 	/**
-	 * Shows works of user
+	 * Shows work of user
 	 *
 	 * @author Michal Kliment
 	 * @param integer $work_id
@@ -874,23 +920,25 @@ class Users_Controller extends Controller
 	}
 	
 	/**
-	 * Callback for type field
-	 * 
-	 * @author Ondřej Fibich
-	 * @staticvar string $enum_type_model
-	 * @param Contact_Model $item
-	 * @param string $name
+	 * Shows work report of user
+	 *
+	 * @author Michal Kliment
+	 * @param integer $work_id
 	 */
-	protected static function additional_contacts_type_callback($item, $name)
+	public function show_work_report ($work_report_id = NULL)
 	{
-	    static $enum_type_model = NULL;
-
-	    if ($enum_type_model == NULL)
-	    {
-			$enum_type_model = new Enum_type_Model();
-	    }
-
-	    echo $enum_type_model->get_value($item->type);
+		Work_reports_Controller::show ($work_report_id);
+	}
+	
+	/**
+	 * Shows request of user
+	 *
+	 * @author Michal Kliment
+	 * @param integer $work_id
+	 */
+	public function show_request ($request_id = NULL)
+	{
+		Requests_Controller::show ($request_id);
 	}
 
 	/**
@@ -909,7 +957,10 @@ class Users_Controller extends Controller
 			Controller::error(RECORD);
 		
 		// access control
-		if (!$this->acl_check_edit(get_class($this), 'password', $user->member_id))
+		if (!$this->acl_check_edit(get_class($this), 'password', $user->member_id) ||
+				($user->is_user_in_aro_group($user->id, Aro_group_Model::ADMINS) &&
+					$user->id != $this->user_id
+				))
 			Controller::error(ACCESS);
 
 		$this->_user_id = $user_id;
@@ -922,18 +973,20 @@ class Users_Controller extends Controller
 		{
 			$form->password('oldpassword')
 					->label(__('Old password') . ':')
-					->rules('required|length[3,50]')
+					->rules('required')
 					->callback(array($this, 'check_password'));
 		}
 		
+		$pass_min_len = Settings::get('security_password_length');
+		
 		$form->password('password')
 				->label(__('New password') . ':&nbsp;' . help::hint('password'))
-				->rules('required|length[6,50]')
-				->class('password');
+				->rules('required|length['.$pass_min_len.',50]')
+				->class('main_password');
 		
 		$form->password('confirm_password')
 				->label(__('Confirm new password') . ':')
-				->rules('required|length[6,50]')
+				->rules('required|length['.$pass_min_len.',50]')
 				->matches($form->password);
 		
 		$form->submit('submit')
@@ -1163,7 +1216,18 @@ class Users_Controller extends Controller
 		if ($user_model->password != sha1($input->value) ||
 			trim($input->value) == '')
 		{
-			$input->add_error('required', __('Wrong password.'));
+			$error = TRUE;
+			
+			// see Settings for exclamation
+			if (Settings::get('pasword_check_for_md5'))
+			{
+				$error = ($user_model->password != md5($input->value));
+			}
+			
+			if ($error)
+			{
+				$input->add_error('required', __('Wrong password.'));
+			}
 		}
 	}
 
@@ -1182,8 +1246,16 @@ class Users_Controller extends Controller
 		
 		$user_model = new User_Model();
 		
-		if ($user_model->username_exist($input->value, $this->_user_id) ||
-			trim($input->value) == '')
+		$username_regex = Settings::get('username_regex');
+		
+		if (preg_match($username_regex, $input->value) == 0)
+		{
+			$input->add_error('required', __(
+					'Login must contains only a-z and 0-9 and starts with literal.'
+			));
+		}
+		else if ($user_model->username_exist($input->value, $this->_user_id) ||
+				 trim($input->value) == '')
 		{
 			$input->add_error('required', __(
 					'Username already exists in database.'

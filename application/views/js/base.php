@@ -50,6 +50,9 @@ $(document).ready(function()
 				if (data.html() != null)
 					$(element).html(data.html());
 				
+				// jQuery tabs
+				$('#tabs, .tabs').tabs();
+				
 				//console.log($(element).html());
 			}
 		});
@@ -115,6 +118,67 @@ $(document).ready(function()
 			return false;
 		}));
 	}
+	
+	/**
+	 * Adds zoom in and zoom out buttons after a map and set their events
+	 * 
+	 * @param e			Element to which buttons are added
+	 * @param min		Minimal zoom [optional - default 1]
+	 * @param max		Maximal zoom [optional - default not limited]
+	 * @author David Raska
+	 */
+	function map_add_zoom_buttons(e, min, max)
+	{
+		if (min === undefined || isNaN(min))
+		{
+			min = 1;
+		}
+		
+		if (max === undefined || isNaN(max))
+		{
+			max = undefined;
+		}
+		
+		$(e).append('<div class="map_zoom_in" title="<?php echo __('Zoom in') ?>"></div>');
+		$(e).append('<div class="map_zoom_out" title="<?php echo __('Zoom out') ?>"></div>');
+		
+		$(e).find('.map_zoom_in').click(function(){
+			var img = $(e).find('img');
+			
+			var src = img.attr('src');
+			var re = new RegExp(/zoom=(\d*)/);
+			var zoom = src.match(re);
+			
+			if (zoom && (max === undefined || zoom[1] < max))
+			{
+				src = src.replace(re, 'zoom='+(+zoom[1]+1).toString());
+				img.attr('src', src);
+			}
+			
+			return false;
+		});
+		
+		$(e).find('.map_zoom_out').click(function(){
+			var img = $(e).find('img');
+			
+			var src = img.attr('src');
+			var re = new RegExp(/zoom=(\d*)/);
+			var zoom = src.match(re);
+			
+			if (zoom && (min === undefined || zoom[1] > min))
+			{
+				src = src.replace(re, 'zoom='+(zoom[1]-1).toString());
+				img.attr('src', src);
+			}
+			
+			return false;
+		});
+	}
+	
+	$('.gmap').each(function (i, e)
+	{
+		map_add_zoom_buttons(e, 6, 20);
+	});
 	
 	// sort unordered grids
 	$('table').tablesorter();
@@ -298,16 +362,22 @@ $(document).ready(function()
 	function Dialog(id, parent, isReloadOn)
 	{
 		this.id = id;
+		this.parent_context = context;
 		
 		// jquery object, represents real html element
 		this._element = $('<div class="dialog" id="dialog-'+this.id+'"></div>');
 		
 		// crates dialog
+		var pc = this.parent_context;
 		this._element.dialog({
 			autoOpen: false,
 			modal: true,
 			position: ['center', 'center'],
-			width: 'auto'
+			width: 'auto',
+			close: function ()
+			{
+				context = pc;
+			}
 		});
 		
 		this._data = '';
@@ -386,7 +456,7 @@ $(document).ready(function()
 				var status = $('<div>').append($(this._data).find('.status-message').clone()).remove().html();
 
 				// remove breadcrumbs and h2
-				$(this._data).children('.breadcrumbs, h2, .status-message').remove();
+				$(this._data).children('.breadcrumbs, h2, .status-message, .action_logs').remove();
 
 				// remove br only from beginning
 				while (true)
@@ -437,6 +507,7 @@ $(document).ready(function()
 		hide: function ()
 		{
 			this._element.dialog('close');
+			context = this.parent_context;
 		},
 		
 		/**
@@ -587,7 +658,13 @@ $(document).ready(function()
 
 				// load url in it
 				dialog.load(url);
-
+				
+				// init TinyMCE Editors in dialog
+				if (window['advancedTinyMCE'] !== undefined)
+				{
+					tinyMCE.init(advancedTinyMCE);
+				}
+				
 				$('#loading-overlay').hide();
 				// no returned data, close dialog and reload parent
 				if (dialog.getFormat() != 'html')
@@ -792,7 +869,7 @@ $(document).ready(function()
 			else
 				$('#whisper').hide('slow');
 
-		}, 200);
+		}, 500);
 	});
 	
 	// trigger search also after on-click action
@@ -902,7 +979,7 @@ $(document).ready(function()
 		
 		reload_element('#'+select_id+'_options', "<?php echo url_lang::base().url_lang::current(0,1) ?>", limit, '#'+select_id);
 	}
-	
+        
 	/**
 	 * Search in multiple
 	 * 
@@ -990,6 +1067,12 @@ $(document).ready(function()
 			$('#'+this.id+' option').attr('selected', true);
 		});
 	});
+	
+	/* Send as form ***********************************************************/
+	$('.as_form').click(function(){
+		$(this).parent().submit();
+		return false;
+	});
 
 	/* Form helpers ***********************************************************/
 
@@ -1058,7 +1141,10 @@ $(document).ready(function()
 	// fix MAC values in inputs
 	$('.mac, .mac_address').live('keyup', function ()
 	{
-		$(this).val(str_replace('-', ':', $(this).val()));
+		if ($(this).val().indexOf('-') != -1)
+		{
+			$(this).val(str_replace('-', ':', $(this).val()));
+		}
 	});
 	
 	// functionality of hiding/showing form group
@@ -1089,12 +1175,16 @@ $(document).ready(function()
 	// activate date picker on class .date after focus
 	$('.date').live('focus', function ()
 	{
+		var date_input = $(this);
 		$(this).datepicker({
 			dateFormat:			'yy-mm-dd',
 			changeMonth:		true,
 			changeYear:			true,
 			showOtherMonths:	true,
 			selectOtherMonths:	true,
+			yearRange:			'c-100:c+100',
+			minDate:			date_input.attr('minDate'),
+			maxDate:			date_input.attr('maxDate'),
 			onClose: function(dateText, inst)
 			{
 				$(this).trigger('keyup');
@@ -1152,38 +1242,68 @@ $(document).ready(function()
 	
 	$.validator.addMethod('mac_address_check', function(value, element)
 	{
-		var ret = false;
+		var ret = false,
+			subnet_id = null,
+			ip_id = null;
 		
-		$.ajax({
-			url:		'<?php echo url_lang::base() ?>json/mac_address_check',
-			async:		false,
-			dataType:	'json',
-			data:		{mac_address: value},
-			success:	function(result)
-			{
-				if(result.state)
-				{
-					ret = true;
-				}
-				else
-				{
-					$.validator.messages.mac_address = result.message;
-				}
-            }
-		});
+		// for devices/add
+		var subnet_dropdown_name = $(element).attr('name').replace('mac', 'subnet');
+		var $subnet_dropdown = $('select[name="' + subnet_dropdown_name + '"]');
 		
-		return ret;
+		if ($subnet_dropdown.length)
+		{
+			subnet_id = $subnet_dropdown.val();
+		}
+		
+		if (subnet_id && value && value.length)
+		{
+			$.ajax({
+				url:		'<?php echo url_lang::base() ?>json/mac_address_check',
+				async:		false,
+				dataType:	'json',
+				data:		{mac: value, subnet_id: subnet_id, ip_address_id: ip_id},
+				success:	function(result)
+				{
+					if(result.state)
+					{
+						ret = true;
+					}
+					else
+					{
+						$.validator.messages.mac_address_check = result.message;
+					}
+				}
+			});
+			return ret;
+		}
+		else
+		{ // if subnet is not set -> mac is always correct
+			return true;
+		}
 	}, '<?php echo __('MAC address already exists.') ?>');
 
 	$.validator.addMethod('to_field', function(value)
 	{
-		return value.match(/^([a-z][a-z0-9]*[_]{0,1}[a-z0-9]+),?[ ]*(([a-z][a-z0-9]*[_]{0,1}[a-z0-9]+),?[ ]*)*$/);
-	}, '<?php echo __('Invalid value') ?>');
+		var usernames = explode(',', trim(trim(value), ','));
+		
+		var match = true;
+		var index;
+		
+		for (index = 0; index < usernames.length; index++)
+		{
+			if (!(trim(usernames[index]).match(<?php echo Settings::get('username_regex') ?>)))
+			{
+				match = false;
+			}
+		}
+		
+		return match;
+	}, '<?php echo __('Invalid value, correct format: login, login') ?>');
 
 	$.validator.addMethod('suffix', function(value)
 	{
 		return value.match(/^\/([^\/]+\/)*$/);
-	}, '<?php echo __('suffix has to start with slash character and has to end with slash character') ?>');
+	}, '<?php echo __('Suffix has to start with slash character, has to end with slash character and contains only a-z, 0-9, - and /') ?>');
 
 	$.validator.addMethod('var_sym', function(value)
 	{
@@ -1260,13 +1380,27 @@ $(document).ready(function()
 	});
 	
 	// validate all form
-	$('.form').validate();
+	$('.form').validate({
+		errorPlacement: function(error, el)
+		{
+			// if element has multiple inputs in row, insert error message after
+			// second input to prevent destroying layout
+			if (el.hasClass('join1') || el.hasClass('join2'))
+			{
+				error.insertAfter(el.parent().find('.join2'));
+			}
+			else // insert error after first element
+			{
+				error.insertAfter(el);
+			}
+		}
+	});
 
 	// gave focus to focus classed objects
 	$('.focus').focus();
 	
 	// auto resize for non WYSIWYG textareas
-	$('textarea').not('.wysiwyg').autoResize();
+	$('textarea').not('.wysiwyg').not('.wysiwyg_simple').autoResize();
 	
 	// trigger autosize by default
 	$('textarea.autosize').trigger('keyup');
@@ -1300,6 +1434,10 @@ $(document).ready(function()
 		
 		$('#cellphone_show_menu').click(function()
 		{
+			//hide tooltip
+			
+			$('#cellphone_menu_tooltip').fadeOut();
+			
 			if ($('#content').hasClass('dispNone'))
 			{
 				cellphone_hide_menu();
@@ -1308,6 +1446,20 @@ $(document).ready(function()
 			{
 				cellphone_show_menu();
 			}
+		});
+
+		// menu tooltip
+		if ($.cookie('cellphone_menu_tooltip') != '1')
+		{
+			$('#cellphone_menu_tooltip').fadeIn(function(){
+				$.cookie('cellphone_menu_tooltip', '1', { path: '<?php echo Settings::get('suffix') ?>' });
+			});
+		}
+		
+		// hide tooltip
+		$('#cellphone_menu_tooltip').click(function()
+		{
+			$(this).fadeOut();
 		});
 	}
 
@@ -1351,6 +1503,15 @@ function mark_all_checkboxs(name, ids)
 	{
 		$('input[name="' + name + '[' + ids[i] + ']"]').attr('checked', val);
 	}
+}
+	
+/**
+ * Status more info expander (status helper)
+ */
+function status_exception_expander(anchor)
+{
+	$(anchor).parent().find('.status-message-exception-body').slideDown('slow');
+	$(anchor).hide('slow');
 }
 
 <?php

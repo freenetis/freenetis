@@ -53,7 +53,7 @@ class resource
 		switch ($state)
 		{
 			case 'cs':
-				return url::base() . 'media/images/icons/flags/cs.jpg';
+				return url::base() . 'media/images/icons/flags/cs.png';
 			default;
 				return '';
 		}

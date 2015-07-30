@@ -66,9 +66,10 @@ class Account_Model extends ORM
 	 */
 	public function get_accounts(
 			$limit_from = 0, $limit_results = 20, $order_by = 'id',
-			$order_by_direction = 'asc', $filter_values = array(), $group = 4)
+			$order_by_direction = 'asc', $filter_sql = '', $date_sql = '', $group = 4)
 	{
 		$where = 'WHERE ';
+		$datetime = '';
 		// order by direction check
 		if (strtolower($order_by_direction) != 'desc')
 		{
@@ -94,25 +95,20 @@ class Account_Model extends ORM
 		$datetime_from_t2 = " AND t2.datetime >= '0000-00-00'";
 		$datetime_to_t2 = " AND t2.datetime <= '9999-12-31'";
 		// filter
-		if (is_array($filter_values))
+		if (!empty($filter_sql))
 		{
-			foreach ($filter_values as $key => $value)
+			if (empty($where))
 			{
-				if ($key == 'name')
-				{
-					$where .= " AND a.name LIKE ".$this->db->escape("%$value%")." COLLATE utf8_general_ci";
-				}
-				else if ($key == 'datetime_from' && preg_match("/^\d{4}\-\d{2}\-\d{2}$/", $value))
-				{
-					$datetime_from_t1 = " AND t1.datetime >= '$value'";
-					$datetime_from_t2 = " AND t2.datetime >= '$value'";
-				}
-				else if ($key == 'datetime_to' && preg_match("/^\d{4}\-\d{2}\-\d{2}$/", $value))
-				{
-					$datetime_to_t1 = " AND t1.datetime <= '$value'";
-					$datetime_to_t2 = " AND t2.datetime <= '$value'";
-				}
+				$where = "WHERE $filter_sql";
 			}
+			else
+			{
+				$where .= " AND $filter_sql";
+			}
+		}
+		if (!empty($date_sql))
+		{
+			$datetime = " AND $date_sql";
 		}
 		// query
 		return $this->db->query("
@@ -122,17 +118,17 @@ class Account_Model extends ORM
 				SELECT q1.*, IFNULL(SUM(amount), 0) AS inbound
 				FROM
 				(
-					SELECT a.id, a.id AS aid, a.name, a.account_attribute_id,
+					SELECT aa.id, aa.id AS aid, aa.name, aa.account_attribute_id,
 					m.name AS member_name, m.id AS member_id,
 					IFNULL(SUM(amount), 0) AS outbound,
-					a.comments_thread_id AS a_comments_thread_id
-					FROM accounts a
-					LEFT JOIN members m ON m.id = a.member_id
-					LEFT JOIN transfers t1 ON a.id = t1.origin_id $datetime_from_t1 $datetime_to_t1
+					aa.comments_thread_id AS a_comments_thread_id
+					FROM accounts aa
+					LEFT JOIN members m ON m.id = aa.member_id
+					LEFT JOIN transfers t1 ON aa.id = t1.origin_id $datetime
 					$where
-					GROUP BY a.id
+					GROUP BY aa.id
 				) q1
-				LEFT JOIN transfers t2 ON q1.id = t2.destination_id $datetime_from_t2 $datetime_to_t2
+				LEFT JOIN transfers t2 ON q1.id = t2.destination_id $datetime
 				GROUP BY q1.id
 			) q2
 			ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
@@ -146,7 +142,7 @@ class Account_Model extends ORM
 	 * @author Jiri Svitak
 	 * @return Mysql_Result
 	 */
-	public function get_accounts_count($filter_values = array(), $group = 4)
+	public function get_accounts_count($filter_sql = '', $group = 4)
 	{
 		$where = 'WHERE ';
 		// group - project, credit and other accounts
@@ -163,16 +159,14 @@ class Account_Model extends ORM
 			$where .= 'account_attribute_id <> '.Account_attribute_Model::PROJECT
 					. ' AND account_attribute_id <> '.Account_attribute_Model::CREDIT;
 		}
-		// filter
-		if (is_array($filter_values) && array_key_exists('name', $filter_values))
+		if(!empty($filter_sql))
 		{
-			$where .= " AND a.name LIKE ".$this->db->escape("%" . $filter_values['name'] . "%")
-					. " COLLATE utf8_general_ci";
+			$where .= " AND $filter_sql";
 		}
 		// get count
 		return $this->db->query("
 			SELECT COUNT(*) AS total
-			FROM accounts a
+			FROM accounts aa
 			$where
 		")->current()->total;
 	}
@@ -275,24 +269,25 @@ class Account_Model extends ORM
 		// query
 		return $this->db->query("
 			SELECT a.id, a.balance, m.entrance_date, m.leaving_date,
-			IF(mf.fee IS NOT NULL, 1, 0) fee_is_set,
-			mf.fee,
-			mf.readonly AS fee_readonly,
-			mf.name AS fee_name,
-			IF(t.id IS NULL, 0, t.id) AS transfer_id
+				IF(mf.fee IS NOT NULL, 1, 0) fee_is_set,
+				mf.fee,
+				mf.readonly AS fee_readonly,
+				mf.name AS fee_name,
+				IF(t.id IS NULL, 0, t.id) AS transfer_id
 			FROM accounts a
 			JOIN members m ON a.member_id = m.id
 			LEFT JOIN enum_types e ON e.id = m.type
 			LEFT JOIN
 			(
-				SELECT * FROM (SELECT f.fee, f.readonly, f.name, mf.member_id, priority FROM members_fees mf
-						LEFT JOIN fees f ON mf.fee_id = f.id
-						LEFT JOIN enum_types et ON f.type_id = et.id
-						WHERE et.value = 'Regular member fee'
-							AND mf.activation_date <= '$date'
-							AND mf.deactivation_date >= '$date'
-							ORDER BY member_id, priority) q
-										GROUP BY q.member_id
+				SELECT * FROM (SELECT f.fee, f.readonly, f.name, mf.member_id, priority
+				FROM members_fees mf
+				LEFT JOIN fees f ON mf.fee_id = f.id
+				LEFT JOIN enum_types et ON f.type_id = et.id
+				WHERE et.value = 'Regular member fee'
+					AND mf.activation_date <= '$date'
+					AND mf.deactivation_date >= '$date'
+				ORDER BY member_id, priority) q
+				GROUP BY q.member_id
 			) mf ON m.id = mf.member_id
 			LEFT JOIN transfers t ON t.origin_id = a.id AND t.type = ? AND t.datetime = '$date'
 			WHERE m.id <> 1 AND m.entrance_date < '$date'
@@ -308,15 +303,44 @@ class Account_Model extends ORM
 	 * @author Jiri Svitak
 	 * @return Mysql_Result
 	 */
-	public function get_accounts_to_deduct_entrance_fees()
+	public function get_accounts_to_deduct_entrance_fees($deduct_date)
 	{
 		return $this->db->query("
-			SELECT a.id, m.entrance_fee, m.debt_payment_rate, m.entrance_date, t.id AS transfer_id, t.amount
-			FROM accounts a
-			JOIN members m ON a.member_id = m.id AND m.id <> 1
-			LEFT JOIN transfers t ON t.origin_id = a.id	AND t.type = ?
-			WHERE a.account_attribute_id = ?
-		", array(Transfer_Model::DEDUCT_ENTRANCE_FEE, Account_attribute_Model::CREDIT));
+			SELECT a.id AS id,
+			IF (debt > debt_payment_rate, debt_payment_rate, debt) AS amount
+			FROM
+			(
+				SELECT a.id,
+				IFNULL(m.entrance_fee, 0) - IFNULL(SUM(t.amount),0) AS debt,
+				debt_payment_rate
+				FROM accounts a
+				JOIN members m ON a.member_id = m.id
+				LEFT JOIN transfers t ON t.origin_id = a.id AND t.type = ?
+				WHERE a.account_attribute_id = ?
+				AND m.entrance_fee > 0 AND m.type <> ?
+				AND m.entrance_date < ? AND
+				(
+						m.type <> ? OR m.leaving_date > ?
+				) AND a.id NOT IN
+				(
+						SELECT t.origin_id
+						FROM transfers t
+						WHERE type = ? AND datetime = ?
+				)
+				GROUP BY a.id
+			) a
+			WHERE a.debt > 0
+		", array
+		(
+			Transfer_Model::DEDUCT_ENTRANCE_FEE,
+			Account_attribute_Model::CREDIT,
+			Member_Model::TYPE_APPLICANT,
+			$deduct_date,
+			Member_Model::TYPE_FORMER,
+			$deduct_date,
+			Transfer_Model::DEDUCT_ENTRANCE_FEE,
+			$deduct_date
+		));
 	}
 
 
@@ -495,18 +519,34 @@ class Account_Model extends ORM
 	 * @author Jiri Svitak
 	 * @return Mysql_Result
 	 */
-	public function get_accounts_to_deduct_device_fees()
+	public function get_accounts_to_deduct_device_fees($deduct_date)
 	{
 		return $this->db->query("
-			SELECT a.id, SUM(d.price) AS total_price
-			FROM accounts a
-			JOIN members m ON a.member_id = m.id AND m.id <> 1
-			JOIN users u ON u.member_id = m.id
-			JOIN devices d ON d.user_id = u.id
-			WHERE a.account_attribute_id = ?
-			GROUP BY a.id
-			HAVING total_price > 0
-		", array(Account_attribute_Model::CREDIT));
+			SELECT a.id, IF (debt > payment_rate, payment_rate, debt) AS amount
+			FROM
+			(
+				SELECT a.id, IFNULL(d.price, 0) - IFNULL(SUM(t.amount),0) AS debt,
+				payment_rate
+				FROM accounts a
+				JOIN members m ON a.member_id = m.id
+				JOIN users u ON u.member_id = m.id
+				JOIN devices d ON d.user_id = u.id AND d.price IS NOT NULL AND d.price > 0
+				LEFT JOIN transfers t ON t.origin_id = a.id AND t.type = ?
+				WHERE a.id NOT IN
+				(
+					SELECT t.origin_id
+					FROM transfers t
+					WHERE type = ? AND datetime = ?
+				)
+				GROUP BY a.id
+			) a
+			WHERE a.debt > 0
+		", array
+		(
+			Transfer_Model::DEDUCT_DEVICE_FEE,
+			Transfer_Model::DEDUCT_DEVICE_FEE,
+			$deduct_date
+		));
 	}
 
 	/**
@@ -633,5 +673,35 @@ class Account_Model extends ORM
 
 		return ($result) ? $result->comment: '';
 	}
-
+	
+	/**
+	 * Returns account by given attribute and member
+	 * 
+	 * @author Michal Kliment
+	 * @param integer $account_attribute_id
+	 * @param integer $member_id
+	 * @return Account_Model
+	 */
+	public function get_account_by_account_attribute_and_member ($account_attribute_id, $member_id)
+	{
+		return $this
+			->where('account_attribute_id', $account_attribute_id)
+			->where('member_id', $member_id)
+			->find();
+	}
+	
+	/**
+	 * Gets account by account attribute ID.
+	 * Creates new instance.
+	 * 
+	 * @param integer $account_attribute_id
+	 * @return Account_Model
+	 */
+	public function get_account_by_attribute($account_attribute_id)
+	{
+		return ORM::factory('account')
+				->where('account_attribute_id', $account_attribute_id)
+				->find();
+	}
+	
 }

@@ -6,7 +6,7 @@ set -e
 
 SERVER=apache2
 CONFIGFILE=/etc/freenetis/freenetis.conf
-CONFIG_SAMPLE_PHP=/var/www/freenetis/config-sample.php
+CONFIG_SAMPLE_PHP=/usr/share/freenetis/config-sample.php
 
 # Generate config file, if it doesn’t exist.
 # An alternative is to copy in a template
@@ -21,6 +21,26 @@ fi
 
 # load configure file
 . $CONFIGFILE || true
+
+# Version 1.1 is located in /usr/share/freenetis but previous versions were 
+# located in /var/www/freeenetis, we try to use old config files if they are 
+# exists. The old configuration must not replace new configuration!
+
+OLD_PATH=/var/www/freenetis
+CURRENT_PATH=/usr/share/freenetis
+
+# DB config
+if [ -f "${OLD_PATH}/config.php" ] && [ ! -f "${CURRENT_PATH}/config.php" ]; then
+	echo "Copying old DB configuration from ${OLD_PATH}/config.php file"
+	cp "${OLD_PATH}/config.php" "${CURRENT_PATH}/config.php"
+fi
+
+# .htaccess
+if [ -f "${OLD_PATH}/.htaccess" ] && [ ! -f "${CURRENT_PATH}/.htaccess" ]; then
+	echo "Copying old apache configuration from ${OLD_PATH}/.htaccess file"
+	cp "${OLD_PATH}/.htaccess" "${CURRENT_PATH}/.htaccess"
+	chmod 0666 "${CURRENT_PATH}/.htaccess" || true
+fi
 
 # Substitute in the values from the debconf db.
 # There are obvious optimizations possible here.
@@ -90,6 +110,11 @@ fi
 
 # Make post install things
 
+# 0) Access rights to some directories
+chmod ugo+w /usr/share/freenetis
+chmod ugo+w /usr/share/freenetis/upload
+mkdir -m 0777 /usr/share/freenetis/logs 2>/dev/null || true
+
 # 1) Apache config
 echo "Preparing Apache"
 
@@ -112,14 +137,15 @@ php_settings="
                 php_flag file_uploads On
                 php_flag short_open_tag On
                 # large inputs (fixes #358, #410)
-				php_value max_input_vars 100000
+                php_value max_input_vars 100000
                 php_admin_value suhosin.post.max_vars 100000
-				php_admin_value suhosin.request.max_vars 100000"
+                php_admin_value suhosin.request.max_vars 100000"
 
 # make config for FN
 if [ "$SERVER_TYPE" = localhost ]; then
 
-	echo "<Directory /var/www/freenetis>" > $A2CF
+	echo "Alias /freenetis /usr/share/freenetis" > $A2CF
+	echo "<Directory /usr/share/freenetis>" >> $A2CF
 	echo "        Options Indexes FollowSymLinks MultiViews" >> $A2CF
 	echo "        AllowOverride All" >> $A2CF
 	echo "        Order allow,deny" >> $A2CF
@@ -139,8 +165,8 @@ else
 
 	echo "        ServerName ${SERVERNAME}" >> $A2CF
 	echo "        ServerAlias www.${SERVERNAME}" >> $A2CF
-	echo "        DocumentRoot /var/www/freenetis" >> $A2CF
-	echo "        <Directory /var/www/freenetis>" >> $A2CF
+	echo "        DocumentRoot /usr/share/freenetis" >> $A2CF
+	echo "        <Directory /usr/share/freenetis>" >> $A2CF
 	echo "                Options Indexes FollowSymLinks MultiViews" >> $A2CF
 	echo "                AllowOverride All" >> $A2CF
 	echo "                Order allow,deny" >> $A2CF
@@ -194,9 +220,9 @@ mv -f $CONFIG_SAMPLE_PHP.tmp $CONFIG_SAMPLE_PHP
 
 # restart
 if [ -x /usr/sbin/invoke-rc.d ]; then
-	invoke-rc.d apache2 reload 3>/dev/null || true
+	invoke-rc.d apache2 restart 3>/dev/null || true
 else
-	/etc/init.d/apache2 reload 3>/dev/null || true
+	/etc/init.d/apache2 restart 3>/dev/null || true
 fi
 
 # 2) CRON
@@ -208,6 +234,8 @@ echo "" >> /etc/cron.d/freenetis
 echo "SHELL=/bin/sh" >> /etc/cron.d/freenetis
 echo "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin" >> /etc/cron.d/freenetis
 echo "* *     * * *   root    wget -O /dev/null ${PROTOCOL}://${SERVERNAME}/index.php/cs/scheduler/run --no-check-certificate -q" >> /etc/cron.d/freenetis
+
+chmod g-w /etc/cron.d/freenetis
 
 if [ -x /usr/sbin/invoke-rc.d ]; then
 	invoke-rc.d cron restart 3>/dev/null || true
@@ -269,5 +297,3 @@ if [ $reconfigure -eq 1 ]; then
 		dpkg-reconfigure locales
 	fi
 fi
-
-#DEBHELPER#

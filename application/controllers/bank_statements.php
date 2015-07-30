@@ -20,6 +20,17 @@
 class Bank_statements_Controller extends Controller
 {
 	/**
+	 * Constructor, only test if finance is enabled
+	 */
+	public function __construct()
+	{		
+		parent::__construct();
+		
+		if (!Settings::get('finance_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Function imported bank statements by bank account.
 	 * 
 	 * @author Jiri Svitak
@@ -54,9 +65,9 @@ class Bank_statements_Controller extends Controller
 			Controller::error(RECORD);
 		}
 			
-		if (is_numeric($this->input->get('record_per_page')))
+		if (is_numeric($this->input->post('record_per_page')))
 		{
-			$limit_results = (int) $this->input->get('record_per_page');
+			$limit_results = (int) $this->input->post('record_per_page');
 		}
 		
 		$allowed_order_type = array(
@@ -112,19 +123,21 @@ class Bank_statements_Controller extends Controller
 				->label('ID');
 		
 		$grid->order_field('statement_number')
-				->label(__('Number'));
+				->label('Number');
 		
 		$grid->order_field('from')
-				->label(__('Date from'));
+				->label('Date from');
 		
 		$grid->order_field('to')
-				->label(__('Date to'));
+				->label('Date to');
 		
 		$grid->order_field('type');
 		
-		$grid->order_field('opening_balance');
+		$grid->order_callback_field('opening_balance')
+				->callback('money');
 		
-		$grid->order_field('closing_balance');
+		$grid->order_callback_field('closing_balance')
+				->callback('money');
 
 		if ($this->acl_check_new('Accounts_Controller', 'bank_transfers'))
 		{
@@ -213,13 +226,13 @@ class Bank_statements_Controller extends Controller
 				->value($bs->statement_number);
 		
 		$form->date('from')
-				->label(__('Date from').':')
+				->label('Date from')
 				->years(date('Y')-100, date('Y'))
 				->rules('required')
 				->value(strtotime($bs->from));
 		
 		$form->date('to')
-				->label(__('Date to').':')
+				->label('Date to')
 				->years(date('Y')-100, date('Y'))
 				->rules('required')
 				->value(strtotime($bs->to));
@@ -341,6 +354,7 @@ class Bank_statements_Controller extends Controller
 				Transfer_Model::delete_transfer($itid);
 			}
 			
+			$ba_id = $statement->bank_account_id;
 			$statement->delete_throwable();
 			$db->transaction_commit();
 			
@@ -352,9 +366,9 @@ class Bank_statements_Controller extends Controller
 		{
 			$db->transaction_rollback();
 			Log::add_exception($e);
-			status::error('Error - cannot delete bank statement.');
+			status::error('Error - cannot delete bank statement.', $e);
 		}
-		url::redirect('bank_statements/show_by_bank_account/' . $statement->bank_account_id);
+		url::redirect('bank_statements/show_by_bank_account/' . $ba_id);
 	}
 	
 }

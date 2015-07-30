@@ -13,7 +13,7 @@
 
 /**
  * Settings of whole FreenetIS.
- * Settings are casched except passwords because of security.
+ * Settings are cached except passwords because of security.
  */
 class Settings
 {
@@ -38,73 +38,228 @@ class Settings
 	 */
 	private static $default_values = array
 	(
-		// default title of system
-		'title'								=> 'FreenetIS',
-		// DB schema version starts from zero
-		'db_schema_version'					=> 0,
-		// default currency is Czech crown
-		'currency'							=> 'CZK',
-		// self applicant registration is enabled by default
-		'self_registration'					=> 1,
-		// javascript is enabled by default
-		'use_javascript'					=> 1,
-		// display index.php in URL
-		'index_page'						=> 1,
-		// defaul email address
-		'email_default_email'				=> 'no-reply@freenetis.org',
-		// default upload directory is upload
-		'upload_directory'					=> 'upload',
-		// upload can remove spaces by default
-		'upload_remove_spaces'				=> 1,
-		// upload can create directorie by default
-		'upload_create_directories'			=> 1,
-		// default email driver
-		'email_driver'						=> 'native',
-		// default email port
-		'email_port'						=> 25,
-		// ulogd settings
-		'ulogd_enabled'						=> 1,
-		// time of last update of ulogd
-		'ulogd_update_last'					=> 0,
-		// interval of updating of ulogd (in seconds), default 1800s' => 30 minutes
-		'ulogd_update_interval'				=> 1800,
-		// count of the most traffic-active members to find, default 10% of members
-		'ulogd_active_count'				=> '10%',
-		// type of traffic of members to find, default download traffic
-		'ulogd_active_type'					=> 'download',
-		// allowed subnets is enabled by default
-		'allowed_subnets_enabled'			=> 1,
-		// time of last update of allowed subnets
-		'allowed_subnets_update_last'		=> 0,
-		// interval of updating of allowed subnets, default 60s
-		'allowed_subnets_update_interval'	=> 60,
+		/**
+		 * ALLOWED SUBNETS SETTINGS
+		 */
 		// default count of allowed subnets
 		'allowed_subnets_default_count'		=> 1,
+		// allowed subnets is enabled by default
+		'allowed_subnets_enabled'			=> 1,
+		// interval of updating of allowed subnets, default 60s
+		'allowed_subnets_update_interval'	=> 60,
+		// time of last update of allowed subnets
+		'allowed_subnets_update_last'		=> 0,
+		
+		// if self member registration is enabled then this value gives
+		// a day count after which the application that is connected and
+		// he have not submit his member registration
+		// is bannet from using of this connection (redirected)
+		'applicant_connection_test_duration' => 14,
+		
+		/**
+		 * CGI SCRIPTS SETTINGS
+		 */
+		// URL for ARP table
+		'cgi_arp_url' => 'http://{GATEWAY_IP_ADDRESS}/cgi-bin/arp.cgi?ip_address={IP_ADDRESS}',
+		
+		/**
+		 * CONNECTION REQUESTS SETTINGS
+		 */
+		// are connection requests enabled?
+		'connection_request_enable'			=> 0,
+		
+		/**
+		 * FINANCE SETTINGS
+		 */
+		// default currency is Czech crown
+		'currency'							=> 'CZK',
+		
+		// deduct day (1-31) (#332)
+		// default value is 15 because this constant was used before FreenetIS 1.1
+		'deduct_day'						=> 15,
+		
+		/**
+		 * DATABASE SETTINGS
+		 */
+		// DB schema version starts from zero
+		'db_schema_version'					=> 0,
 		// if a deadlock came in, whole transaction may be executed again
 		// this property sets the max count of repeats of execution. (#284)
 		'db_trans_deadlock_repeats_count'	=> 4,
 		// if repeats (previous variable) are set as greater than 1, this
 		// timeout in ms defines time to next repeat of execution. (#284)
 		'db_trans_deadlock_repeats_timeout'	=> 100,
+		
+		// time theshold in seconds, before DHCP server is out of date
+		'dhcp_server_reload_timeout'		=> 1800,
+		
+		/**
+		 * E-MAIL SETTINGS
+		 */
+		// defaul email address
+		'email_default_email'				=> 'no-reply@freenetis.org',
+		// default email driver
+		'email_driver'						=> 'native',
+		// default email port
+		'email_port'						=> 25,
 		// default value for prefix of subject of notification
 		// e-mails to members
 		'email_subject_prefix'				=> 'FreenetIS',
-		// IP adresses states interval
-		'ip_addresses_states_interval'		=> 60,
-		// count of days in which new members will not be notificated
-		// to pay, default 14
-		'initial_immunity'					=> 14,
+		
+		// ID of bank account that is shown on registration (if null random is used)
+		'export_header_bank_account'		=> NULL,
+		
+		// finance is enabled by default
+		'finance_enabled'					=> TRUE,
+		
+		// enable/disable removing of member's devices on member leaving day (#738)
+		'former_member_auto_device_remove'	=> FALSE,
+		
+		// whether hide grid on its first load (for optimalization) (#442)
+		'grid_hide_on_first_load'			=> FALSE,
+		
+		// display index.php in URL
+		'index_page'						=> 1,
+		
+		/**
+		 * INITIAL IMMUNITY SETTINGS
+		 */
 		// count of days in which new members will not be blocked
 		// and notificated as debtor, default 35
 		'initial_debtor_immunity'			=> 35,
-		'redirection_port_self_cancel'		=> 80,
-		'qos_enabled'						=> 0,
-		'qos_active_speed'					=> '1M/2M',
+		// count of days in which new members will not be notificated
+		// to pay, default 14
+		'initial_immunity'					=> 14,
+		
+		// IP adresses states interval
+		'ip_addresses_states_interval'		=> 60,
+		
+		// date of last deduct of device fees
+		'last_deduct_device_fees'			=> '0000-00-00',
+		
+		/**
+		 * LOCAL SUBNETS SETTINGS
+		 */
 		// variables for local subnets update
-		'local_subnets_update_last'			=> 0,
 		'local_subnets_update_interval'		=> 86400,
+		'local_subnets_update_last'			=> 0,
+		
+		// minimal membership interrupt period is 1 month
+		'membership_interrupt_minimum'		=> 1,
+		
 		// time threshold in minutes, before module is shown as inactive
-		'module_status_timeout'				=> 2
+		'module_status_timeout'				=> 2,
+		
+		/**
+		 * MONITORING SETTINGS
+		 */
+		// interval of notication for host down
+		'monitoring_notification_down_host_interval'	=> 10,
+		// interval of monitoring notification
+		'monitoring_notification_interval'	=> 1,
+		// interval of notication for host up
+		'monitoring_notification_up_host_interval'		=> 5,
+		
+		// networks is enabled by default
+		'networks_enabled'					=> TRUE,
+		
+		// notificatuion is enabled by default
+		'notification_enabled'				=> TRUE,
+		
+		// password check also for MD5 algorithm (not only fo SHA1)
+		// this is here because of posibility of transformation from old data
+		// structures (another IS). I (Ondrej Fibich) made this due to
+		// import of passwords from old IS of PVFREE association (2013-02-15)
+		'pasword_check_for_md5'				=> FALSE,
+		
+		/**
+		 * QOS SETTINGS
+		 */
+		// qos is enabled
+		'qos_enabled'						=> 0,
+		// speed for active
+		'qos_active_speed'					=> '1M/2M',
+		
+		/**
+		 * REDIRECTION SETTINGS
+		 */
+		// redirection is enabled by default
+		'redirection_enabled'				=> TRUE,
+
+		// minimal membership interrupt period is 1 month
+		'membership_interrupt_minimum'		=> 1,
+
+		/**
+		 * VTIGER SETTINGS
+		 */
+		// vtiger field names - members
+		'vtiger_member_fields'				=> '{"name":"accountname","acc_type":"accountype","entrance_date":"",
+												"organization_identifier":"","var_sym":"","type":"",
+												"street":"bill_street","town":"bill_city","country":"bill_country",
+												"zip_code":"bill_code","phone1":"phone","phone2":"","phone3":"",
+												"email1":"email1","email2":"","email3":"","employees":"employees",
+												"do_not_send_emails":"emailoptout","notify_owner":"notify_owner",
+												"comment":"description","id":""}',
+		// vtiger field names - users
+		'vtiger_user_fields'				=> '{"name":"firstname","middle_name":"","surname":"lastname",
+												"pre_title":"","post_title":"","member_id":"account_id",
+												"street":"mailingstreet","town":"mailingcity",
+												"country":"mailingcountry","zip_code":"mailingzip","phone1":"phone",
+												"phone2":"","phone3":"","email1":"email1","email2":"","email3":"",
+												"birthday":"birthday","do_not_call":"donotcall",
+												"do_not_send_emails":"emailoptout","notify_owner":"notify_owner",
+												"comment":"description","id":""}',
+
+		'redirection_port_self_cancel'		=> 80,
+		
+		/**
+		 * SECURITY SETTINGS
+		 */
+		// default minimal password length
+		'security_password_length'			=> 8,
+		// default minimal password level is good
+		'security_password_level'			=> 3,
+		
+		// default text for self cancel of a cancellable redirection
+		'self_cancel_text'					=> 'OK, I am aware',
+		
+		// self applicant registration is enabled by default
+		'self_registration'					=> 1,
+		'self_registration_enable_approval_without_registration' => 1,
+		'self_registration_enable_additional_payment' => 1,
+		
+		// default title of system
+		'title'								=> 'FreenetIS',
+		
+		/**
+		 * ULOGD SETTINGS
+		 */
+		// count of the most traffic-active members to find, default 10% of members
+		'ulogd_active_count'				=> '10%',
+		// type of traffic of members to find, default download traffic
+		'ulogd_active_type'					=> 'download',
+		// ulogd settings
+		'ulogd_enabled'						=> 1,
+		// interval of updating of ulogd (in seconds), default 1800s' => 30 minutes
+		'ulogd_update_interval'				=> 1800,
+		// time of last update of ulogd
+		'ulogd_update_last'					=> 0,
+		
+		/**
+		 * UPLOAD SETTINGS
+		 */
+		// upload can create directorie by default
+		'upload_create_directories'			=> 1,
+		// default upload directory is upload
+		'upload_directory'					=> 'upload',
+		// upload can remove spaces by default
+		'upload_remove_spaces'				=> 1,
+		
+		// javascript is enabled by default
+		'use_javascript'					=> 1,
+		
+		// username regex #360
+		'username_regex'					=> '/^[a-z][a-z0-9_]{4,}$/',
 	);
 	
 	/**
@@ -148,7 +303,7 @@ class Settings
 		
 		return TRUE;
 	}
-
+	
 	/**
 	 * Function to get value from settings by given key
 	 * 

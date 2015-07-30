@@ -40,6 +40,28 @@ class callback
 	}
 	
 	/**
+	 * Callback for axodoc
+	 *
+	 * @author David Raška
+	 * @param object $item
+	 * @param string $name 
+	 */
+	public static function axodoc($item, $name)
+	{
+		echo '<a href="'.AXODOC_URL.'?axo='.urlencode($item->section_value).'/'.
+			$item->value.'" target="_blank" class="action_field_icon" title="'.
+			__('Show pages where is this AXO (access right) used.').'">'.
+			html::image(array
+			(
+				'width' => '14',
+				'height' => '14',
+				'alt' => __('Show pages where is this AXO (access right) used.'),
+				'src' => url::base().'/media/images/icons/grid_action/axodoc.png'
+				
+			)).'</a>';
+	}
+	
+	/**
 	 * Callback for date
 	 *
 	 * @author Ondrej Fibich
@@ -94,7 +116,7 @@ class callback
 					
 		$pieces = array();
 		foreach ($interval as $unit => $val)
-		{	
+		{
 			// do not work with empty values (fixes #412)
 			if (empty($val))
 			{
@@ -113,7 +135,7 @@ class callback
 		
 		// return result
 		echo implode(', ',$pieces);
-	} 
+	}
 	
 	/**
 	 * Callback for display GPS
@@ -160,6 +182,11 @@ class callback
 	 */
 	public static function money($item, $name)
 	{
+		if (empty($item->$name))
+		{
+			return; // NULL value
+		}
+		
 		$price = number_format($item->$name, 2, ',', ' ') . ' ';
 		$price = str_replace(' ', '&nbsp;', $price);
 		
@@ -175,7 +202,7 @@ class callback
 		}
 		
 		// has transfer?
-		if (property_exists($item, 'transfer_id') && $item->transfer_id)
+		if (Settings::get('finance_enabled') && property_exists($item, 'transfer_id') && $item->transfer_id)
 		{
 			echo html::anchor('transfers/show/' . $item->transfer_id, $price);
 		}
@@ -217,6 +244,18 @@ class callback
 	}
 	
 	/**
+	 * Callback for percents.
+	 * 
+	 * @author Jan Dubina
+	 * @param object $item
+	 * @param string $name 
+	 */
+	public static function percent2($item, $name)
+	{
+		echo ($item->$name * 100) .'%';
+	}
+	
+	/**
 	 * Round value by first argument. If first argument is lower than 0,
 	 * value is rouded right from decimal point, left otherwise.
 	 * 
@@ -231,6 +270,23 @@ class callback
 		echo round($item->$name, $precision);
 	}
 	
+	/**
+	 * Callback function to print count with title (column of thew title is
+	 * stored in args)
+	 * 
+	 * @param object $item
+	 * @param string $name 
+	 * @param array $args
+	 */
+	public static function count_field($item, $name, $args = array())
+	{
+		$title = @$args[0];
+		if (!empty($args[0]) && isset($item->$title))
+			echo '<span class="help" title="' . $item->$title . '">' . $item->$name . "</span>";
+		else
+			echo $item->$name;
+	}
+	
 	/************** Callbacks for using in special ocations *******************/
 	
 	/**
@@ -243,7 +299,7 @@ class callback
 	public static function aco_count_field ($item, $name)
 	{
 		if ($item->aco_count)
-			echo "<span class='help' title='$item->aco_value'>$item->aco_count</span>";
+			echo "<span class='help' title='$item->aco_names'>$item->aco_count</span>";
 		else
 			echo $item->aco_count;
 	}
@@ -272,6 +328,41 @@ class callback
 		}
 		
 		echo '<span style="color: '.$color.'">'.__(''.$state).'</span>';
+	}
+	
+	/**
+	 * Callback for type field
+	 * 
+	 * @author Ondřej Fibich
+	 * @staticvar string $enum_type_model
+	 * @param Contact_Model $item
+	 * @param string $name
+	 */
+	public static function additional_contacts_type_callback($item, $name)
+	{
+	    static $enum_type_model = NULL;
+
+	    if ($enum_type_model == NULL)
+	    {
+			$enum_type_model = new Enum_type_Model();
+	    }
+
+	    echo $enum_type_model->get_value($item->type);
+		
+		if (isset($item->type) && $item->type == Contact_Model::TYPE_EMAIL &&
+			isset($item->user_id))
+		{
+			$contact_model = new Contact_Model($item->id);
+			
+			if ($contact_model->is_user_redirected_email($item->user_id))
+			{
+				echo ' ' . html::image(array
+				(
+					'src'	=> '/media/images/icons/mail-forward.png',
+					'title'	=> __('Your inner mail is redirected to this e-mail box'),
+				));
+			}
+		}
 	}
 
 	/**
@@ -335,7 +426,7 @@ class callback
 	public static function aro_groups_count_field ($item, $name)
 	{
 		if ($item->aro_groups_count)
-			echo "<span class='help' title='$item->aro_groups_value'>$item->aro_groups_count</span>";
+			echo "<span class='help' title='$item->aro_groups_names'>$item->aro_groups_count</span>";
 		else
 			echo $item->aro_groups_count;
 	}
@@ -350,7 +441,7 @@ class callback
 	public static function axo_count_field ($item, $name)
 	{
 		if ($item->axo_count)
-			echo "<span class='help' title='$item->axo_value'>$item->axo_count</span>";
+			echo '<span class="help" title="'.$item->axo_names.'">'.$item->axo_count.'</span>';
 		else
 			echo $item->axo_count;
 	}
@@ -402,6 +493,55 @@ class callback
 						'title' => __('Add comment to financial state of member')
 					)
 			);
+		}
+	}
+	
+	/**
+	 * Bank account type field.
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function bank_account_type($item, $name)
+	{
+		echo Bank_account_Model::get_type_name($item->$name);
+	}
+	
+	/**
+	 * Callback function to print rate of speed class
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function speed_class_ceil_field ($item, $name)
+	{
+		if ($item->d_ceil != $item->u_ceil)
+		{
+			echo network::speed($item->u_ceil) . '/';
+			echo network::speed($item->d_ceil);
+		}
+		else
+		{
+			echo network::speed($item->d_ceil);
+		}
+	}
+	
+	/**
+	 * Callback function to print ceil of speed class
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function speed_class_rate_field ($item, $name)
+	{
+		if ($item->d_rate != $item->u_rate)
+		{
+			echo network::speed($item->u_rate) . '/';
+			echo network::speed($item->d_rate);
+		}
+		else
+		{
+			echo network::speed($item->d_rate);
 		}
 	}
 	
@@ -577,12 +717,32 @@ class callback
 		{
 			if ($item->connected_to_devices_count == 1)
 			{
-				echo html::anchor(
-						'devices/show/'.$item->connected_to_device_id,
-						$item->connected_to_device_name
-				);
+				if (Controller::instance()->acl_check_view('Devices_Controller', 'devices'))
+				{
+					echo html::anchor(
+							'devices/show/'.$item->connected_to_device_id,
+							$item->connected_to_device_name
+					);
+				}
+				else
+				{
+					echo $item->connected_to_device_name;
+				}
+				
+				if (Controller::instance()->acl_check_view('Ifaces_Controller', 'iface'))
+				{
+					echo " (". html::anchor(
+							'ifaces/show/'.$item->connected_to_iface_id,
+							$item->connected_to_iface_name
+					).")";
+				}
+				else
+				{
+					echo " (".$item->connected_to_iface_name.")";
+				}
 			}
-			else if (isset($item->link_id))
+			else if (Controller::instance()->acl_check_view('Links_Controller', 'link') &&
+					 isset($item->link_id))
 			{
 				echo html::anchor(
 						'links/show/'.$item->link_id,
@@ -623,10 +783,29 @@ class callback
 		{
 			if ($connected->connected_to_devices_count == 1)
 			{
-				echo html::anchor(
-						'devices/show/'.$connected->connected_to_device_id,
-						$connected->connected_to_device_name
-				);
+				if (Controller::instance()->acl_check_view('Devices_Controller', 'devices'))
+				{
+					echo html::anchor(
+							'devices/show/'.$connected->connected_to_device_id,
+							$connected->connected_to_device_name
+					);
+				}
+				else
+				{
+					echo $connected->connected_to_device_name;
+				}
+				
+				if (Controller::instance()->acl_check_view('Ifaces_Controller', 'iface'))
+				{
+					echo " (". html::anchor(
+							'ifaces/show/'.$connected->connected_to_iface_id,
+							$connected->connected_to_iface_name
+					).")";
+				}
+				else
+				{
+					echo " (".$connected->connected_to_iface_name.")";
+				}
 			}
 			else
 			{
@@ -640,6 +819,32 @@ class callback
 	}
 	
 	/**
+	 * DHCP last access color diff.
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function dhcp_servers_last_access_diff_field($item, $name)
+	{
+		$timeout = Settings::get('dhcp_server_reload_timeout');
+		
+		if (empty($item->$name))
+		{
+			echo '<b class="error_text">' . __('Never') . '</b>';
+		}
+		else if (abs(time() - strtotime($item->$name)) > $timeout)
+		{
+			echo '<b class="error_text">';
+			self::datetime_diff($item, $name);
+			echo '</b>';
+		}
+		else
+		{
+			echo self::datetime_diff($item, $name);
+		}
+	}
+	
+	/**
 	 * Callback function to print e-mail From address
 	 * 
 	 * @author Michal Kliment
@@ -648,7 +853,7 @@ class callback
 	 */
 	public static function email_from_field($item, $name)
 	{
-		if ($item->from_user_id)
+		if (isset($item->from_user_id))
 		{
 			echo html::anchor(
 					'users/show/'.$item->from_user_id,
@@ -671,7 +876,7 @@ class callback
 	 */
 	public static function email_to_field ($item, $name)
 	{
-		if ($item->to_user_id)
+		if (isset($item->to_user_id))
 		{
 			echo html::anchor(
 					'users/show/'.$item->to_user_id,
@@ -694,9 +899,14 @@ class callback
 	 */
 	public static function email_subject_field ($item, $name)
 	{
-		$body = preg_replace('<(br|BR)( ?\/)?>', '\n', $item->body);
-		$body = strip_tags($body);
-		echo "<span class='help' title='".$body."'>".$item->subject."</span>";
+		echo "<span";
+		if (isset($item->body))
+		{
+			$body = strip_tags(nl2br($item->body));
+			$sbody = strip_tags($body);
+			echo " class='help' title='$sbody'";
+		}
+		echo ">$item->subject</span>";
 	}
 	
 	/**
@@ -721,6 +931,51 @@ class callback
 			case Email_queue_Model::STATE_FAIL:
 				echo "<span style='color: red'>".__('Failed')."</span>";
 				break;
+		}
+	}
+	
+	/**
+	 * Callback function to print connection request state
+	 * 
+	 * @author Ondřej Fibich
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function connection_request_state_field($item, $name)
+	{
+		switch ($item->state)
+		{
+			case Connection_request_Model::STATE_UNDECIDED:
+				echo "<span style='color: #999'>".__('Undecided')."</span>";
+				break;
+			
+			case Connection_request_Model::STATE_APPROVED:
+				echo "<span style='color: green'>".__('Approved')."</span>";
+				break;
+			
+			case Connection_request_Model::STATE_REJECTED:
+				echo "<span style='color: red'>".__('Rejected')."</span>";
+				break;
+		}
+		
+		if (isset($item->a_comment) && !empty($item->a_comment))
+		{
+			echo '<span class="help" title="'.$item->a_comment.'">';
+			echo html::image('media/images/icons/comment.png');
+			echo '</span>';
+		}
+		
+		if (isset($item->member_id) && isset($item->a_comment_add) && $item->a_comment_add)
+		{
+			$url = (isset($item->a_comments_thread_id) && $item->a_comments_thread_id) ? 
+						'comments/add/'.$item->a_comments_thread_id :
+						'comments_threads/add/connection_request/'.$item->id;
+			
+			echo html::anchor($url, html::image('media/images/icons/ico_add.gif'), array
+			(
+				'title' => __('Add comment to connection request'),
+				'class'	=> 'popup_link'
+			));
 		}
 	}
 
@@ -836,6 +1091,33 @@ class callback
 	}
 
 	/**
+	 * Callback function to print type of invoice
+	 * 
+	 * @author Jan Dubina
+	 * @param type $item
+	 * @param type $name 
+	 */
+	public static function invoice_type_field ($item, $name)
+	{
+		echo Invoice_Model::get_type($item->$name);
+	}
+	
+	/**
+	 * Callback function to print partner name or company
+	 * 
+	 * @author Jan Dubina
+	 * @param type $item
+	 * @param type $name 
+	 */
+	public static function partner_field ($item, $name)
+	{
+		if (!empty($item->company))
+			echo $item->company;
+		else
+			echo $item->$name;
+	}
+	
+	/**
 	 * Callback field for ip address. Leaves blank ip if needed.
 	 * 
 	 * @author Jiri Svitak
@@ -844,7 +1126,7 @@ class callback
 	 */
 	public static function ip_address_field($item, $name, $args = array())
 	{
-		$class = '';
+		$class = 'popup_link';
 		$title = '';
 		
 		$ip_address = (isset($args[0]) && $args[0]) ?
@@ -1035,9 +1317,10 @@ class callback
 	{
 		echo strftime('%B', mktime(0,0,0,$item->month));
 	}
-	
+
 	/**
 	 * Callback function to print form field for notification action
+	 * 
 	 * @param type $item
 	 * @param type $name
 	 * @param type $input
@@ -1046,58 +1329,88 @@ class callback
 	public static function notification_form_field ($item, $name, $input, $args = array())
 	{
 		$selected = Notifications_Controller::KEEP;
-		switch ($args[0])
-		{
-			case Message_Model::DEBTOR_MESSAGE:
-				
-				if ($item->balance < Settings::get('debtor_boundary')
-					&& !$item->whitelisted
-					&& (!$item->interrupt || ($name == 'redirection' && $item->interrupt))
-					&& ($item->type != Member_Model::TYPE_FORMER || ($name == 'redirection' && $item->type == Member_Model::TYPE_FORMER)))
-				{
-					$selected = Notifications_Controller::ACTIVATE;
-				}
-				
-				break;
-				
-			case Message_Model::PAYMENT_NOTICE_MESSAGE:
-				
-				if ($item->balance >= Settings::get('debtor_boundary')
-					&& $item->balance < Settings::get('payment_notice_boundary')
-					&& (!$item->interrupt || ($name == 'redirection' && $item->interrupt))
-					&& ($item->type != Member_Model::TYPE_FORMER || ($name == 'redirection' && $item->type == Member_Model::TYPE_FORMER))
-					&& !$item->whitelisted)
-				{
-					$selected = Notifications_Controller::ACTIVATE;
-				}
-				
-				break;
-				
-			case Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE:
-				
-				if ($item->interrupt)
-					$selected = Notifications_Controller::ACTIVATE;
-				
-				break;
-				
-			case Message_Model::UNALLOWED_CONNECTING_PLACE_MESSAGE:
-				
-				if (!$item->allowed && (!$item->interrupt || ($name == 'redirection' && $item->interrupt)))
-					$selected = Notifications_Controller::ACTIVATE;
-				
-				break;
-				
-			case Message_Model::USER_MESSAGE:
-				
-				if ((!$item->interrupt || ($name == 'redirection' && $item->interrupt)) && (!$item->whitelisted || ($item->whitelisted && $args[1]==1)))
-					$selected = Notifications_Controller::ACTIVATE;
-				
-				break;
-			
-		}
+		$message = $args[0];
 		
-		$input->selected($selected);
-		echo $input->html();
+		// valid message?
+		if ($message instanceof Message_Model && $message && $message->id)
+		{
+			switch ($message->type)
+			{
+				case Message_Model::DEBTOR_MESSAGE:
+
+					if ($item->balance < Settings::get('debtor_boundary')
+						&& !$item->interrupt
+						&& ($item->type != Member_Model::TYPE_FORMER)
+						&& (!$item->whitelisted || $message->ignore_whitelist))
+					{
+						$selected = Notifications_Controller::ACTIVATE;
+					}
+
+					break;
+
+				case Message_Model::PAYMENT_NOTICE_MESSAGE:
+
+					if ($item->balance >= Settings::get('debtor_boundary')
+						&& $item->balance < Settings::get('payment_notice_boundary')
+						&& !$item->interrupt
+						&& ($item->type != Member_Model::TYPE_FORMER)
+						&& (!$item->whitelisted || $message->ignore_whitelist))
+					{
+						$selected = Notifications_Controller::ACTIVATE;
+					}
+
+					break;
+
+				case Message_Model::USER_MESSAGE:
+
+					if (!$item->interrupt
+						&& ($item->type != Member_Model::TYPE_FORMER)
+						&& (!$item->whitelisted || $message->ignore_whitelist))
+					{
+						$selected = Notifications_Controller::ACTIVATE;
+					}
+
+					break;
+
+			}
+
+			// member notification settings if message is self cancelable
+			// overrides global settings
+			if ($selected == Notifications_Controller::ACTIVATE &&
+				$message->self_cancel != Message_Model::SELF_CANCEL_DISABLED)
+			{
+				switch ($name)
+				{
+					case 'redirection':
+						if (isset($item->notification_by_redirection) &&
+							!$item->notification_by_redirection)
+						{
+							$selected = Notifications_Controller::KEEP;
+							$input->title(__('Disabled in member settings'));
+						}
+						break;
+					case 'email':
+						if (isset($item->notification_by_email) &&
+							!$item->notification_by_email)
+						{
+							$selected = Notifications_Controller::KEEP;
+							$input->title(__('Disabled in member settings'));
+						}
+						break;
+					case 'sms':
+						if (isset($item->notification_by_sms) &&
+							!$item->notification_by_sms)
+						{
+							$selected = Notifications_Controller::KEEP;
+							$input->title(__('Disabled in member settings'));
+						}
+						break;
+				}
+			}
+
+			$input->selected($selected);
+			echo $input->html();
+		}
 	}
 
 	/**
@@ -1181,9 +1494,7 @@ class callback
 	{
 		$message = new Message_Model($item->id);
 		
-		if ($message->type == Message_Model::CONTACT_INFORMATION ||
-			$message->type == Message_Model::CANCEL_MESSAGE ||
-			$message->type == Message_Model::UNKNOWN_DEVICE_MESSAGE)
+		if (!Message_Model::can_be_activate_directly($message->type))
 		{
 			echo '&nbsp;';
 		}
@@ -1204,36 +1515,13 @@ class callback
 	{
 		$message = new Message_Model($item->id);
 		
-		if ($message->type == Message_Model::CONTACT_INFORMATION ||
-			$message->type == Message_Model::CANCEL_MESSAGE ||
-			$message->type == Message_Model::UNKNOWN_DEVICE_MESSAGE)
+		if (!Message_Model::can_be_activate_directly($message->type))
 		{
 			echo '&nbsp;';
 		}
 		else
 		{
 			echo html::anchor('messages/deactivate/'.$message->id, __('Deactivate'));
-		}
-	}
-
-	/**
-	 * Field for deleting messages. Only user messages are allowed to be deleted.
-	 * 
-	 * @author Jiri Svitak
-	 * @param object $item
-	 * @param string $name
-	 */
-	public static function message_delete_field($item, $name)
-	{
-		$message = new Message_Model($item->id);
-		
-		if ($message->type == Message_Model::USER_MESSAGE)
-		{
-			echo html::anchor('messages/delete/'.$message->id, __('Delete'));
-		}
-		else
-		{
-			echo '&nbsp';
 		}
 	}
 
@@ -1287,6 +1575,45 @@ class callback
 				break;
 		}
 	}
+	
+	/**
+	 * Message auto activation settings type field
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public function message_auto_setting_type($item, $name)
+	{
+		echo strtolower(Messages_automatical_activation_Model::get_type_message($item->$name));
+	}
+	
+	/**
+	 * Message auto activation settings attributes field
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public function message_auto_setting_attribute($item, $name)
+	{
+		$ats = Messages_automatical_activation_Model::get_type_attributes($item->type);
+		$attrs = explode('/', $item->attribute);
+		
+		foreach ($ats as $at)
+		{
+			echo array_shift($attrs);
+			
+			if (isset($at['title']))
+			{
+				echo ' (' . __($at['title'], array(), 1) . ')';
+			}
+			
+			if (count($attrs))
+			{
+				echo ', ';
+			}
+		}
+	}
+
 
 	/**
 	 * Callback for object of log
@@ -1571,6 +1898,18 @@ class callback
 	}
 	
 	/**
+	 * Callback function to print port VLAN
+	 * 
+	 * @author Michal Kliment
+	 * @param type $item
+	 * @param type $name
+	 */
+	public static function port_vlan_field($item, $name)
+	{
+		echo '<span class="help" title="'.$item->port_vlan.'">'.$item->port_vlan_tag_802_1q.'</span>';
+	}
+	
+	/**
 	 * Callback function to print count of ports and grouped ports as title
 	 * 
 	 * @author Michal Kliment
@@ -1587,6 +1926,42 @@ class callback
 		{
 			echo $item->ports_count;
 		}
+	}
+	
+	/**
+	 * Callback function to print tax-included price
+	 * 
+	 * @author Jan Dubina
+	 * @param type $item
+	 * @param type $name 
+	 */
+	public static function price_vat_field ($item, $name)
+	{
+		// is vat set?
+		if (isset($item->vat))
+		{
+			$price = $item->$name * (1 + $item->vat);
+		}
+		else
+		{
+			$price = $item->$name;
+		}
+		
+		$price = number_format($price, 2, ',', ' ') . ' ';
+		$price = str_replace(' ', '&nbsp;', $price);
+		
+		// has currency?
+		if (property_exists($item, 'currency'))
+		{
+			$price .= __($item->currency);
+		}
+		// default currency
+		else
+		{
+			$price .= __(Settings::get('currency'));
+		}
+		
+		echo $price;
 	}
 
 	/**
@@ -1624,13 +1999,90 @@ class callback
 	 */
 	public static function registration_field ($item, $name)
 	{
-		if ($item->registration == __('Yes'))
+		if ($item->registration && $item->registration != __('No'))
 		{
 			echo '<span style="color: green">'.__('Yes').'</span>';
 		}
 		else
 		{
 			echo '<span style="color: red">'.__('No').'</span>';
+		}
+	}
+	
+	/**
+	 * Callback function for request type. 
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function request_type($item, $name)
+	{
+		echo Request_Model::get_type_name($item->$name);
+	}
+
+
+	/**
+	 * Callback function to print multiple applicants of membership checkbox
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function member_approve_avaiable ($item, $name)
+	{
+		if (condition::is_applicant_registration($item))
+		{
+			echo form::checkbox('toapprove[]', $item->id, FALSE, 'class="checkbox"');
+		}
+	}
+	
+	/**
+	 * Callback function to print state of login log
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function log_queues_type_field($item, $name)
+	{
+		echo '<b class="error_text" style="background-color:'
+			. Log_queue_Model::get_type_color($item->type) . '">'
+			. Log_queue_Model::get_type_name($item->type) . '<b>';
+	}
+	
+	/**
+	 * Callback function to print state of login log
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function log_queues_state_field($item, $name)
+	{
+		if ($item->state == Log_queue_Model::STATE_NEW)
+		{
+			echo '<b style="color:green">' . __('New') . '</b>';
+		}
+		else
+		{
+			echo __('Closed');
+		}
+		
+		if (isset($item->a_comment) && !empty($item->a_comment))
+		{
+			echo ' <span class="help" title="'.$item->a_comment.'">';
+			echo html::image('media/images/icons/comment.png');
+			echo '</span>';
+		}
+		
+		if (isset($item->id) && isset($item->a_comment_add) && $item->a_comment_add)
+		{
+			$url = (isset($item->a_comments_thread_id) && $item->a_comments_thread_id) ? 
+						'comments/add/'.$item->a_comments_thread_id :
+						'comments_threads/add/log_queue/'.$item->id;
+			
+			echo ' ' . html::anchor($url, html::image('media/images/icons/ico_add.gif'), array
+			(
+				'title' => __('Add comment'),
+				'class'	=> 'popup_link'
+			));
 		}
 	}
 	
@@ -1656,6 +2108,36 @@ class callback
 	public static function link_medium_field ($item, $name)
 	{
 		echo Link_Model::get_medium_type($item->medium);
+	}
+	
+	/**
+	 * Callback to print segment medium as icon
+	 * 
+	 * @author Michal Kliment
+	 * @param type $item
+	 * @param type $name
+	 */
+	public static function link_medium_icon_field ($item, $name)
+	{
+		switch ($item->medium)
+		{
+			case Link_Model::MEDIUM_SINGLE_FIBER:
+			case Link_Model::MEDIUM_MULTI_FIBER:
+				echo html::image(array
+				(
+					'src' => 'media/images/icons/ifaces/sfp.png',
+					'title' => Link_Model::get_medium_type($item->medium)
+				));
+			break;
+		
+			case Link_Model::MEDIUM_CABLE:
+				echo html::image(array
+				(
+					'src' => 'media/images/icons/ifaces/tp.png',
+					'title' => Link_Model::get_medium_type($item->medium)
+				));
+			break;
+		}
 	}
 	
 	/**
@@ -1993,6 +2475,12 @@ class callback
 	 */
 	public static function vote_state_field ($item, $name)
 	{
+		echo "<span style='color: ".Vote_Model::get_state_color($item->state)."'>";
+		echo Vote_Model::get_state_name($item->state);
+		echo "</span>";
+		
+		echo " (";
+		
 		if (property_exists($item, 'vote_comments'))
 		{
 			echo "<span title='$item->vote_comments' class='help'>";
@@ -2008,6 +2496,8 @@ class callback
 		{
 			echo "</span>";
 		}
+		
+		echo ")";
 	}
 	
 	/**
@@ -2036,7 +2526,7 @@ class callback
 	{
 		switch ($item->whitelisted)
 		{
-			case Ip_address_Model::PERNAMENT_WHITELIST:
+			case Ip_address_Model::PERMANENT_WHITELIST:
 				echo __('Permanent whitelist');
 			break;
 			case Ip_address_Model::TEMPORARY_WHITELIST:
@@ -2185,9 +2675,14 @@ class callback
 			);
 			
 			if ($votes->count())
-			{	
+			{
+				$tvotes = array
+				(
+					Vote_Model::DISAGREE => 0,
+					Vote_Model::ABSTAIN => 0,
+					Vote_Model::AGREE => 0
+				);
 				$count_votes = 0;
-				$tvotes = array(-1 => 0, 0 => 0, 1 => 0);
 				$icon = 'abstain';
 				
 				foreach ($votes as $vote)
@@ -2201,7 +2696,21 @@ class callback
 				
 				if ($count_votes > 0)
 				{
-					$icon = ($tvotes[1] == $votes->count()) ? 'agree' : 'disagree';
+					$max = max(array
+					(
+						$tvotes[Vote_Model::DISAGREE],
+						$tvotes[Vote_Model::AGREE],
+						$tvotes[Vote_Model::ABSTAIN]
+					));
+					
+					if ($max == $tvotes[Vote_Model::DISAGREE])
+					{
+						$icon = 'disagree';
+					}
+					else if ($max == $tvotes[Vote_Model::AGREE])
+					{
+						$icon = 'agree';
+					}
 				}
 			
 				echo '<img alt="voted" src="' . url::base() . '/media/images/states/' . $icon . '.png" title="';
@@ -2209,12 +2718,135 @@ class callback
 				if ($count_votes > 0)
 				{
 					echo __('You have voted in') . ' ' . $count_votes . ' ' . __('of') . ' ' . $votes->count() . "\n";
-					echo __('Your votes') . ': ' . $tvotes[1] . '/' . $tvotes[-1] . '/' . $tvotes[0];
+					echo __('Your votes') . ': ' . $tvotes[Vote_Model::AGREE] . '/' 
+						. $tvotes[Vote_Model::DISAGREE] . '/' . $tvotes[Vote_Model::ABSTAIN];
 					echo ' (' . __('Agree') . '/' . __('Disagree') . '/' . __('Abstain') . ')';
 				}
 				
 				echo '" />';
 			}
 		}
+	}
+	
+	/**
+	 * Replaces {ip_address} tag with device's first IP address
+	 * 
+	 * @param string $url_pattern	URL pattern
+	 * @param integer $device_id	Device ID
+	 * @return string
+	 */
+	public static function device_active_link_url_prepare($url_pattern, $device_id)
+	{
+		$controller = Controller::instance();
+		$dm = new Device_Model($device_id);
+		$ip_address_model = new Ip_address_Model();
+		$ips = $ip_address_model->get_ip_addresses_of_device($device_id);
+		
+		// replace {ip_address}
+		if ($ips->current() && $ips->current()->ip_address)
+		{
+			$url_pattern = str_replace('{ip_address}', $ips->current()->ip_address, $url_pattern);
+			
+			$sm = new Subnet_Model();
+			$subnet = $sm->get_subnet_of_ip_address($ips->current()->ip_address);
+			
+			if ($subnet && $subnet->id)
+			{
+				$gw = $dm->get_gateway_of_subnet($subnet->id);
+				
+				if ($gw && $gw->id)
+				{
+					$gw_ip = $ip_address_model->get_ip_addresses_of_device($gw->id);
+					
+					if ($gw_ip->current() && $gw_ip->current()->ip_address)
+					{
+						$url_pattern = str_replace('{gateway_ip}', $gw_ip->current()->ip_address, $url_pattern);
+					}
+				}
+			}
+		}
+		
+		if ($controller->acl_check_view('Devices_Controller', 'login') && 
+			$dm->login);
+		{
+			$url_pattern = str_replace('{login}', $dm->login, $url_pattern);
+		}
+		
+		if ($controller->acl_check_view('Devices_Controller', 'password') && 
+			$dm->password);
+		{
+			$url_pattern = str_replace('{password}', $dm->password, $url_pattern);
+		}
+		
+		return $url_pattern;
+	}
+	
+	/**
+	 * Callback for printing device's active links
+	 * 
+	 * @param object $item
+	 * @param string $name
+	 */
+	public static function device_active_links($item, $name)
+	{
+		$device_active_links_model = new Device_active_link_Model();
+		
+		$active_links = $device_active_links_model->get_device_active_links($item->id);
+		
+		$links = array();
+		
+		foreach ($active_links AS $al)
+		{
+			$link = '';
+			
+			if (($name == 'show_by_user' && $al->show_in_user_grid) ||
+				($name == 'device_grid' && $al->show_in_grid) ||
+				$name == 'device_show'
+				)
+			{
+				$url = callback::device_active_link_url_prepare(htmlspecialchars_decode($al->url_pattern), $item->id);
+
+				if ($url !== NULL)
+				{
+					if ($al->as_form)
+					{
+						// create link using POST method
+						$p = explode('?', $url);
+						
+						if (isset($p[0]))
+						{
+							$url = $p[0];
+						}
+
+						if (isset($p[1]))
+						{
+							// create form
+							parse_str($p[1], $qs);
+							
+							$link = '<form target="_blank" action="'.$url.'" method="post" enctype="multipart/form-data">';
+						
+							foreach ($qs AS $k => $v)
+							{
+								$link .= '<input type="hidden" name="'.$k.'" value="'.$v.'">';
+							}
+
+							$link .= '<a class="as_form" href="'.$url.'" title="'.$al->title.'">'.($al->name? $al->name : $url).'</a></form>';
+						}
+					}
+					else
+					{
+						// create link using GET method
+						$link = '<div><a href="'.$url.'" title="'.$al->title.'" target="_blank">'.($al->name? $al->name : $url).'</a></div>';
+					}
+					
+					if ($link)
+					{
+						$links[] = $link;
+					}
+				}
+			}
+		}
+		
+		echo implode($links);
 	}
 }

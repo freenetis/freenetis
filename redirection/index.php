@@ -58,11 +58,13 @@ if (!preg_match ("/^((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9])\.
 	echo 'Invalid IP address.';
 	die();
 }
+// footer
+$footer = '';
 // content of redirection message
 if (!isset($id))
 {
 	$message_query = "
-	SELECT ms.id, ms.text, ms.self_cancel, ip.ip_address, ip.whitelisted,
+	SELECT ms.id, ms.text, ms.self_cancel, ip.ip_address,
 		subnet_name, mm.name AS member_name, mm.id AS member_id,
 		(
 			SELECT GROUP_CONCAT(vs.variable_symbol) AS variable_symbol
@@ -74,7 +76,7 @@ if (!isset($id))
 		IFNULL(ip.login, u.login) AS login
 	FROM
 	(
-		SELECT ip.id, ip.ip_address, ip.whitelisted, s.name AS subnet_name,
+		SELECT ip.id, ip.ip_address, s.name AS subnet_name,
 			IFNULL(ip.member_id,u.member_id) AS member_id, u.login
 		FROM ip_addresses ip
 		LEFT JOIN ifaces i ON ip.iface_id = i.id
@@ -96,7 +98,6 @@ else
 {
 	$message_query = "
 	SELECT ms.id, ms.text, ms.self_cancel, '$ip_address' AS ip_address,
-		ip.whitelisted,
 		IFNULL(IFNULL(subnet_name, us.name),'???') AS subnet_name,
 		IFNULL(mm.name,'???') AS member_name, IFNULL(mm.id,'???') AS member_id,
 		(
@@ -111,7 +112,7 @@ else
 	FROM messages ms
 	LEFT JOIN
 	(
-		SELECT ip.id, ip.ip_address, ip.whitelisted, s.name AS subnet_name,
+		SELECT ip.id, ip.ip_address, s.name AS subnet_name,
 			IFNULL(ip.member_id,u.member_id) AS member_id, u.login
 		FROM ip_addresses ip
 		LEFT JOIN ifaces i ON ip.iface_id = i.id
@@ -174,6 +175,58 @@ else
 	$message_result = mysql_query($message_query, $link) or die(mysql_error());
 	$message = mysql_fetch_array($message_result);
 	$content = $message['text'];
+	
+	// connection requests enabled?
+	$cr_query = "SELECT name, value FROM config WHERE name = 'connection_request_enable'";
+	$cr_result = mysql_query($cr_query, $link) or die(mysql_error());
+	$cr_array = mysql_fetch_array($cr_result);
+	$cr_enabled = ($cr_array && isset($cr_array['value']) && $cr_array['value']);
+
+	if ($cr_enabled)
+	{
+		// get subnet id
+		$subnet_id_query = "
+			SELECT id
+			FROM subnets s
+			WHERE inet_aton(netmask) & inet_aton('$ip_address') = inet_aton(network_address)";
+		$subnet_id_result = mysql_query($subnet_id_query, $link) or die(mysql_error());
+		$subnet_id_array = mysql_fetch_array($subnet_id_result);
+		
+		// display link
+		if ($subnet_id_array && isset($subnet_id_array['id']) && $subnet_id_array['id'])
+		{
+			// alt for link
+			$alt_options = array
+			(
+				'cs' => 'ZAŽÁDAT O PŘIPOJENÍ TOHOTO ZAŘÍZENÍ',
+				'en' => 'REQUEST FOR CONNECTING OF THIS DEVICE'
+			);
+			
+			$lang_shortcut = 'en';
+			$alt = $alt_options[$lang_shortcut];	// default
+
+			// Look for HTTP_ACCEPT_LANGUAGE for language
+			if (isset($_SERVER['HTTP_ACCEPT_LANGUAGE']))
+			{
+				foreach (explode(',', $_SERVER['HTTP_ACCEPT_LANGUAGE']) as $part)
+				{
+					$lang = substr($part, 0, 2);
+
+					if ($lang != 'en' && array_key_exists($lang, $alt_options))
+					{
+						$lang_shortcut = $lang;
+						$alt = $alt_options[$lang];
+						break;
+					}
+				}
+			}
+		
+			// display
+			$footer = '<a class="cancel_link" href="../' . $lang_shortcut . '/connection_requests/add/'
+					. $subnet_id_array['id'] . '/' . $ip_address . '">' . $alt . '</a>';
+		}
+
+	}
 }
 // text in left contact panel,
 // it asssumed that after installation, there is always contact message with ID 1
@@ -205,19 +258,18 @@ if ($suffix_array &&
 }
 
 // self cancelable messages have additional anchor for self canceling placed in footer
-$sct_query = "SELECT name, value FROM config WHERE name = 'self_cancel_text'";
-$sct_result = mysql_query($sct_query, $link) or die(mysql_error());
-$sct_array = mysql_fetch_array($sct_result);
-if (!$sct_array)
-{
-	echo 'self_cancel_text has not been set, configure your redirection settings.';
-	die();
-}
-$sct = $sct_array['value'];
 if (isset($message['self_cancel']) && $message['self_cancel'] > 0)
+{
+	$sct_query = "SELECT name, value FROM config WHERE name = 'self_cancel_text'";
+	$sct_result = mysql_query($sct_query, $link) or die(mysql_error());
+	$sct_array = mysql_fetch_array($sct_result);
+	$sct = 'OK, I am aware';
+	if ($sct_array)
+	{
+		$sct = $sct_array['value'];
+	}
 	$footer = '<a class="cancel_link" href="cancel.php?redirect_to='.$redirect_to.'">'.$sct.'</a>';
-else
-	$footer = '';
+}
 // close database connection
 mysql_close($link);
 ?>
@@ -229,8 +281,8 @@ mysql_close($link);
 <meta http-equiv="Cache-Control" content="no-cache" />
 <meta http-equiv="pragma" content="no-cache" />
 <meta http-equiv="expires" content="-1" />
-<title>Freenetis</title>
-<?php // echo str_replace('https', 'http', html::stylesheet('media/css/style.css', 'screen')) ?>
+<title>FreenetIS</title>
+<link href="../media/images/favicon.ico" rel="shorcut icon" type="image/x-icon" />
 <link href="../media/css/style.css" rel="stylesheet" type="text/css" />
 <style type="text/css">
 #content-padd h2 {margin: 10px 0px;}
@@ -242,6 +294,9 @@ a.cancel_link	{
 	color: red;
 	font-size: 14px;
 }
+</style>
+<style type="text/css" media="handheld, screen and (max-device-width: 640px)">
+#content-padd {margin-right: 20px;width: auto;}
 </style>
 </head>
 <body>
@@ -267,7 +322,7 @@ a.cancel_link	{
 			</div>
 		</div>
 		<div id="content">
-			<div id="content-padd" style="margin:10px">
+			<div id="content-padd">
 				<?php echo $content; ?>
 			</div>
 		</div>

@@ -19,31 +19,15 @@
  */
 class Approval_types_Controller extends Controller
 {
-	public static $vote_options = array();
-	
-	public static $types = array
-	(
-		1 => 'Simple majority',
-		2 => 'Absolute majority',
-	);
-
 	public function __construct()
 	{
 		parent::__construct();
 		
-		self::$vote_options = array
-		(
-			NULL	=> __('None'),
-			1		=> __('Agree'),
-			-1		=> __('Disagree'),
-			0		=> __('Abstain')
-		);
-
-		self::$types = array
-		(
-			1		=> __('Simple majority'),
-			2		=> __('Absolute majority')
-		);
+		// approval are not enabled
+	    if (!Settings::get('approval_enabled'))
+		{
+			self::error(ACCESS);
+		}
 	}
 
 	/**
@@ -70,11 +54,11 @@ class Approval_types_Controller extends Controller
 	{
 		//access control
 		if (!$this->acl_check_view('approval', 'types'))
-			Controller::error(ACCESS);
+			self::error(ACCESS);
 		
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$approval_type_model = new Approval_type_Model();
 		$total_approval_types = $approval_type_model->count_all();
@@ -125,17 +109,27 @@ class Approval_types_Controller extends Controller
 				->label('Percent for majority')
 				->callback('callback::percent');
 		
+		/* TODO: #815
 		$grid->order_callback_field('interval')
 				->label('Interval')
 				->callback('Approval_types_Controller::interval_field');
 		
 		$grid->order_callback_field('default_vote')
 				->label('Default vote')
-				->callback('Approval_types_Controller::default_vote_field');
+				->callback('Approval_types_Controller::default_vote_field');*/
 		
 		$grid->order_callback_field('min_suggest_amount')
 				->label('Minimal suggest amount')
 				->callback('Approval_types_Controller::min_suggest_amount_field');
+		
+		$actions = $grid->grouped_action_field();
+		
+		if ($this->acl_check_new('approval', 'types'))
+		{
+			$actions->add_action('id')
+					->icon_action('show')
+					->url('approval_types/show');
+		}
 		
 		$grid->datasource($approval_types);
 
@@ -158,17 +152,17 @@ class Approval_types_Controller extends Controller
 	{
 		// access control
 		if (!$this->acl_check_view('approval', 'types'))
-			Controller::error('ACCESS');
+			self::error('ACCESS');
 
 		// bad parameter
 		if (!$approval_type_id || !is_numeric($approval_type_id))
-			Controller::warning(PARAMETER);
+			self::warning(PARAMETER);
 
 		$approval_type = new Approval_type_Model($approval_type_id);
 
 		// record doesn't exist
 		if (!$approval_type->id)
-			Controller::error(RECORD);
+			self::error(RECORD);
 
 		$state = $approval_type->get_state($approval_type->id);
 		
@@ -199,7 +193,7 @@ class Approval_types_Controller extends Controller
 	{
 		// access control
 		if (!$this->acl_check_new('approval', 'types'))
-			Controller::error('ACCESS');
+			self::error('ACCESS');
 
 		$aro_group_model = new Aro_group_Model();
 		$aro_groups = $aro_group_model->get_traverz_tree();
@@ -233,16 +227,23 @@ class Approval_types_Controller extends Controller
 				->label('Group')
 				->options($arr_aro_groups)
 				->rules('required')
-				->style('width:500px');
+				->style('width:500px')
+				->help('Who votes');
 		
 		$form->input('min_suggest_amount')
 				->label('Minimal suggest amount')
-				->rules('valid_numeric');
+				->rules('valid_numeric')
+				->help(help::hint('approval_type_min_suggested_amount'));
+		
+		$form->checkbox('one_vote')
+			->label('Single vote is enough?')
+			->value('1')
+			->help(help::hint('approval_type_one_vote'));
 		
 		$form->group('Type');
 		
 		$form->dropdown('type')
-				->options(self::$types)
+				->options(Approval_type_Model::get_type_names())
 				->rules('required')
 				->style('width:200px');
 		
@@ -252,6 +253,7 @@ class Approval_types_Controller extends Controller
 				->value('51')
 				->callback(array($this, 'valid_majority_percent'));
 		
+		/* TODO: #815
 		$form->group('Time constraints');
 		
 		$form->input('interval')
@@ -260,8 +262,8 @@ class Approval_types_Controller extends Controller
 				->callback(array($this, 'valid_interval'));
 		
 		$form->dropdown('default_vote')
-				->options(self::$vote_options)
-				->callback(array($this, 'valid_default_vote'));
+				->options(Vote_Model::get_vote_options(NULL, NULL, TRUE))
+				->callback(array($this, 'valid_default_vote'));*/
 
 		$form->submit('Save');
 
@@ -276,13 +278,20 @@ class Approval_types_Controller extends Controller
 			$at->aro_group_id = $form_data['aro_group_id'];
 			$at->type = $form_data['type'];
 			$at->majority_percent = $form_data['majority_percent'];
-			$at->interval = date::from_interval($form_data['interval']);
+			/* TODO: #815
+			$at->interval = date::from_interval($form_data['interval']); */
 			$at->min_suggest_amount = $form_data['min_suggest_amount'];
-			$at->save();
-
-			status::success('Approval type has been successfully added.');
+			$at->one_vote = ($form_data['one_vote'] == 1);
 			
-			$this->redirect('approval_types/show/', $at->id);
+			if ($at->save())
+			{
+				status::success('Approval type has been successfully added.');
+				$this->redirect('approval_types/show/', $at->id);
+			}
+			else
+			{
+				status::success('Approval type has not been added.');
+			}
 		}
 	
 		// headline
@@ -316,17 +325,17 @@ class Approval_types_Controller extends Controller
 	{
 		// access control
 		if (!$this->acl_check_edit('approval', 'types'))
-			Controller::error('ACCESS');
+			self::error('ACCESS');
 
 		// bad parameter
 		if (!$approval_type_id || !is_numeric($approval_type_id))
-			Controller::warning(PARAMETER);
+			self::warning(PARAMETER);
 
 		$at = new Approval_type_Model($approval_type_id);
 
 		// record doesn't exist
 		if (!$at->id)
-			Controller::error(RECORD);
+			self::error(RECORD);
 
 		$state = $at->get_state($at->id);
 
@@ -352,10 +361,10 @@ class Approval_types_Controller extends Controller
 			$arr_aro_groups[$aro_group->id] = $ret.__(''.$aro_group->name);
 		}
 
-		$interval = date::interval($at->interval);
+		/* TODO: #815 $interval = date::interval($at->interval); */
 
 		// form
-		$form = new Forge(url_lang::base().'approval_types/edit/'.$at->id);
+		$form = new Forge('approval_types/edit/'.$at->id);
 
 		$form->group('Basic information');
 		
@@ -368,28 +377,37 @@ class Approval_types_Controller extends Controller
 				->value($at->comment);
 		
 		$form->dropdown('aro_group_id')
-				->label(__('Group').':')
+				->label('Group')
 				->options($arr_aro_groups)->rules('required')
-				->selected($at->aro_group_id);
+				->selected($at->aro_group_id)
+				->help('Who votes');
 		
 		$form->input('min_suggest_amount')
-				->label(__('Minimal suggest amount').':')
+				->label('Minimal suggest amount')
 				->rules('valid_numeric')
-				->value($at->min_suggest_amount);
+				->value($at->min_suggest_amount)
+				->help(help::hint('approval_type_min_suggested_amount'));
+		
+		$form->checkbox('one_vote')
+			->label('Single vote is enough?')
+			->value('1')
+			->help(help::hint('approval_type_one_vote'))
+			->checked($at->one_vote);
 		
 		$form->group('Type');
 		
 		$form->dropdown('type')
-				->options(self::$types)
+				->options(Approval_type_Model::get_type_names())
 				->rules('required')
 				->selected($at->type);
 		
 		$form->input('majority_percent')
-				->label(__('Percent for majority').':')
+				->label('Percent for majority')
 				->rules('valid_numeric')
 				->value($at->majority_percent)
 				->callback(array($this,'valid_majority_percent'));
 		
+		/* TODO: #815
 		$form->group('Time constraints');
 		
 		$form->input('interval')
@@ -399,13 +417,13 @@ class Approval_types_Controller extends Controller
 				->callback(array($this,'valid_interval'));
 		
 		$form->dropdown('default_vote')
-				->label(__('Default vote').':')
-				->options(self::$vote_options)
+				->label('Default vote')
+				->options(Vote_Model::get_vote_options(NULL, NULL, TRUE))
 				->selected($at->default_vote)
-				->callback(array($this,'valid_default_vote'));
+				->callback(array($this,'valid_default_vote'));*/
 
 		$form->submit('submit')
-				->value(__('Save'));
+				->value('Save');
 
 		// form is validate
 		if ($form->validate())
@@ -418,19 +436,32 @@ class Approval_types_Controller extends Controller
 			$at->aro_group_id = $form_data['aro_group_id'];
 			$at->type = $form_data['type'];
 			$at->majority_percent = $form_data['majority_percent'];
+			
+			/* TODO: #815
 			$at->interval = date::from_interval($form_data['interval']);
+			
 
 			if ($form_data['default_vote'] != NULL)
+			{
 				$at->default_vote = $form_data['default_vote'];
+			}
 			else
+			{
 				$at->default_vote = NULL;
+			}*/
 
 			$at->min_suggest_amount = $form_data['min_suggest_amount'];
+			$at->one_vote = ($form_data['one_vote'] == 1);
 			
-			$at->save();
-
-			status::success('Approval type has been successfully updated.');
-			url::redirect('approval_types/show/'.$at->id);
+			if ($at->save())
+			{
+				status::success('Approval type has been successfully updated.');
+				url::redirect('approval_types/show/'.$at->id);
+			}
+			else
+			{
+				status::success('Approval type has not been updated.');	
+			}
 		}
 		
 		// breadcrums
@@ -461,17 +492,17 @@ class Approval_types_Controller extends Controller
 	{
 		// access control
 		if (!$this->acl_check_delete('approval', 'types'))
-			Controller::error('ACCESS');
+			self::error('ACCESS');
 
 		// bad parameter
 		if (!$approval_type_id || !is_numeric($approval_type_id))
-			Controller::warning(PARAMETER);
+			self::warning(PARAMETER);
 
 		$at = new Approval_type_Model($approval_type_id);
 
 		// record doesn't exist
 		if (!$at->id)
-			Controller::error(RECORD);
+			self::error(RECORD);
 
 		$state = $at->get_state($at->id);
 
@@ -482,10 +513,15 @@ class Approval_types_Controller extends Controller
 			url::redirect('approval_types/show/'.$at->id);
 		}
 		
-		$at->delete();
-		
-		status::success('Approval type has been successfully deleted.');
-		url::redirect('approval_types/show_all');
+		if ($at->delete())
+		{
+			status::success('Approval type has been successfully deleted.');
+			url::redirect('approval_types/show_all');
+		}
+		else
+		{
+			status::success('Approval type has not been deleted.');
+		}
 	}
 
 	/* CALLBACK FUNCTIONS */
@@ -499,7 +535,7 @@ class Approval_types_Controller extends Controller
 	 */
 	protected static function type_field($item, $name)
 	{
-		echo __(''.self::$types[$item->type]);
+		echo Approval_type_Model::get_type_name($item->type);
 	}
 
 	/**
@@ -527,7 +563,9 @@ class Approval_types_Controller extends Controller
 	protected static function interval_field($item, $name)
 	{
 		if (!$item->interval)
+		{
 			echo __('None');
+		}
 		else
 		{
 			$interval = date::interval($item->interval);
@@ -544,7 +582,7 @@ class Approval_types_Controller extends Controller
 	 */
 	protected static function default_vote_field($item, $name)
 	{
-		echo self::$vote_options[$item->default_vote];
+		echo Vote_Model::get_vote_option_name($item->default_vote, TRUE);
 	}
 
 	/**
@@ -567,6 +605,7 @@ class Approval_types_Controller extends Controller
 		}
 	}
 
+	/* VALIDATORS */
 
 	/**
 	 * Callback function

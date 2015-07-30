@@ -6,10 +6,10 @@ if (isset($submenu))
 
 $links = array();
 
-if ($this->acl_check_edit('Devices_Controller', 'iface', $iface->device->user->member_id))
+if ($this->acl_check_edit('Ifaces_Controller', 'iface', $iface->device->user->member_id))
 	$links[] = html::anchor('ifaces/edit/'.$iface->id, __('Edit'));
 
-if ($this->acl_check_delete('Devices_Controller', 'iface', $iface->device->user->member_id))
+if ($this->acl_check_delete('Ifaces_Controller', 'iface', $iface->device->user->member_id))
 	$links[] = html::anchor('ifaces/delete/'.$iface->id, __('Delete'));
 
 echo implode(' | ', $links);
@@ -65,7 +65,7 @@ echo implode(' | ', $links);
 		<td><?php echo  $iface->mac ?></td>
 	</tr>
 	<?php endif; ?>
-	<?php if (isset($iface->wireless_mode)): ?>
+	<?php if (isset($iface->wireless_mode) && $iface->wireless_mode): ?>
 	<tr>
 		<th><?php echo  __('Wireless mode') ?></th>
 		<td><?php echo Iface_Model::get_wireless_mode($iface->wireless_mode) ?></td>
@@ -87,7 +87,11 @@ echo implode(' | ', $links);
 	</tr>
 	<tr>
 		<th><?php echo __('Name') ?></th>
-		<td><?php echo html::anchor('links/show/'.$iface->link->id, $iface->link->name)?></td>
+		<?php if ($this->acl_check_view('Links_Controller', 'link')): ?>
+		<td><?php echo html::anchor('links/show/'.$iface->link->id, $iface->link->name) ?></td>
+		<?php else: ?>
+		<td><?php echo $iface->link->name ?></td>
+		<?php endif ?>
 	</tr>
 	<tr>
 		<th><?php echo __('Medium') ?></th>

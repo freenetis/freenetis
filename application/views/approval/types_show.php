@@ -30,16 +30,21 @@ echo implode(' | ', $links);
 	</tr>
 	<tr>
 		<th><?php echo __('Minimal suggest amount') ?></th>
-		<td><?php echo $approval_type->min_suggest_amount ?></td>
+		<td><?php echo money::format($approval_type->min_suggest_amount) ?></td>
 	</tr>
 	<tr>
 		<th><?php echo __('Type') ?></th>
-		<td><?php echo Approval_types_Controller::$types[$approval_type->type] ?></td>
+		<td><?php echo Approval_type_Model::get_type_name($approval_type->type) ?></td>
 	</tr>
 	<tr>
-		<th><?php echo __('Percent for majority') ?></th>
+		<th><?php echo __('Percent for majority') ?> <?php echo help::hint('approval_type_min_suggested_amount') ?></th>
 		<td><?php echo $approval_type->majority_percent ?>%</td>
 	</tr>
+	<tr>
+		<th><?php echo __('Single vote is enough?') ?> <?php echo help::hint('approval_type_one_vote') ?></th>
+		<td><?php echo ($approval_type->one_vote) ? __('Yes') : __('No') ?></td>
+	</tr>
+	<?php /* TODO: #815
 	<tr>
 		<th><?php echo __('Interval') ?></th>
 		<td><?php
@@ -50,6 +55,7 @@ echo implode(' | ', $links);
 	</tr>
 	<tr>
 		<th><?php echo __('Default vote') ?></th>
-		<td><?php echo Approval_types_Controller::$vote_options[$approval_type->default_vote]; ?></td>
+		<td><?php echo Vote_Model::get_vote_option_name($approval_type->default_vote, TRUE); ?></td>
 	</tr>
+	 */ ?>
 </table>

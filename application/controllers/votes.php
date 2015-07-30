@@ -21,85 +21,185 @@
  */
 class Votes_Controller extends Controller
 {
-
 	/**
-	 * Function adds vote to work
+	 * Only checks whether approval are enabled
 	 * 
 	 * @author Michal Kliment
-	 * @param integer $work_id id of work
 	 */
-	public function add_to_work($work_id = NULL)
+	public function __construct()
+	{
+	    parent::__construct();
+	    
+	    // approval are not enabled
+	    if (!Settings::get('approval_enabled'))
+			Controller::error (ACCESS);
+	}
+
+	/**
+	 * Function adds vote to work or request
+	 * 
+	 * @author Michal Kliment
+	 * @param type $type Type of item to vote
+	 * @param type $fk_id ID of itemto vote
+	 */
+	public function add ($type = '', $fk_id = NULL)
 	{
 		// is parameter set?
-		if (!$work_id || !is_numeric($work_id))
+		if (!$fk_id || !is_numeric($fk_id))
 			Controller::warning(PARAMETER);
+		
+		$breadcrumbs = breadcrumbs::add();
+		
+		switch ($type)
+		{
+			// it's vote to work
+			case Vote_Model::WORK:
+				
+				// works are not enabled
+				if (!Settings::get('works_enabled'))
+					Controller::error (ACCESS);
+				
+				// create work object
+				$object = new Job_Model($fk_id);
 
-		// create work object
-		$work = new Job_Model($work_id);
-
-		// work doesn't exist
-		if (!$work->id || $work->job_report_id)
-			Controller::error(RECORD);
+				// work doesn't exist
+				if (!$object->id || $object->job_report_id)
+					Controller::error(RECORD);
+				
+				if (Path::instance()->uri(TRUE)->previous(0,1) == 'users')
+				{
+					$breadcrumbs->link('members/show_all', 'Members',
+									$this->acl_check_view('Members_Controller', 'members'))
+							->disable_translation()
+							->link('members/show/' . $object->user->member->id,
+									'ID ' . $object->user->member->id . ' - ' . $object->user->member->name,
+									$this->acl_check_view('Members_Controller', 'members', $object->user->member->id))
+							->enable_translation()
+							->link('users/show_by_member/' . $object->user->member_id, 'Users',
+									$this->acl_check_view('Users_Controller', 'users', $object->user->member_id))
+							->link('users/show/' . $object->user->id,
+									$object->user->name . " " . $object->user->surname . " (" . $object->user->login . ")",
+									$this->acl_check_view('Users_Controller', 'users', $object->user->member_id))
+							->link('works/show_by_user/' . $object->user->id, 'Works',
+									$this->acl_check_view('Works_Controller', 'work', $object->user->member_id))
+							->disable_translation()
+							->link('users/show_work/' . $object->id, __('ID') . ' ' . $object->id,
+									$this->acl_check_view('Works_Controller', 'work', $object->user->member_id))
+							->enable_translation();
+				}
+				else
+				{
+					$breadcrumbs
+							->link('works/pending', 'Works',
+								$this->acl_check_view('Works_Controller', 'work'))
+							->disable_translation()
+							->link('works/show/' . $object->id, 
+									__('ID') . ' ' . $object->id,
+									$this->acl_check_view('Works_Controller', 'work', $object->user->member_id))
+							->enable_translation();
+				}
+				
+				$breadcrumbs->text('Add vote');
+				
+				$object_url = Path::instance()->uri(TRUE)->previous();
+				
+				break;
+			
+			// it's vote to request
+			case Vote_Model::REQUEST:
+				
+				$object = new Request_Model($fk_id);
+				
+				// request doesn't exist
+				if (!$object->id)
+					Controller::error(RECORD);
+				
+				if (Path::instance()->uri(TRUE)->previous(0,1) == 'users')
+				{
+					$breadcrumbs->link('members/show_all', 'Members',
+									$this->acl_check_view('Members_Controller', 'members'))
+							->disable_translation()
+							->link('members/show/' . $object->user->member->id,
+									'ID ' . $object->user->member->id . ' - ' . $object->user->member->name,
+									$this->acl_check_view('Members_Controller', 'members', $object->user->member->id))
+							->enable_translation()
+							->link('users/show_by_member/' . $object->user->member_id, 'Users',
+									$this->acl_check_view('Users_Controller', 'users', $object->user->member_id))
+							->link('users/show/' . $object->user->id,
+									$object->user->name . " " . $object->user->surname . " (" . $object->user->login . ")",
+									$this->acl_check_view('Users_Controller', 'users', $object->user->member_id))
+							->link('requests/show_by_user/' . $object->user->id, 'Requests',
+									$this->acl_check_view('Requests_Controller', 'request', $object->user->member_id))
+							->disable_translation()
+							->link('users/show_request/' . $object->id, __('ID') . ' ' . $object->id,
+									$this->acl_check_view('Requests_Controller', 'request', $object->user->member_id))
+							->enable_translation();
+				}
+				else
+				{
+					$breadcrumbs
+							->link('works/request', 'Requests',
+								$this->acl_check_view('Requests_Controller', 'request'))
+							->disable_translation()
+							->link('requests/show/' . $object->id, 
+									__('ID') . ' ' . $object->id,
+									$this->acl_check_view('Requests_Controller', 'request', $object->user->member_id))
+							->enable_translation();
+				}
+				
+				$breadcrumbs->text('Add vote');
+				
+				$object_url = Path::instance()->uri(TRUE)->previous();
+				
+				break;
+			
+			default:
+				Controller::warning(PARAMETER);
+				break;
+		}
 
 		$approval_template_item_model = new Approval_template_item_Model();
 		
 		$aro_group = $approval_template_item_model->get_aro_group_by_approval_template_id_and_user_id(
-				$work->approval_template_id, $this->session->get('user_id'),
-				$work->suggest_amount
+				$object->approval_template_id, $this->user_id,
+				$object->suggest_amount
 		);
 				
 		$vote_rights = $approval_template_item_model->check_user_vote_rights(
-				$work->id, $this->user_id
+				$object, $type, $this->user_id, $object->suggest_amount
 		);
 
 		// access control
 		if (!$aro_group || !$aro_group->id || !$vote_rights)
 			Controller::error(ACCESS);
 
-		// work is locked => cannot add vote
-		if ($work->state > 1)
+		// object is locked => cannot add vote
+		if ($object->state > 1)
 		{
-			status::warning('It is not possible vote about locked work.');
-			url::redirect('works/show/'.$work->id);
-		}
-
-		// work is on work report => cannot vote this way
-		if ($work->job_report_id)
-		{
-			status::warning('It is not possible vote this way about work on work report.');
-			url::redirect('works/show/'.$work->id);
+			status::warning('It is not possible vote about locked item.');
+			url::redirect($object_url);
 		}
 
 		$vote_model = new Vote_Model();
 		
-		$vote = $vote_model->where('user_id', $this->session->get('user_id'))
-				->where('type',Vote_Model::WORK)
-				->where('fk_id', $work->id)
+		$vote = $vote_model->where('user_id', $this->user_id)
+				->where('type', $type)
+				->where('fk_id', $object->id)
 				->find();
 
 		// vote about this work already exists
 		if ($vote && $vote->id)
 		{
-			status::warning('You cannot vote twice about same work!');
-			url::redirect('works/show/'.$work->id);
+			status::warning('You cannot vote twice about same item!');
+			url::redirect($object_url);
 		}
+	
+		$vote_options = Vote_Model::get_vote_options(
+			$type,
+			$object->user_id == $this->user_id
+		);
 
-		if ($work->user_id != $this->session->get('user_id'))
-		{
-			$vote_options = array
-			(
-				1	=> __('Agree'),
-				-1	=> __('Disagree'),
-				0	=> __('Abstain')
-			);
-		}
-		else
-		{
-			// nobody cannot approve his own work
-			$vote_options = array(0 => __('Abstain'));
-		}
-
-		$form = new Forge(url::base(TRUE).url::current(TRUE));
+		$form = new Forge();
 
 		$form->dropdown('vote')
 				->options($vote_options);
@@ -113,186 +213,177 @@ class Votes_Controller extends Controller
 		if ($form->validate())
 		{
 			$form_data = $form->as_array();
-			$mail_message = new Mail_message_Model();
-			$user = new User_Model();
-
-			$vote = new Vote_Model();
-			$vote->user_id = $this->session->get('user_id');
-			$vote->type = Vote_Model::WORK;
-			$vote->fk_id = $work->id;
-			$vote->aro_group_id = $aro_group->id;
-			$vote->vote = $form_data['vote'];
-			$vote->comment = $form_data['comment'];
-			$vote->time = date('Y-m-d H:i:s');
-			$vote->save();
 			
-			$work->state = $work->get_state(Vote_Model::WORK);
-
-			// work is approved
-			if ($work->state == 3)
+			try
 			{
-				// creates new transfer
-				$account_model = new Account_Model();
+				$object->transaction_start();
 				
-				$operating_id = $account_model->where(
-						'account_attribute_id', Account_attribute_Model::OPERATING
-				)->find()->id;
-				
-				$credit_id = $account_model->where('member_id', $work->user->member_id)
-						->where('account_attribute_id', Account_attribute_Model::CREDIT)
-						->find()->id;
+				$user = new User_Model($this->user_id);
 
-				$transfer_id = Transfer_Model::insert_transfer(
-					$operating_id, $credit_id, null, null,
-						$this->session->get('user_id'),
-					null, date('Y-m-d'), date('Y-m-d H:i:s'),
-					__('Work approval'), $work->suggest_amount
+				// add new vote
+				Vote_Model::insert(
+					$this->user_id,
+					$type,
+					$object->id,
+					$form_data['vote'],
+					$form_data['comment'],
+					$aro_group->id
 				);
-
-				$work->transfer_id = $transfer_id;
-			}
-
-			// saves work
-			$work->save();
-			
-			ORM::factory ('member')
-					->reactivate_messages($work->user->member_id);
-
-			// is not necessary send message to user who voted about his work
-			if ($vote->user_id != $work->user_id)
-			{
-				$user->clear();
-				$user->where('id', $vote->user_id)->find();
-
-				switch ($work->state)
+				
+				switch ($type)
 				{
-					// work is pending
-					case 1:
-						$your_subject = mail_message::format('your_work_vote_add_subject');
-						$your_body = mail_message::format('your_work_vote_add', array
-						(
-							$user->name.' '.$user->surname,
-							url_lang::base().'works/show/'.$work->id
-						));
-						break;
-
-					// work is rejected
-					case 2:
-						$your_subject = mail_message::format('your_work_reject_subject');
-						$your_body = mail_message::format('your_work_reject', array
-						(
-							$user->name.' '.$user->surname,
-							url_lang::base().'works/show/'.$work->id
-						));
-						break;
-
-					// work is approved
-					case 3:
-						$your_subject = mail_message::format('your_work_approved_subject');
-						$your_body = mail_message::format('your_work_approved', array
-						(
-							$user->name.' '.$user->surname,
-							url_lang::base().'works/show/'.$work->id
-						));
-						break;					
-				}
-
-				$mail_message->clear();
-				$mail_message->from_id = 1;
-				$mail_message->to_id = $work->user_id;
-				$mail_message->subject = $your_subject;
-				$mail_message->body = $your_body;
-				$mail_message->time = date('Y-m-d H:i:s');
-				$mail_message->from_deleted = 1;
-				$mail_message->save();
-			}
-
-			// finds all aro ids assigned to vote about this work
-			$aro_ids = $approval_template_item_model->get_aro_ids_by_approval_template_id(
-					$work->approval_template_id, $work->suggest_amount
-			);
-
-			// count of aro ids is not null
-			if (count($aro_ids))
-			{
-				// finds user to whom belongs work
-				$user->clear();
-				$user->where('id', $work->user_id)->find();
-				$work_user = $user->name.' '.$user->surname;
-
-				$user->clear();
-				$user->where('id', $vote->user_id)->find();
-				$vote_user = $user->name.' '.$user->surname;
-
-				switch ($work->state)
-				{
-					// work is pending
-					case 1;
+					case Vote_Model::WORK:
 						$subject = mail_message::format('work_vote_add_subject');
 						$body = mail_message::format('work_vote_add', array
 						(
-							$vote_user, $work_user,
-							url_lang::base().'works/show/'.$work->id
+							$user->name.' '.$user->surname,
+							$object->user->name.' '.$object->user->surname,
+							url_lang::base().'works/show/'.$object->id
 						));
 						break;
 					
-					// work is rejected
-					case 2:
-						$subject = mail_message::format('work_reject_subject');
-						$body = mail_message::format('work_reject', array
+					case Vote_Model::REQUEST:
+						$subject = mail_message::format('request_vote_add_subject');
+						$body = mail_message::format('request_vote_add', array
 						(
-							$vote_user, $work_user,
-							url_lang::base().'works/show/'.$work->id
-						));
-						break;
-
-					// work is approved
-					case 3:
-						$subject = mail_message::format('work_approved_subject');
-						$body = mail_message::format('work_approved', array
-						(
-							$vote_user, $work_user,
-							url_lang::base().'works/show/'.$work->id
+							$user->name.' '.$user->surname,
+							$object->user->name.' '.$object->user->surname,
+							url_lang::base().'requests/show/'.$object->id
 						));
 						break;
 				}
 
-				foreach ($aro_ids as $aro)
+				// send message about vote adding to all watchers
+				Mail_message_Model::send_system_message_to_item_watchers(
+					$subject,
+					$body,
+					$type,
+					$object->id
+				);
+
+				$object->state = Vote_Model::get_state($object);
+
+				switch ($object->state)
 				{
-					// is not necessary send message to  user who added vote
-					if ($aro->id != $this->session->get('user_id'))
-					{
-						// sends message
-						$mail_message->clear();
-						$mail_message->from_id = 1;
-						$mail_message->to_id = $aro->id;
-						$mail_message->subject = $subject;
-						$mail_message->body = $body;
-						$mail_message->time = date('Y-m-d H:i:s');
-						$mail_message->from_deleted = 1;
-						$mail_message->save();
-					}
+					// item is approved
+					case Vote_Model::STATE_APPROVED:
+						
+						switch ($type)
+						{
+							case Vote_Model::WORK:
+								
+								if (Settings::get('finance_enabled'))
+								{
+									// create transfer
+									$object->transfer_id = Transfer_Model::insert_transfer_for_work_approve(
+										$object->user->member_id,
+										$object->suggest_amount
+									);
+								}
+
+								$subject = mail_message::format('work_approve_subject');
+								$body = mail_message::format('work_approve', array
+								(
+									$object->user->name.' '.$object->user->surname,
+									url_lang::base().'works/show/'.$object->id
+								));
+								
+								break;
+							
+							case Vote_Model::REQUEST:
+								
+								$subject = mail_message::format('request_approve_subject');
+								$body = mail_message::format('request_approve', array
+								(
+									$object->user->name.' '.$object->user->surname,
+									url_lang::base().'requests/show/'.$object->id
+								));
+								
+								break;
+						}
+						
+						// send messages about work approve to all watchers
+						Mail_message_Model::send_system_message_to_item_watchers(
+							$subject,
+							$body,
+							$type,
+							$object->id
+						);
+						
+						break;
+
+						// work was rejected
+					case Vote_Model::STATE_REJECTED:
+						
+						switch ($type)
+						{
+							case Vote_Model::WORK:
+								
+								$subject = mail_message::format('work_reject_subject');
+								$body = mail_message::format('work_reject', array
+								(
+									$object->user->name.' '.$object->user->surname,
+									url_lang::base().'works/show/'.$object->id
+								));
+								
+								break;
+							
+							case Vote_Model::REQUEST:
+								
+								$subject = mail_message::format('request_reject_subject');
+								$body = mail_message::format('request_reject', array
+								(
+									$object->user->name.' '.$object->user->surname,
+									url_lang::base().'requests/show/'.$object->id
+								));
+								
+								break;
+						}
+						
+						// send messages about work approve to all watchers
+						Mail_message_Model::send_system_message_to_item_watchers(
+							$subject,
+							$body,
+							$type,
+							$object->id
+						);
+
+						break;
 				}
+
+				// saves work
+				$object->save_throwable();
+
+				ORM::factory ('member')
+					->reactivate_messages($object->user->member_id);
+
+				// set up state of approval template
+				Approval_template_Model::update_state(
+					$object->approval_template_id
+				);
+
+				$object->transaction_commit();
+				status::success('Vote has been successfully added.');
 			}
-
-			// set up state of approval template
-			$approval_template = new Approval_template_Model($work->approval_template_id);
-			$approval_template->state = $approval_template->get_state($approval_template->id);
-			$approval_template->save();
-
-			status::success('Vote has been successfully added.');
-			url::redirect('works/show/'.$work->id);
+			catch (Exception $e)
+			{
+				$object->transaction_rollback();
+				status::error('Error - Cannot add vote.', $e);
+				Log::add_exception($e);
+			}
+			
+			$this->redirect($object_url);
 		}
-
-		$view = new View('main');
-		$view->title = __('Add vote about work');
-		$view->content = new View('form');
-		$view->content->headline = __('Add vote about work');
-		$view->content->link_back = html::anchor(
-				'works/show/'.$work->id, __('Back to the work')
-		);
-		$view->content->form = $form->html();
-		$view->render(TRUE);
+		else
+		{
+			$view = new View('main');
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->title = __('Add vote');
+			$view->content = new View('form');
+			$view->content->headline = __('Add vote');
+			$view->content->form = $form->html();
+			$view->render(TRUE);
+		}
 	}
 
 	/**
@@ -313,68 +404,161 @@ class Votes_Controller extends Controller
 		// vote doesn't exist
 		if (!$vote->id)
 			Controller::error(RECORD);
+		
+		$breadcrumbs = breadcrumbs::add();
 
 		// test type of vote
 		switch ($vote->type)
 		{
 			// vote about work
 			case Vote_Model::WORK:
+
+				// works are not enabled
+				if (!Settings::get('works_enabled'))
+					Controller::error (ACCESS);
 			    
-			    $work = new Job_Model($vote->fk_id);
-
-			    $approval_template_item = new Approval_template_item_Model();
+				$object = new Job_Model($vote->fk_id);
 				
-			    $aro_group = $approval_template_item->get_aro_group_by_approval_template_id_and_user_id(
-						$work->approval_template_id,
-						$this->session->get('user_id'),
-						$work->suggest_amount
-				);
+				// work doesn't exist
+				if (!$object->id || $object->job_report_id)
+					Controller::error(RECORD);
 				
-				$vote_rights = $approval_template_item->check_user_vote_rights(
-						$work->id, $this->user_id
-				);
-
-			    // access control
-			    if (!$aro_group || !$aro_group->id || !$vote_rights ||
-					$vote->user_id != $this->user_id)
+				if (Path::instance()->uri(TRUE)->previous(0,1) == 'users')
 				{
-					Controller::error(ACCESS);
+					$breadcrumbs->link('members/show_all', 'Members',
+									$this->acl_check_view('Members_Controller', 'members'))
+							->disable_translation()
+							->link('members/show/' . $object->user->member->id,
+									'ID ' . $object->user->member->id . ' - ' . $object->user->member->name,
+									$this->acl_check_view('Members_Controller', 'members', $object->user->member->id))
+							->enable_translation()
+							->link('users/show_by_member/' . $object->user->member_id, 'Users',
+									$this->acl_check_view('Users_Controller', 'users', $object->user->member_id))
+							->link('users/show/' . $object->user->id,
+									$object->user->name . " " . $object->user->surname . " (" . $object->user->login . ")",
+									$this->acl_check_view('Users_Controller', 'users', $object->user->member_id))
+							->link('works/show_by_user/' . $object->user->id, 'Works',
+									$this->acl_check_view('Works_Controller', 'work', $object->user->member_id))
+							->disable_translation()
+							->link('users/show_work/' . $object->id, __('ID') . ' ' . $object->id,
+									$this->acl_check_view('Works_Controller', 'work', $object->user->member_id))
+							->enable_translation();
 				}
+				else
+				{
+					$breadcrumbs
+							->link('works/pending', 'Works',
+								$this->acl_check_view('Works_Controller', 'work'))
+							->disable_translation()
+							->link('works/show/' . $object->id, 
+									__('ID') . ' ' . $object->id,
+									$this->acl_check_view('Works_Controller', 'work', $object->user->member_id))
+							->enable_translation();
+				}
+				
+				$breadcrumbs->text('Edit vote');
+				
+				$object_url = Path::instance()->uri(TRUE)->previous();
+				
+				$title = __('Edit vote about work');
 
-			    // work is locked => cannot edit vote
-			    if ($work->state >= 2)
-			    {
-				    status::warning('It is not possible vote about locked work.');
-				    url::redirect('works/show/'.$work->id);
-			    }
-
-			    // work is on work report => cannot vote this way
-			    if ($work->job_report_id)
-			    {
-				    status::warning('It is not possible vote this way about work on work report.');
-				    url::redirect('works/show/'.$work->id);
-			    }
-
-			    if ($work->user_id != $this->session->get('user_id'))
-			    {
-				    $vote_options = array(1 => __('Agree'),
-								 -1 => __('Disagree'),
-								  0 => __('Abstain'));
-			    }
-			    else
-			    {
-				    // nobody cannot approve his own work
-				    $vote_options = array(0 => __('Abstain'));
-			    }
-			    $title = __('Edit vote about work');
-			    $link_back = html::anchor(
-						url_lang::base().'works/show/'.$work->id,
-						__('Back to the work')
-				);
 			    break;
+				
+			// it's vote to request
+			case Vote_Model::REQUEST:
+				
+				$object = new Request_Model($vote->fk_id);
+				
+				// request doesn't exist
+				if (!$object->id)
+					Controller::error(RECORD);
+				
+				if (Path::instance()->uri(TRUE)->previous(0,1) == 'users')
+				{
+					$breadcrumbs->link('members/show_all', 'Members',
+									$this->acl_check_view('Members_Controller', 'members'))
+							->disable_translation()
+							->link('members/show/' . $object->user->member->id,
+									'ID ' . $object->user->member->id . ' - ' . $object->user->member->name,
+									$this->acl_check_view('Members_Controller', 'members', $object->user->member->id))
+							->enable_translation()
+							->link('users/show_by_member/' . $object->user->member_id, 'Users',
+									$this->acl_check_view('Users_Controller', 'users', $object->user->member_id))
+							->link('users/show/' . $object->user->id,
+									$object->user->name . " " . $object->user->surname . " (" . $object->user->login . ")",
+									$this->acl_check_view('Users_Controller', 'users', $object->user->member_id))
+							->link('requests/show_by_user/' . $object->user->id, 'Requests',
+									$this->acl_check_view('Requests_Controller', 'request', $object->user->member_id))
+							->disable_translation()
+							->link('users/show_request/' . $object->id, __('ID') . ' ' . $object->id,
+									$this->acl_check_view('Requests_Controller', 'request', $object->user->member_id))
+							->enable_translation();
+				}
+				else
+				{
+					$breadcrumbs
+							->link('works/request', 'Requests',
+								$this->acl_check_view('Requests_Controller', 'request'))
+							->disable_translation()
+							->link('requests/show/' . $object->id, 
+									__('ID') . ' ' . $object->id,
+									$this->acl_check_view('Requests_Controller', 'request', $object->user->member_id))
+							->enable_translation();
+				}
+				
+				$breadcrumbs->text('Edit vote');
+				
+				$object_url = Path::instance()->uri(TRUE)->previous();
+				
+				$title = __('Edit vote about request');
+				
+				break;
+			    
+			default:
+				Controller::warning(PARAMETER);
+				break;
+		}
+		
+		// cannot delete vote to locked item
+		if ($object->state != Vote_Model::STATE_NEW
+			&& $object->state != Vote_Model::STATE_OPEN)
+		{
+			status::warning('Error - Cannot update vote to locked item.');
+			$this->redirect(Path::instance()->previous());
+		}
+		
+		$approval_template_item = new Approval_template_item_Model();
+				
+		$aro_group = $approval_template_item->get_aro_group_by_approval_template_id_and_user_id(
+			$object->approval_template_id, $this->user_id,
+			$object->suggest_amount
+		);
+
+		$vote_rights = $approval_template_item->check_user_vote_rights(
+				$object, $vote->type, $this->user_id, $object->suggest_amount
+		);
+
+		// access control
+		if (!$aro_group || !$aro_group->id || !$vote_rights ||
+			$vote->user_id != $this->user_id)
+		{
+			Controller::error(ACCESS);
 		}
 
-		$form = new Forge(url::base(TRUE).url::current(TRUE));
+		// item is locked => cannot edit vote
+		if ($object->state != Vote_Model::STATE_NEW &&
+			$object->state != Vote_Model::STATE_OPEN)
+		{
+			status::warning('It is not possible vote about locked item.');
+			url::redirect($object_url);
+		}
+
+		$vote_options = Vote_Model::get_vote_options(
+			$vote->type,
+			$object->user_id == $this->user_id
+		);
+
+		$form = new Forge();
 
 		$form->dropdown('vote')
 				->options($vote_options)
@@ -390,168 +574,155 @@ class Votes_Controller extends Controller
 		if ($form->validate())
 		{
 			$form_data = $form->as_array();
-			$mail_message = new Mail_message_Model();
-			$user = new User_Model();
-
-			$vote = new Vote_Model($vote_id);
-			$vote->vote = $form_data['vote'];
-			$vote->comment = $form_data['comment'];
-			$vote->time = date('Y-m-d H:i:s');
-			$vote->save();
-
-			switch ($vote->type)
+			
+			try
 			{
-				// vote about work
-				case Vote_Model::WORK:
-					$work->state = $work->get_state(Vote_Model::WORK);
+				$object->transaction_start();
+				
+				$user = new User_Model($this->user_id);
 
-					// work is approved
-					if ($work->state == 3)
-					{
-						// creates new transfer
-						$account_model = new Account_Model();
-
-						$operating_id = $account_model->where(
-								'account_attribute_id',
-								Account_attribute_Model::OPERATING
-						)->find()->id;
+				$vote->vote = $form_data['vote'];
+				$vote->comment = $form_data['comment'];
+				$vote->time = date('Y-m-d H:i:s');
+				$vote->save_throwable();
+				
+				switch ($vote->type)
+				{
+					case Vote_Model::WORK:
 						
-						$credit_id = $account_model->where(
-										'member_id', $work->user->member_id
-								)->where(
-										'account_attribute_id',
-										Account_attribute_Model::CREDIT
-								)->find()->id;
-
-						$transfer_id = Transfer_Model::insert_transfer(
-							$operating_id, $credit_id, null,
-							null, $this->session->get('user_id'),
-							null, date('Y-m-d'), date('Y-m-d H:i:s'),
-							__('Work approval'), $work->suggest_amount
-						);
-
-						$work->transfer_id = $transfer_id;
-					}
-
-					// saves work
-					$work->save();
-					
-					ORM::factory ('member')
-							->reactivate_messages($work->user->member_id);
-
-					if ($work->state == 3)
-					{
-						$your_subject = __('Your work has been approved');
-						$your_body = 'mail.your_work_approve';
-
-						$subject = __('Work has been approved');
-						$body = 'mail.work_approve';
-					}
-					// work is rejected
-					else if ($work->state == 2)
-					{
-						$your_subject = __('Your work has been rejected');
-						$your_body = 'mail.your_work_reject';
-
-						$subject = __('Work has been rejected');
-						$body = 'mail.work_reject';
-					}
-					// work is pending
-					else
-					{
-						$your_subject = __('Vote to your work has been updated');
-						$your_body = 'mail.your_work_vote_add';
-
-						$subject = __('Vote to work has been updated');
-						$body = 'mail.work_vote_add';
-					}
-
-					// is not necessary send message to user who voted about his work
-					if ($vote->user_id != $work->user_id)
-					{
-						$user->clear();
-						$user->where('id', $vote->user_id)->find();
-
-						$mail_message->clear();
-						$mail_message->from_id = 1;
-						$mail_message->to_id = $work->user_id;
-						$mail_message->subject = $your_subject;
-						$mail_message->body = url_lang::lang($your_body, array
+						$subject = mail_message::format('work_vote_update_subject');
+						$body = mail_message::format('work_vote_update', array
 						(
 							$user->name.' '.$user->surname,
-							url_lang::base().'works/show/'.$work->id
+							$object->user->name.' '.$object->user->surname,
+							url_lang::base().'works/show/'.$object->id
 						));
-						$mail_message->time = date('Y-m-d H:i:s');
-						$mail_message->from_deleted = 1;
-						$mail_message->save();
-					}
-
-					// finds all aro ids assigned to vote about this work
-					$aro_ids = $approval_template_item->get_aro_ids_by_approval_template_id(
-							$work->approval_template_id, $work->suggest_amount
-					);
-
-					// count of aro ids is not null
-					if (count($aro_ids))
-					{
-						// finds user to whom belongs work
-						$user->clear();
-						$user->where('id', $work->user_id)->find();
-						$work_user = $user->name.' '.$user->surname;
-
-						$user->clear();
-						$user->where('id', $vote->user_id)->find();
-						$vote_user = $user->name.' '.$user->surname;
-
-						$body = url_lang::lang($body, array
+						
+						break;
+					
+					case Vote_Model::REQUEST:
+						
+						$subject = mail_message::format('request_vote_update_subject');
+						$body = mail_message::format('request_vote_update', array
 						(
-							$vote_user, $work_user,
-							url_lang::base().'works/show/'.$work->id
+							$user->name.' '.$user->surname,
+							$object->user->name.' '.$object->user->surname,
+							url_lang::base().'requests/show/'.$object->id
 						));
+						
+						break;
+				}
+				
+				// send message about vote adding to all watchers
+				Mail_message_Model::send_system_message_to_item_watchers(
+					$subject,
+					$body,
+					$vote->type,
+					$object->id
+				);
 
-						foreach ($aro_ids as $aro)
+				$object->state = Vote_Model::get_state($object);
+
+				switch ($object->state)
+				{
+					// item is approved
+					case Vote_Model::STATE_APPROVED:
+						
+						switch ($vote->type)
 						{
-							// is not necessary send message to  user who edit vote
-							if ($aro->id != $this->session->get('user_id'))
-							{
-								// sends message
-								$mail_message->clear();
-								$mail_message->from_id = 1;
-								$mail_message->to_id = $aro->id;
-								$mail_message->subject = $subject;
-								$mail_message->body = $body;
-								$mail_message->time = date('Y-m-d H:i:s');
-								$mail_message->from_deleted = 1;
-								$mail_message->save();
-							}
+							// item is work
+							case Vote_Model::WORK:
+								
+								if (Settings::get('finance_enabled'))
+								{
+									// create transfer
+									$object->transfer_id = Transfer_Model::insert_transfer_for_work_approve(
+										$object->user->member_id,
+										$object->suggest_amount
+									);
+								}
+
+								$subject = mail_message::format('work_approve_subject');
+								$body = mail_message::format('work_approve', array
+								(
+									$object->user->name.' '.$object->user->surname,
+									url_lang::base().'works/show/'.$object->id
+								));
+								
+								break;
 						}
-					}
+						
+						// send messages about work approve to all watchers
+						Mail_message_Model::send_system_message_to_item_watchers(
+							$subject,
+							$body,
+							$vote->type,
+							$object->id
+						);
+						
+						break;
 
-					// set up state of approval template
-					$approval_template = new Approval_template_Model(
-							$work->approval_template_id
-					);
-					
-					$approval_template->state = $approval_template->get_state(
-							$approval_template->id
-					);
-					
-					$approval_template->save();
-					break;
+						// work was rejected
+					case Vote_Model::STATE_REJECTED:
+						
+						switch ($vote->type)
+						{
+							// item is work
+							case Vote_Model::WORK:
+
+								$subject = mail_message::format('work_reject_subject');
+								$body = mail_message::format('work_reject', array
+								(
+									$object->user->name.' '.$object->user->surname,
+									url_lang::base().'works/show/'.$object->id
+								));
+								
+								break;
+						}
+						
+						// send messages about work approve to all watchers
+						Mail_message_Model::send_system_message_to_item_watchers(
+							$subject,
+							$body,
+							$vote->type,
+							$object->id
+						);
+
+						break;
+				}
+
+				$object->save_throwable();
+				
+				ORM::factory ('member')
+					->reactivate_messages($object->user->member_id);
+
+				// set up state of approval template
+				Approval_template_Model::update_state(
+					$object->approval_template_id
+				);
+				
+				$object->transaction_commit();
+				status::success('Vote has been successfully updated.');
 			}
-
+			catch (Exception $e)
+			{
+				$object->transaction_rollback();
+				status::error('Error - Cannot update vote.', $e);
+				Log::add_exception($e);
+			}
 			
-			status::success('Vote has been successfully updated.');
-			url::redirect('works/show/'.$work->id);
+			$this->redirect($object_url);
 		}
-
-		$view = new View('main');
-		$view->title = $title;
-		$view->content = new View('form');
-		$view->content->headline = $title;
-		$view->content->link_back = $link_back;
-		$view->content->form = $form->html();
-		$view->render(TRUE);
+		else
+		{
+			$view = new View('main');
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->title = $title;
+			$view->content = new View('form');
+			$view->content->headline = $title;
+			$view->content->form = $form->html();
+			$view->render(TRUE);
+		}
 	}
 
 	/**
@@ -578,53 +749,191 @@ class Votes_Controller extends Controller
 		{
 			case Vote_Model::WORK:
 			    
-			    $work = new Job_Model($vote->fk_id);
-
-			    $approval_template_item = new Approval_template_item_Model();
+				// works are not enabled
+				if (!Settings::get('works_enabled'))
+					Controller::error (ACCESS);
+			    
+				$object = new Job_Model($vote->fk_id);
 				
-			    $aro_group = $approval_template_item->get_aro_group_by_approval_template_id_and_user_id(
-						$work->approval_template_id,
-						$this->session->get('user_id'),
-						$work->suggest_amount
-				);
+				// work doesn't exist
+				if (!$object->id || $object->job_report_id)
+					Controller::error(RECORD);
 				
-				$vote_rights = $approval_template_item->check_user_vote_rights(
-						$work->id, $this->user_id
-				);
-
-			    // access control
-			    if (!$aro_group || !$aro_group->id || !$vote_rights ||
-					$vote->user_id != $this->user_id)
-				{
-					Controller::error(ACCESS);
-				}
-
-			    // work is locked => cannot edit vote
-			    if ($work->state > 1)
-			    {
-					status::warning('It is not possible vote about locked work.');
-			    }
-			    else
-			    {
-					// delete vote
-					$vote->delete();
-					status::success('Vote has been successfully deleted.');
-
-					$work->state = $work->get_state(Vote_Model::WORK);
-					$work->save();
-					// set up state of approval template
-					$approval_template = new Approval_template_Model(
-							$work->approval_template_id
-					);
-					$approval_template->state = $approval_template->get_state(
-							$approval_template->id
-					);
-					$approval_template->save();
-			    }
-			    url::redirect('works/show/'.$work->id);
-			    break;
+				$object_url = Path::instance()->uri(TRUE)->previous();
+				
+				break;
+				
+			// it's vote to request
+			case Vote_Model::REQUEST:
+				
+				$object = new Request_Model($vote->fk_id);
+				
+				// request doesn't exist
+				if (!$object->id)
+					Controller::error(RECORD);
+				
+				$object_url = Path::instance()->uri(TRUE)->previous();
+				
+				break;
+				
+			default:
+				Controller::warning(PARAMETER);
+				break;
 		}
 		
+		// cannot delete vote to locked item
+		if ($object->state != Vote_Model::STATE_NEW
+			&& $object->state != Vote_Model::STATE_OPEN)
+		{
+			status::warning('Error - Cannot delete vote to locked item.');
+			$this->redirect(Path::instance()->previous());
+		}
+		
+		try
+		{
+			$object->transaction_start();
+			
+			$user = new User_Model($this->user_id);
+			
+			$approval_template_item = new Approval_template_item_Model();
+
+			$aro_group = $approval_template_item->get_aro_group_by_approval_template_id_and_user_id(
+				$object->approval_template_id, $this->user_id,
+				$object->suggest_amount
+			);
+
+			$vote_rights = $approval_template_item->check_user_vote_rights(
+					$object, $vote->type, $this->user_id, $object->suggest_amount
+			);
+
+			// access control
+			if (!$aro_group || !$aro_group->id || !$vote_rights ||
+				$vote->user_id != $this->user_id)
+			{
+				Controller::error(ACCESS);
+			}
+
+			// item is locked => cannot edit vote
+			if ($object->state != Vote_Model::STATE_NEW &&
+				$object->state != Vote_Model::STATE_OPEN)
+			{
+				status::warning('It is not possible vote about locked item.');
+				url::redirect($object_url);
+			}
+			
+			switch ($vote->type)
+			{
+				case Vote_Model::WORK:
+					
+					$subject = mail_message::format('work_vote_delete_subject');
+					$body = mail_message::format('work_vote_delete', array
+					(
+						$user->name.' '.$user->surname,
+						$object->user->name.' '.$object->user->surname,
+						url_lang::base().'works/show/'.$object->id
+					));
+					
+					break;
+				
+				case Vote_Model::REQUEST:
+					
+					$subject = mail_message::format('request_vote_delete_subject');
+					$body = mail_message::format('request_vote_delete', array
+					(
+						$user->name.' '.$user->surname,
+						$object->user->name.' '.$object->user->surname,
+						url_lang::base().'requests/show/'.$object->id
+					));
+					
+					break;
+			}
+			
+			// send message about vote adding to all watchers
+			Mail_message_Model::send_system_message_to_item_watchers(
+				$subject,
+				$body,
+				$vote->type,
+				$object->id
+			);
+
+			// delete vote
+			$vote->delete_throwable();
+
+			$object->state = Vote_Model::get_state($object);
+			
+			$object->save_throwable();
+
+			// set up state of approval template
+			Approval_template_Model::update_state(
+					$object->approval_template_id
+			);
+			
+			$object->transaction_commit();
+			status::success('Vote has been successfully deleted.');
+		}
+		catch (Exception $e)
+		{
+			$object->transaction_rollback();
+			status::error('Error - Cannot delete vote.', $e);
+			Log::add_exception($e);
+		}
+			
+		url::redirect($object_url);
+	}
+	
+	
+	/** CALLBACK FUNCTIONS **/
+
+	/**
+	 * Callback function to show vote dropwdown in grid
+	 * 
+	 * @author Michal Kliment
+	 * @param object $item
+	 * @param string $name
+	 * @param object $input
+	 */
+	protected static function vote_form_field ($item, $name, $input, $args = array())
+	{		
+		if (isset($args[0]) && isset($args[1]))
+		{
+			$items_to_vote	= $args[0];
+			$type		= $args[1];
+			
+			if (in_array($item->id, $items_to_vote))
+			{
+				$uid = Session::instance()->get('user_id');
+
+				$input->options(
+					$input->options +
+					Vote_Model::get_vote_options(
+						$type, $uid == $item->user_id
+					)
+				);
+				
+				echo $input->html();
+			}
+		}	
+	}
+
+	/**
+	 * Callback function to show comment textarea in grid
+	 * 
+	 * @author Michal Kliment
+	 * @param object $item
+	 * @param string $name
+	 * @param object $input
+	 */
+	protected static function comment_form_field ($item, $name, $input, $args = array())
+	{
+		if (isset($args[0]))
+		{
+			$items_to_vote	= $args[0];
+			
+			if (in_array($item->id, $items_to_vote))
+			{	
+				echo $input->html();
+			}
+		}
 	}
 
 }

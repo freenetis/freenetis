@@ -25,6 +25,12 @@ class Sms_Controller extends Controller
 	{
 		parent::__construct();
 		
+	    // sms is not enabled, quit
+	    if (!Settings::get('sms_enabled'))
+		{
+			Controller::error(ACCESS);
+		}
+		
 		if (!Sms::enabled())
 		{
 			$view = new View('main');
@@ -60,15 +66,15 @@ class Sms_Controller extends Controller
 			$order_by_direction = 'desc', $page_word = null, $page = 1)
 	{
 		// access
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Sms_Controller', 'sms'))
 		{
 			Controller::error(ACCESS);
 		}
 		
 	    // get new selector
-	    if (is_numeric($this->input->get('record_per_page')))
+	    if (is_numeric($this->input->post('record_per_page')))
 		{
-			$limit_results = (int) $this->input->get('record_per_page');
+			$limit_results = (int) $this->input->post('record_per_page');
 		}
 		
 	    // parameters control
@@ -91,15 +97,24 @@ class Sms_Controller extends Controller
 		// filter form
 		$filter_form = new Filter_form('sms');
 		
+		$filter_form->add('type')
+				->type('select')
+				->values(Sms_message_Model::get_types());
+		
+		$filter_form->add('state')
+				->type('select')
+				->values(Sms_message_Model::get_states());
+		
 		$filter_form->add('send_date')
-				->type('date')
-				->default(Filter_form::OPER_GREATER_OR_EQUAL, date('Y-m-d'));
+				->type('date');
 		
 		$filter_form->add('sender')
-				->label('Telephone number of sender');
+				->label('Telephone number of sender')
+				->callback('json/user_phone');
 		
 		$filter_form->add('receiver')
-				->label('Telephone number of receiver');
+				->label('Telephone number of receiver')
+				->callback('json/user_phone');
 
 	    $model_sms_message = new Sms_message_Model();
 
@@ -139,9 +154,21 @@ class Sms_Controller extends Controller
 	    ));
 
 	    $grid->add_new_button('sms/show_unread', __('Show unread messages'));
-	    $grid->add_new_button('sms/delete_unsended', __('Delete unsended messages'));
+		
+		if ($this->acl_check_delete('Sms_Controller', 'sms'))
+		{
+			$grid->add_new_button(
+				'sms/delete_unsended',
+				__('Delete unsended messages'),
+				array
+				(
+					'class' => 'delete_link'
+				)
+			);
+		}
 
-	    if (Sms::has_active_driver())
+	    if ($this->acl_check_new('Sms_Controller', 'sms') &&
+			Sms::has_active_driver())
 		{
 			$grid->add_new_button('sms/send', __('Send message'));
 		}
@@ -204,15 +231,15 @@ class Sms_Controller extends Controller
 			$order_by_direction = 'desc', $page_word = null, $page = 1)
 	{
 		// access
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Sms_Controller', 'sms'))
 		{
 			Controller::error(ACCESS);
 		}
 		
 	    // get new selector
-	    if (is_numeric($this->input->get('record_per_page')))
+	    if (is_numeric($this->input->post('record_per_page')))
 		{
-			$limit_results = (int) $this->input->get('record_per_page');
+			$limit_results = (int) $this->input->post('record_per_page');
 		}
 		
 	    // parameters control
@@ -252,7 +279,7 @@ class Sms_Controller extends Controller
 			'selector_increace'			=> 100,
 			'selector_min'				=> 100,
 			'selector_max_multiplier'   => 10,
-			'base_url'					=> Config::get('lang').'/sms/show_all/'
+			'base_url'					=> Config::get('lang').'/sms/show_unread/'
 										. $limit_results.'/'.$order_by.'/'.$order_by_direction,
 			'uri_segment'				=> 'page',
 			'total_items'				=> $total_sms_message,
@@ -302,7 +329,7 @@ class Sms_Controller extends Controller
 	public function delete_unsended()
 	{
 		// access
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_delete('Sms_Controller', 'sms'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -339,7 +366,7 @@ class Sms_Controller extends Controller
 	public function show($sms_id = null)
 	{
 		// access
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Sms_Controller', 'sms'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -362,7 +389,7 @@ class Sms_Controller extends Controller
 			// save new state
 			if ($sms->state == Sms_message_Model::RECEIVED_UNREAD)
 			{
-				$sms->state = Sms_Controller::RECEIVED_READ;
+				$sms->state = Sms_message_Model::RECEIVED_READ;
 				$sms->save();
 			}
 
@@ -451,7 +478,7 @@ class Sms_Controller extends Controller
 	public function send($phone = null, $sms_id = null, $selected_subnet = null)
 	{
 		// access
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_new('Sms_Controller', 'sms'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -606,7 +633,7 @@ class Sms_Controller extends Controller
 			{
 				$sms->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cant add new SMS message.');
+				status::error('Error - cant add new SMS message.', $e);
 			}
 		}
 		else

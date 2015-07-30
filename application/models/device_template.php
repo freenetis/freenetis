@@ -23,10 +23,12 @@
  * @property string $name
  * @property string $values
  * @property boolean $default
+ * @property ORM_Iterator $connection_requests
  */
 class Device_template_Model extends ORM
 {
 	protected $belongs_to = array('enum_type');
+	protected $has_many = array('connection_requests');
 	
 	/**
 	 * Gets parsed value of current object

@@ -53,8 +53,8 @@ class Towns_Controller extends Controller
 			Controller::error(ACCESS);
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		// parameters control
 		$allowed_order_type = array('id', 'town', 'quarter', 'zip_code');

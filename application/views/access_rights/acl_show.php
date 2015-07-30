@@ -3,8 +3,12 @@
 
 <?php
 $links = array();
-$links[] = html::anchor('acl/edit/'.$acl->id, __('Edit'));
-$links[] = html::anchor('acl/delete/'.$acl->id, __('Delete'));
+
+if ($this->acl_check_edit('Acl_Controller', 'acl'))
+	$links[] = html::anchor('acl/edit/'.$acl->id, __('Edit'));
+
+if ($this->acl_check_delete('Acl_Controller', 'acl'))
+	$links[] = html::anchor('acl/delete/'.$acl->id, __('Delete'), array('class' => 'delete_link'));
 		
 echo implode(' | ',$links);
 ?><br /><br />

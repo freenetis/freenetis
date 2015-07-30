@@ -24,7 +24,15 @@
 class Comments_thread_Model extends ORM
 {
 	protected $has_many = array('comments');
-	protected $has_one = array('account', 'job');
+	
+	protected $has_one = array
+	(
+		'account',
+		'job',
+		'connection_request',
+		'log_queue',
+		'request'
+	);
 
 	/**
 	 * Return parent object of comment thread

@@ -1,7 +1,7 @@
 <h2><?php echo __('Address point detail') . ' ' . $address_point->name ?></h2><br />
 
 <?php
-if ($gps == '' && $this->acl_check_edit(get_class($this), 'address_point'))
+if ($gps == '' && $this->acl_check_edit('Address_points_Controller', 'address_point'))
 	echo html::anchor('address_points/edit/' . $address_point->id, __('Fill in GPS'));
 else
 	echo html::anchor('address_points/edit/' . $address_point->id, __('Edit'), array('title' => __('Edit'), 'class' => 'popup_link'));
@@ -52,9 +52,11 @@ else
 </table>
 
 <?php if (!empty($gps)): ?>
-	<a href="http://maps.google.com/maps?f=q&hl=<?php echo $lang ?>&geocode=&q=<?php echo $gpsx ?>,<?php echo $gpsy ?>&z=18&t=h&ie=UTF8"  target="_blank">
-		<img alt="<?php echo __('Address point detail') ?>" src="http://maps.google.com/maps/api/staticmap?center=<?php echo $gpsx ?>,<?php echo $gpsy ?>&zoom=16&maptype=hybrid&size=400x300&markers=color:red%7C<?php echo $gpsx ?>,<?php echo $gpsy ?>&language<?php echo $lang ?>&sensor=false" style="float: right; margin-right: 10px;" />
-	</a>
+	<div id="ap_gmap" style="float: <?php echo ($this->popup ? 'left' : 'right');?>">
+		<a class="gmap" href="http://maps.google.com/maps?f=q&hl=<?php echo $lang ?>&geocode=&q=<?php echo $gpsx ?>,<?php echo $gpsy ?>&z=18&t=h&ie=UTF8"  target="_blank">
+			<img alt="<?php echo __('Address point detail') ?>" src="http://maps.google.com/maps/api/staticmap?center=<?php echo $gpsx ?>,<?php echo $gpsy ?>&zoom=16&maptype=hybrid&size=400x300&markers=color:red%7C<?php echo $gpsx ?>,<?php echo $gpsy ?>&language<?php echo $lang ?>&sensor=false"/>
+		</a>
+	</div>
 	<div style="margin-bottom: 10px; float:left"></div>
 <?php endif; ?>
 

@@ -30,6 +30,10 @@ class Tools_Controller extends Controller
 			'ssh'					=> __('SSH'),
 			'whois'					=> __('WHOIS')
 		);
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
 	}
 	
 	/**
@@ -48,7 +52,7 @@ class Tools_Controller extends Controller
 	 */
 	public function ssh($ip = NULL, $port = NULL)
 	{
-		if (!$this->acl_check_edit('Devices_Controller', 'tools'))
+		if (!$this->acl_check_view('Tools_Controller', 'tools'))
 			Controller::error(ACCESS);
 		
 		if (!isset($ip) || !valid::ip($ip))
@@ -71,7 +75,7 @@ class Tools_Controller extends Controller
 	 */
 	public function whois($hostname = NULL)
 	{
-		if (!$this->acl_check_edit('Devices_Controller', 'tools'))
+		if (!$this->acl_check_view('Tools_Controller', 'tools'))
 			Controller::error(ACCESS);
 		
 		if (!$this->input->post('query') == NULL)

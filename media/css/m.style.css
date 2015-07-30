@@ -2,9 +2,13 @@
 	Mobile device style
 */
 
+@media only screen and (max-device-width : 640px) { /* firefox 3 require this to work properly */
+	
 #main { 
 	background-image: none;
 	width: auto;
+	max-width: none;
+	min-width: 0;
 }
 
 #middle { 
@@ -14,6 +18,21 @@
 
 #header, #content, #footer {
 	width: 100%;
+}
+
+#content {
+	margin-left: 0px;
+	max-width: none;
+	min-width: 0;
+}
+
+#content-padd {
+	max-width: none;
+	min-width: 0;
+}
+
+#footer {
+	display: none;
 }
 
 #menu {
@@ -47,7 +66,26 @@
 	cursor: pointer;
 }
 
+#cellphone_menu_tooltip {
+	display: none;
+	text-align: left;
+	background-color: #FF833D;
+	color: #ffffff;
+	line-height: 45px;
+	position: absolute;
+	padding: 0 1.5em;
+	left: 67px;
+	top: 25px;
+	z-index: 10;
+	font-weight: bold;
+	opacity: 0.9;
+}
+
 h1#logo {
+	display: none;
+}
+
+.cellphone_hide {
 	display: none;
 }
 
@@ -111,4 +149,6 @@ select {
 .search input#keyword {
 	max-width: 210px ! important;
 	width: 210px;
+}
+
 }

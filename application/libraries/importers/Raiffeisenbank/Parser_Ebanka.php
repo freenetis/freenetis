@@ -82,6 +82,41 @@ class Parser_Ebanka extends Parser_Html_Table
 	 * @var object 
 	 */
 	protected $result;
+	
+	/**
+	 * Send SMS notification of received payments
+	 *
+	 * @since 1.1
+	 * @var integer
+	 */
+	protected $send_sms = Notifications_Controller::KEEP;
+	
+	/**
+	 * Send e-mail notification of received payments
+	 *
+	 * @since 1.1
+	 * @var integer
+	 */
+	protected $send_emails = Notifications_Controller::KEEP;
+	
+	/**
+	 * Construct
+	 * 
+	 * @param boolean $send_emails	Send e-mail notification of received payments?
+	 * @param boolean $send_sms		Send SMS notification of received payments?
+	 */
+	public function __construct($send_emails, $send_sms)
+	{
+		if ($send_emails)
+		{
+			$this->send_emails = Notifications_Controller::ACTIVATE;
+		}
+		
+		if ($send_sms)
+		{
+			$this->send_sms = Notifications_Controller::ACTIVATE;
+		}
+	}
 
 	/**
 	 *  
@@ -290,7 +325,9 @@ class Parser_Ebanka extends Parser_Html_Table
 						//ted uz muzeme ulozit ziskane data do databaze:
 						//if (isset($this->callback))
 						//	call_user_func($this->callback, $res);
-						$rb_importer->store_transfer_ebanka($res);
+						$rb_importer->store_transfer_ebanka(
+								$res, $this->send_emails, $this->send_sms
+						);
 					
 						break;
 				} // switch
@@ -425,7 +462,9 @@ class Parser_Ebanka extends Parser_Html_Table
 						case 6:   // fee
 							$res->fee = $this->get_fee($field, FALSE);
 							//if (isset($this->callback)) call_user_func($this->callback, $res);
-							$rb_importer->store_transfer_ebanka($res);
+							$rb_importer->store_transfer_ebanka(
+									$res, $this->send_emails, $this->send_sms
+							);
 							/**
 							 * ted uz muzeme ulozit ziskane data do databaze:
 							 */

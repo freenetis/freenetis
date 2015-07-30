@@ -20,17 +20,27 @@
  */
 class Web_interface_Controller extends Controller
 {
-
+	// predefined QoS classes
 	const MEMBERS_QOS_PARENT			=	1;
 	const MEMBERS_QOS_ORDINARY			=	2;
 	const MEMBERS_QOS_ACTIVE			=	3;
 	const MEMBERS_QOS_HIGH_PRIORITY		=	4;
 	const MEMBERS_QOS_MEMBERS			=	5;
-	
+	// QoS priority types
 	const MEMBERS_QOS_PRIORITY_NORMAL	=	1;
 	const MEMBERS_QOS_PRIORITY_HIGH		=	0;
-	
+	// QoS protocol
 	const MEMBERS_QOS_PROTOCOL_ALL		=	'all';
+	
+	/**
+	 * Preprocesor not useful here.
+	 * 
+	 * @return boolean
+	 */
+	protected function is_preprocesor_enabled()
+	{
+		return FALSE;
+	}
 	
 	/**
 	 * Index prints about message
@@ -45,25 +55,28 @@ class Web_interface_Controller extends Controller
 	 * Any IP address belonging to these subnet ranges can be redirected.
 	 * 
 	 * @author Jiri Svitak
-	 * @return unknown_type
 	 */
-	public function redirected_ranges($paginator = FALSE, $page = NULL)
+	public function redirected_ranges()
 	{
+		// if gateway set uped - anly allow to access this page from it
+		// also if redirection is not enabled
+		if (!module::e('redirection') || 
+			!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
 		$ranges = ORM::factory('subnet')->get_redirected_ranges();
 		
 		$items = array();
-		foreach ($ranges as $range)
-			$items[] = $range->subnet_range;
 		
-		// stupid mikrotik cannot handle file >= 4096kB
-		if ($paginator)
+		foreach ($ranges as $range)
 		{
-			echo $this->paginator(4096, $items, $page);
+			$items[] = $range->subnet_range;
 		}
-		else
-		{
-			echo implode("\n", $items)."\n";
-		}
+		
+		echo implode("\n", $items)."\n";
 		
 		// set state of module (last activation time)
 		Settings::set('redirection_state', date('Y-m-d H:i:s'));
@@ -76,76 +89,91 @@ class Web_interface_Controller extends Controller
 	 * IP addresses with a redirection set are not exported.
 	 * 
 	 * @author Jiri Svitak
-	 * @return unknown_type
 	 */
-	public function allowed_ip_addresses($paginator = FALSE, $page = NULL)
+	public function allowed_ip_addresses()
 	{
+		// if gateway set uped - anly allow to access this page from it
+		// also if redirection is not enabled
+		if (!module::e('redirection') || 
+			!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
 		$ip_adresses = ORM::factory('ip_address')->get_allowed_ip_addresses();
 		
 		$items = array();
-		foreach ($ip_adresses as $ip_adress)
-			$items[] = $ip_adress->ip_address;
 		
-		// stupid mikrotik cannot handle file >= 4096kB
-		if ($paginator)
+		foreach ($ip_adresses as $ip_adress)
 		{
-			echo $this->paginator(4096, $items, $page);
+			$items[] = $ip_adress->ip_address;
 		}
-		else
-		{
-			echo implode("\n", $items)."\n";
-		}
+		
+		echo implode("\n", $items)."\n";
+		
+		// set state of module (last activation time)
+		Settings::set('redirection_state', date('Y-m-d H:i:s'));
 	}
 	
 	/**
 	 * Prints all unallowed ip addresses, otherwise same as previous method
 	 * 
 	 * @author Michal Kliments
-	 * @param type $paginator
-	 * @param type $page 
 	 */
-	public function unallowed_ip_addresses($paginator = FALSE, $page = NULL)
+	public function unallowed_ip_addresses()
 	{
+		// if gateway set uped - anly allow to access this page from it
+		// also if redirection is not enabled
+		if (!module::e('redirection') || 
+			!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
 		$ip_adresses = ORM::factory('ip_address')->get_unallowed_ip_addresses();
 		
 		$items = array();
-		foreach ($ip_adresses as $ip_adress)
-			$items[] = $ip_adress->ip_address;
 		
-		// stupid mikrotik cannot handle file >= 4096kB
-		if ($paginator)
+		foreach ($ip_adresses as $ip_adress)
 		{
-			echo $this->paginator(4096, $items, $page);
+			$items[] = $ip_adress->ip_address;
 		}
-		else
-		{
-			echo implode("\n", $items)."\n";
-		}
+		
+		echo implode("\n", $items)."\n";
 		
 		// set state of module (last activation time)
 		Settings::set('redirection_state', date('Y-m-d H:i:s'));
 	}
 
 	/**
+	 * Prints list of IP addresses which are redirected by a message that is self
+	 * canceble.
+	 * 
 	 * @author Michal Kliment
 	 */
-    public function self_cancelable_ip_addresses($paginator = FALSE, $page = NULL)
+    public function self_cancelable_ip_addresses()
     {
+		// if gateway set uped - anly allow to access this page from it
+		// also if redirection is not enabled
+		if (!module::e('redirection') || 
+			!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
         $ip_adresses = ORM::factory('ip_address')->get_ip_addresses_with_self_cancel();
 
 		$items = array();
-		foreach ($ip_adresses as $ip_adress)
-			$items[] = $ip_adress->ip_address;
 		
-		// stupid mikrotik cannot handle file >= 4096kB
-		if ($paginator)
+		foreach ($ip_adresses as $ip_adress)
 		{
-			echo $this->paginator(4096, $items, $page);
+			$items[] = $ip_adress->ip_address;
 		}
-		else
-		{
-			echo implode("\n", $items)."\n";
-		}
+		
+		echo implode("\n", $items)."\n";
 		
 		// set state of module (last activation time)
 		Settings::set('redirection_state', date('Y-m-d H:i:s'));
@@ -155,93 +183,92 @@ class Web_interface_Controller extends Controller
 	 * Prints all local subnets
 	 * 
 	 * @author Michal Kliment
-	 * @param type $paginator
-	 * @param type $page 
 	 */
-	public function local_subnets($paginator = FALSE, $page = NULL)
+	public function local_subnets()
 	{
+		// only enabled if IP address that requested for this page is from
+		// one of allowed ranges in the FreenetIS
+		if (!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
 		$local_subnets = ORM::factory('local_subnet')->get_all_local_subnets();
 		
 		$items = array();
-		foreach ($local_subnets as $local_subnet)
-			$items[] = $local_subnet->address;
 		
-		// stupid mikrotik cannot handle file >= 4096kB
-		if ($paginator)
+		foreach ($local_subnets as $local_subnet)
 		{
-			echo $this->paginator(4096, $items, $page);
+			$items[] = $local_subnet->address;
 		}
-		else
-		{
-			echo implode("\n", $items)."\n";
-		}
+		
+		echo implode("\n", $items)."\n";
 	}
 
 	/**
 	 * Function is used for VoIP callback.
+	 * 
+	 * @see http://www.voip-info.org/wiki/index.php?page=Asterisk+Manager+API+Action+Originate
 	 * @param integer $user
 	 * @param string $pass
 	 * @param integer $number
 	 */
-	public function callback($user = null, $pass = null, $number = null)
+	public function voip_callback($user = null, $pass = null, $number = null)
 	{
-
+		// only enabled if IP address that requested for this page is from
+		// one of allowed ranges in the FreenetIS
+		if (!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
+		// VoIP is not enabled, quit
+		if (!Settings::get('voip_enabled'))
+		    return;
+	    
 		if ($user == null || $pass == null || $number == null)
 		{
-			echo 'No input data';
-			exit;
+			die('No input data');
 		}
 
 		if (!valid::digit($user) || !valid::digit($number))
 		{
-			echo 'Not valid input data';
-			exit;
+			die('Not valid input data');
 		}
 
 		$voip = ORM::factory('voip_sip')->get_voip_sip_by_name($user);
 
 		if (count($voip) == 0 || $voip->current()->secret != $pass)
 		{
-			echo 'Bad user or password';
-			exit;
+			die('Bad user or password');
 		}
 		else
 		{
-			$this->settings = new Settings();
-
 			$asm = new AsteriskManager();
 
-			$ahostname = $this->settings->get('voip_asterisk_hostname');
-			$auser = $this->settings->get('voip_asterisk_user');
-			$apass = $this->settings->get('voip_asterisk_pass');
+			$ahostname = Settings::get('voip_asterisk_hostname');
+			$auser = Settings::get('voip_asterisk_user');
+			$apass = Settings::get('voip_asterisk_pass');
 
-			if ($ahostname == null ||
-				$ahostname == '' ||
-				$auser == null ||
-				$auser == '' ||
-				$apass == null ||
-				$apass == '')
+			if (empty($ahostname) || empty($auser) || empty($apass))
 			{
-				echo 'Error. Check freenetis settings.';
-				exit;
+				die('Error. Check FreenetIS settings.');
 			}
 
 			if ($asm->connect($ahostname, $auser, $apass))
 			{
-				//http://www.voip-info.org/wiki/index.php?page=Asterisk+Manager+API+Action+Originate
-				$call = $asm->Originate(
+				$asm->Originate(
 						'SIP/' . $user, $number, 'internal', 1,
-						$application = NULL, $data = NULL,
-						30000, $user, $variable = NULL,
-						$account = NULL, 'Async',
-						$actionid = NULL
+						NULL, NULL, 30000, $user, NULL, NULL, 'Async', NULL
 				);
 				$asm->disconnect();
 				echo 'Success';
 			}
 			else
 			{
-				echo 'Error. Could not connect to server.';
+				die('Error. Could not connect to server.');
 			}
 		}
 	}
@@ -255,27 +282,41 @@ class Web_interface_Controller extends Controller
 	 */
 	public function authorized_keys($device_id = NULL)
 	{
+		// only enabled if IP address that requested for this page is from
+		// one of allowed ranges in the FreenetIS
+		if (!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
 		// device_id is set
 		if ($device_id && is_numeric($device_id))
 		{
+			// device load
+			$d = new Device_Model($device_id);
+
 			// finds all keys by device
-			$keys = ORM::factory('users_key')->get_keys_by_device($device_id);
-		}
-		// prints all keys
-		else
-		{
-			// finds all keys
-			$keys = ORM::factory('users_key')->orderby('user_id')->find_all();
-		}
+			if ($d->id)
+			{
+				$keys = ORM::factory('users_key')->get_keys_by_device($d->id);
+				
+				echo "#\n";
+				echo "# Generated by FreenetIS at " . date("Y-m-d H:i:s") . "\n";
+				echo "#\n";
 
-		echo "#\n";
-		echo "# Generated by FreenetIS at " . date("Y-m-d H:i:s") . "\n";
-		echo "#\n";
-
-		foreach ($keys as $key)
-		{
-			echo "$key->key\n";
+				foreach ($keys as $key)
+				{
+					echo "$key->key\n";
+				}
+				
+				die();
+			}
 		}
+		
+		// not founded
+		@header('HTTP/1.0 404 Not Found');
+		die();
 	}
 
 	/**
@@ -287,17 +328,42 @@ class Web_interface_Controller extends Controller
 	 */
 	public function key($user_id = NULL)
 	{
-		// bad parameter
-		if (!$user_id || !is_numeric($user_id))
-			return;
-
-		// finds all keys by user
-		$keys = ORM::factory('users_key')->where('user_id', $user_id)->find_all();
-
-		foreach ($keys as $key)
+		// only enabled if IP address that requested for this page is from
+		// one of allowed ranges in the FreenetIS
+		if (!network::ip_address_in_ranges(server::remote_addr()))
 		{
-			echo "$key->key\n";
+			@header('HTTP/1.0 403 Forbidden');
+			die();
 		}
+		
+		// bad parameter
+		if ($user_id || is_numeric($user_id))
+		{
+			// device load
+			$u = new User_Model($user_id);
+
+			// finds all keys by device
+			if ($u->id)
+			{
+				// finds all keys by user
+				$keys = ORM::factory('users_key')->where('user_id', $u->id)->find_all();
+			
+				echo "#\n";
+				echo "# Generated by FreenetIS at " . date("Y-m-d H:i:s") . "\n";
+				echo "#\n";
+
+				foreach ($keys as $key)
+				{
+					echo "$key->key\n";
+				}
+				
+				die();
+			}
+		}
+		
+		// not founded
+		@header('HTTP/1.0 404 Not Found');
+		die();
 	}
 	
 	/**
@@ -308,6 +374,14 @@ class Web_interface_Controller extends Controller
 	 */
 	public function members_qos_ceil_rate()
 	{
+		// only enabled if IP address that requested for this page is from
+		// one of allowed ranges in the FreenetIS
+		if (!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
 		// qos is not enabled, we ends
 		if (!Settings::get('qos_enabled'))
 			return;
@@ -340,8 +414,13 @@ class Web_interface_Controller extends Controller
 		
 		foreach ($members as $member)
 		{
-			$qos_ceil = network::speed_size($member->qos_ceil,"M");
-			$qos_rate = network::speed_size($member->qos_rate,"M");
+			$ceil = network::speed($member->u_ceil) . '/'
+					. network::speed($member->d_ceil);
+			$rate = network::speed($member->u_rate) . '/'
+					. network::speed($member->d_rate);
+			
+			$qos_ceil = network::speed_size($ceil,"M");
+			$qos_rate = network::speed_size($rate,"M");
 			
 			$total_upload_rate += $qos_rate['upload'];
 			$total_download_rate += $qos_rate['download'];
@@ -457,6 +536,14 @@ class Web_interface_Controller extends Controller
 	 */
 	public function ip_addresses_qos_ceil_rate()
 	{
+		// only enabled if IP address that requested for this page is from
+		// one of allowed ranges in the FreenetIS
+		if (!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+		
 		// qos is not enabled, we ends
 		if (!Settings::get('qos_enabled'))
 			return;
@@ -551,7 +638,7 @@ class Web_interface_Controller extends Controller
 	 * @return type 
 	 */
 	public function monitoring_states()
-	{	
+	{
 		if (!Settings::get('monitoring_enabled') ||
 			(server::remote_addr() != Settings::get('monitoring_server_ip_address')))
 		{
@@ -579,54 +666,71 @@ class Web_interface_Controller extends Controller
 	}
 	
 	/**
-	 * It creates pagination of results, it is used for buffering result
-	 * for smaller parts, e.g. Mikrotik cannot handle file >= 4096 kB
+	 * Configuration for Prometheus QoS utility.
+	 * This configuration does not includes handlind of upload values of speed,
+	 * it takes just download.
 	 * 
-	 * @author Michal Kliment
-	 * @param type $delimeter_size
-	 * @param type $items
-	 * @param type $page
-	 * @return string 
+	 * @author Ondřej Fibich
+	 * @see http://freecode.com/projects/prometheus-qos
 	 */
-	private function paginator($delimeter_size, $items, $page = NULL)
+	public function qos_prometheus()
 	{
-		$data = array();
+		// only enabled if IP address that requested for this page is from
+		// one of allowed ranges in the FreenetIS
+		if (!network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
 		
-		$current_page = 1;
+		$speed_class_model = new Speed_class_Model();
 		
-		// data for first page
-		$data[$current_page] = '';
+		echo "# Prometheus QoS configuration\n";
+		echo "# generated on " . date('Y-m-d H:i:s') . "\n";
+		echo "# FreenetIS " . Version::get_version() . "\n\n";
+
+		$speed_classes = $speed_class_model->orderby('d_ceil', 'DESC')->find_all();
 		
-		foreach ($items as $item)
-		{	
-			// overflow data of current page
-			if (strlen($data[$current_page]) + strlen($item) +1 >= $delimeter_size)
-			{
-				// we want current page => return it
-				if ($page && $page == $current_page)
+		foreach ($speed_classes as $speed_class)
+		{
+			echo "\n######## $speed_class->name ################################\n";
+			
+			$ips = $speed_class_model->get_ip_addresses_to_class($speed_class->id);
+			$last_member_id = NULL;
+			$last_id = NULL;
+			
+			foreach ($ips as $ip)
+			{				
+				// last two parts of IP address
+				$ip_end = mb_substr($ip->ip_address, mb_strpos(
+								$ip->ip_address, '.',
+								mb_strpos($ip->ip_address, '.') + 1
+				) + 1);
+				
+				// first row
+				if ($last_id === NULL)
 				{
-					return $data[$current_page];
+					$last_id = "$ip->user_login.$ip_end";
 				}
 				
-				// otherwise create new page
-				$current_page++;
-
-				$data[$current_page] = '';
-			}
-
-			// store data to current page
-			$data[$current_page] .= "$item\n";
+				echo "$ip->ip_address\t$ip->user_login.$ip_end\t\t";
 				
+				// group same member by comments
+				if ($last_member_id != $ip->member_id)
+				{
+					$min = intval($speed_class->d_rate / 1024); // convert B => kB
+					$max = intval($speed_class->d_ceil / 1024); // convert B => kB
+					echo "#via-prometheus-$min-$max\n";
+					// change member values
+					$last_member_id = $ip->member_id;
+					$last_id = "$ip->user_login.$ip_end";
+				}
+				else
+				{
+					echo "#sharing-$last_id\n";
+				}
+			}
 		}
-		
-		// we want last page => return it
-		if ($page)
-		{
-			return $data[$current_page];
-		}
-		
-		// otherwise print number of total pages
-		return count($data);
 	}
-
+	
 }

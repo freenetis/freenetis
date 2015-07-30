@@ -24,8 +24,7 @@ class Forgotten_password_Controller extends Controller
 	 */
 	public function index()
 	{
-		if (!$this->settings->get('forgotten_password') ||
-			$this->session->get('user_id', 0))
+		if (!Settings::get('forgotten_password') || $this->session->get('user_id', 0))
 		{
 			url::redirect('login');
 		}
@@ -33,90 +32,134 @@ class Forgotten_password_Controller extends Controller
 		if ($this->input->get('request'))
 		{
 			self::change_password($this->input->get('request'));
+			exit();
 		}
-		else
+		
+		$message = __('New password into the information system can be obtained via e-mail') . '.<br />';
+		$message .= __('Please insert username or e-mail which you had filled in previously in FreenetIS or which you filled in your application').'.';
+		$message_error = NULL; 
+		
+		$form = new Forge();
+
+		$form->input('data')
+				->label('Username or e-mail')
+				->rules('required');
+
+		// submit button
+		$form->submit('Send');
+
+		$form_html = $form->html();
+
+		if ($form->validate())
 		{
-			$message = __('New password into the information system can be obtained via e-mail') . '.<br />';
-			$message .= __('Please insert username and e-mail which you had filled in previously in Freenetis or which you filled in your application').'.';
+			$form_data = $form->as_array();
 
-			$form = new Forge();
+			$user = new User_Model();
+			$user_contact = new Users_contacts_Model();
+			$contact = new Contact_Model();
 
-			$form->input('login')
-					->label('Username')
-					->rules('required|length[3,50]')
-					->callback(array($this, 'valid_username'));
-					
-			$form->input('email')
-					->rules('length[4,50]|valid_email');
-
-			// submit button
-			$form->submit('Send');
-			
-			$form_html = $form->html();
-
-			if ($form->validate())
+			if (valid::email($form_data['data']))
 			{
-				$form_data = $form->as_array();
+				$contact->where(array
+				(
+					'type'	=> Contact_Model::TYPE_EMAIL,
+					'value'	=> $form_data['data']
+				))->find();
 
-				/* @var $user User_Model */
-				$user = ORM::factory('user')->where('login', $form_data['login'])->find();
-				
-				//if login was not found
-				if (!$user->id)
+				if ($contact->id)
 				{
-					$message = '<b class="error">'.__('Login do not match with data in information system').'. ';
-					$message .= __('Please contact support.').'.</b>';
-				}
-				else
-				{
-					if ($user->email_exist($form_data['email'], $user->id))
-					{
-						$hash = text::random('numeric', 10);
+					$user_id = $user_contact->get_user_of_contact($contact->id);
 
-						$user->password_request = $hash;
-						$user->save();
-
-						// From, subject and HTML message
-						$from = Settings::get('email_default_email');
-						$to = $form_data['email'];
-						$subject = 'FreenetIS - '.__('Forgotten password');
-						
-						$e_message = '<html><body>';
-						$e_message .= __('Hello').' ';
-						$e_message .= $user->login.',<br /><br />';
-						$e_message .= __('Someone from the IP address %s, probably you, requested to change your password', server::remote_addr()).'. ';
-						$e_message .= __('New password can be changed at the following link').':<br /><br />';
-						$e_message .= html::anchor('forgotten_password?request='.$hash,	url_lang::base().'forgotten_password?request='.$hash);
-						$e_message .= '<br /><br />'.url_lang::lang('mail.welcome').'<br />';
-						$e_message .= '</body></html>';
-			
-						if (email::send($to, $from, $subject, $e_message, true))
-						{
-						    $message = '<b>'.__('The request has been sent to your e-mail').' (';
-							$message .= $to . ').</b><br />';
-						    $message .= __('Please check your e-mail box').'. ';
-						    $message .= __('If message does not arrive in 20 minutes, please contact support').'.';
-						}
-						else
-						{
-						    $message = __('Sending message failed. Please contact support.');
-						}
-						
-						$form_html = '';
-					}
-					else
+					if ($user_id)
 					{
-						$message = '<b class="error">'.__('E-mail do not match with data in information system. Please contact support.').'.</b>';;
+						$user->find($user_id);
 					}
 				}
 			}
-			
-			$view = new View('forgotten_password/index');
-			$view->title = __('Forgotten password');
-			$view->message = $message;
-			$view->form = $form_html;
-			$view->render(TRUE);
+			else
+			{
+				$user->where('login', $form_data['data'])->find();
+			}
+
+			// if login was not found
+			if (!$user->id)
+			{
+				$message_error = __('Login or e-mail do not match with data in information system').'. ';
+				$message_error .= __('Please contact support.').'.';
+			}
+			// if user has no e-mail addresses
+			else if (!$contact->count_all_users_contacts($user->id, Contact_Model::TYPE_EMAIL))
+			{
+				$message_error = __('There is no e-mail filled in your account').'. ';
+				$message_error .= __('Please contact support.').'.';
+			}
+			else
+			{
+				// e-mail address
+				if ($contact->id)
+				{
+					$to = array($contact->value); 
+				}
+				else
+				{
+					$to = array();
+					$contacts = $contact->find_all_users_contacts($user->id, Contact_Model::TYPE_EMAIL);
+
+					foreach ($contacts as $c)
+					{
+						$to[] = $c->value;
+					}
+				}
+
+				// save request string
+				$hash = text::random('numeric', 10);
+				$user->password_request = $hash;
+				$user->save();
+
+				// From, subject and HTML message
+				$from = Settings::get('email_default_email');
+				$subject = Settings::get('title') . ' - '.__('Forgotten password');
+
+				$e_message = '<html><body>';
+				$e_message .= __('Hello').' ';
+				$e_message .= $user->get_full_name_with_login().',<br /><br />';
+				$e_message .= __('Someone from the IP address %s, probably you, requested to change your password', server::remote_addr()).'. ';
+				$e_message .= __('New password can be changed at the following link').':<br /><br />';
+				$e_message .= html::anchor('forgotten_password?request='.$hash);
+				$e_message .= '<br /><br />'.url_lang::lang('mail.welcome').'<br />';
+				$e_message .= '</body></html>';
+
+				$sended = TRUE;
+
+				foreach ($to as $email)
+				{
+					if (!email::send($email, $from, $subject, $e_message, true))
+					{
+						$sended = FALSE;
+					}
+				}
+
+				if ($sended)
+				{
+					$message = '<b>'.__('The request has been sent to your e-mail').' (';
+					$message .= implode(', ', $to) . ').</b><br />';
+					$message .= __('Please check your e-mail box').'. ';
+					$message .= __('If message does not arrive in 20 minutes, please contact support').'.';
+				}
+				else
+				{
+					$message_error = __('Sending message failed. Please contact support.');
+				}
+
+				$form_html = '';
+			}
 		}
+
+		$view = new View('forgotten_password/index');
+		$view->title = __('Forgotten password');
+		$view->message = $message . ($message_error ? '<br /><br /><b class="error">' . $message_error . '</b>' : '');
+		$view->form = $form_html;
+		$view->render(TRUE);
 	}
 
 	/**
@@ -127,9 +170,8 @@ class Forgotten_password_Controller extends Controller
 	private function change_password($hash)
 	{
 		$user = ORM::factory('user')->where('password_request', $hash)->find();
-
-
-		if ($user->id == 0)
+		
+		if (!$user->id)
 		{
 			$view = new View('forgotten_password/index');
 			$view->title = __('Forgotten password');
@@ -139,16 +181,18 @@ class Forgotten_password_Controller extends Controller
 		}
 		else
 		{
+			$pass_min_len = Settings::get('security_password_length');
+			
 			$form = new Forge('forgotten_password?request='.htmlspecialchars($hash));
 
 			$form->password('password')
-					->label('New password')
-					->rules('required|length[3,50]')
-					->class('password');
+					->label(__('New password') . ':&nbsp;' . help::hint('password'))
+					->rules('required|length['.$pass_min_len.',50]')
+					->class('main_password');
 			
 			$form->password('confirm_password')
 					->label('Confirm new password')
-					->rules('required|length[3,50]')
+					->rules('required|length['.$pass_min_len.',50]')
 					->matches($form->password);
 
 			// submit button
@@ -178,31 +222,10 @@ class Forgotten_password_Controller extends Controller
 				$view->message = $message;
 				$view->form = $form->html();
 				$view->render(TRUE);
-
 			}
 		}
 	}
-
-	/**
-	 * Check if username is valid
-	 *
-	 * @param object $input 
-	 */
-	public function valid_username($input = NULL)
-	{
-		// validators cannot be accessed
-		if (empty($input) || !is_object($input))
-		{
-			self::error(PAGE);
-		}
-		
-		if (preg_match('/^[a-zA-Z0-9]+$/', $input->value) == 0)
-		{
-			$input->add_error('required', __(
-					'Login must contains only a-z and 0-9 and starts with literal.'
-			));
-		}
-	}
+	
 }
 
 

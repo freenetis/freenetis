@@ -2,11 +2,11 @@
 <?php if (isset($submenu))
 	echo '<div class="submenu">' . $submenu . '</div>'; ?>
 <?php
-if ($this->acl_check_edit('Devices_Controller', 'vlan'))
+if ($this->acl_check_edit('Vlans_Controller', 'vlan'))
 	echo html::anchor('vlans/edit/' . $vlan->id, __('Edit'))
 ?>
 <?php
-if ($this->acl_check_delete('Devices_Controller', 'vlan'))
+if ($this->acl_check_delete('Vlans_Controller', 'vlan'))
 	echo ' | '.html::anchor('vlans/delete/' . $vlan->id, __('Delete'))
 ?><br /><br />
 

@@ -101,9 +101,9 @@ class Sms_Soudvinv100 extends Sms
 			return false;
 		}
 		
-		if (!text::starts_with($recipient, '00'))
+		if (!text::starts_with($recipient, '+'))
 		{
-			$recipient .= '00';
+			$recipient = '+' . $recipient;
 		}
 
 		$vars = array
@@ -167,37 +167,36 @@ class Sms_Soudvinv100 extends Sms
 			return false;
 		}
 		else
-		{
-			$messages = explode('\n', $result);
+		{			
+			$lines = explode("\n", $result);
 
 			$sms = array();
-			$c = 0;
 
-			foreach ($messages as $m)
+			foreach ($lines as $line)
 			{
-				$message = substr($m, strpos($m, 'From:'));
+				
+				$message = substr($line, strpos($line, 'From:'));
 
 				if (stristr($message, 'From:') != FALSE &&
 					stristr($message, 'Date:') != FALSE &&
 					stristr($message, 'Message:') != FALSE)
 				{
+					$item = new stdClass();
+					
 					$sub_message = explode('Date:', $message);
 
 					$from = str_replace('+', '', $sub_message[0]);
 
 					$from = trim($from);
-					$sender = substr($from, 5);
-					$date = substr($sub_message[1], 0, 17);
+					$item->sender = substr($from, 5);
+					$item->date = substr($sub_message[1], 0, 17);
 		
-					$text = substr(
+					$item->text = substr(
 							substr($sub_message[1], 26), 0,
 							strlen(substr($sub_message[1], 26)) - 2
 					);
 
-					$sms[$c]->sender = $sender;
-					$sms[$c]->date = $date;
-					$sms[$c]->text = $text;
-					$c++;
+					$sms[] = $item;
 				}
 			}
 

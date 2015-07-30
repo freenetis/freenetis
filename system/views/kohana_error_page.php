@@ -60,14 +60,14 @@ strong {color:#700;}
 		$('form').validate();
 	});
 
---></script>
+//--></script>
 </head>
 <body>
 	<div id="wrap">
 		<h1><?php echo Kohana::lang('core.Server error') ?></h1>
 		<p><?php echo Kohana::lang('core.Please report this error as bug using form below') ?>:</p>
 		<form action="<?php echo url_lang::base() ?>email/send_email_to_developers" class="form" method="post" style="margin-bottom: 20px">
-			<table cellspacing="4" class="form">
+			<table cellspacing="4" class="form" style="background: #F1F1F1">
 				<tr>
 					<td><label for="uname"><?php echo url_lang::lang('texts.Your name') ?>:</label></td>
 					<td><input type="text" name="uname" class="required" /></td>

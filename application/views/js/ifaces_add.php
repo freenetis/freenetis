@@ -264,10 +264,11 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		{
 			$link_add_detail.hide();
 		}
+		
+		var type = $('#itype').val();
 
 		if (!made)
 		{
-			var type = $('#itype').val();
 			var default_name = (type == <?php echo Iface_Model::TYPE_WIRELESS ?>) ? '<?php echo __('air') ?>' : '<?php echo __('cable') ?>';
 
 			$.ajax({
@@ -298,6 +299,27 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			$('#wireless_channel').val(null);
 			$('#wireless_channel_width').val(null);
 			$('#wireless_polarization').val(null);
+		}
+		
+		// inform user if the new connection will break some old connection (#397)
+		if (type == <?php echo Iface_Model::TYPE_PORT ?> || type == <?php echo Iface_Model::TYPE_ETHERNET ?>)
+		{
+			$.ajax({
+				method:		'get',
+				dataType:	'json',
+				url:		'<?php echo url_lang::base(); ?>json/get_iface_and_device_connected_to_iface?iface_id=' + iface_id<?php if ($iface_id): echo " + '&parent_iface_id=$iface_id'"; endif; ?>,
+				success:	function (v)
+				{
+					if (v && v.device && v.iface)
+					{
+						var m = '<?php echo __('Interface that you choosed is connected to another interface') ?>:\n\n';
+						m += '<?php echo __('Device') ?>: ' + v.device.id + ', ' + v.device.name + '\n';
+						m += '<?php echo __('Interface') ?>: ' + v.iface.name + ', ' + v.iface.mac + '\n\n';
+						m += '<?php echo __('If you do not change this connected to option, link between these devices will be destroyed') ?>!';
+						alert(m);
+					}
+				}
+			});
 		}
 	}
 	

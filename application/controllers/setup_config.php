@@ -205,7 +205,7 @@ class Setup_config_Controller extends Controller
 				->rules('required')
 				->help('99&#37 chance you won\'t need to change this value.');
 		
-		$form->submit('Submit');
+		$form->submit(__('Next step').' >>>');
 
 		// form is valid
 		if ($form->validate())

@@ -39,15 +39,15 @@ class Logs_Controller extends Controller
 	 */
 	public function show_all($limit_results = 50, $page_word = null, $page = 1)
 	{
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Logs_Controller', 'logs'))
 			Controller::error(ACCESS);
 		
 		if (Settings::get('action_logs_active') != 1)
 			url::redirect('settings/logging');
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$filter_form = new Filter_form('l');
 		
@@ -74,8 +74,8 @@ class Logs_Controller extends Controller
 				->values(array
 				(
 					Log_Model::ACTION_ADD		=> __('Added'),
-					Log_Model::ACTION_DELETE	=> __('Deleted'),
-					Log_Model::ACTION_UPDATE	=> __('Updated')
+					Log_Model::ACTION_DELETE		=> __('Deleted'),
+					Log_Model::ACTION_UPDATE		=> __('Updated')
 				));
 		
 		$filter_form->add('object_id')
@@ -153,7 +153,7 @@ class Logs_Controller extends Controller
 	public function show_by_user($user_id = null, $limit_results = 200,
 			$page_word = null, $page = 1)
 	{
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Logs_Controller', 'logs'))
 			Controller::error(ACCESS);
 
 		if (!isset($user_id))
@@ -168,8 +168,8 @@ class Logs_Controller extends Controller
 			Controller::error(RECORD);
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$log_model = new Log_Model();
 
@@ -218,7 +218,7 @@ class Logs_Controller extends Controller
 				->callback('callback::log_action_field');
 		
 		$grid->field('table_name')
-				->label(__('Table'));
+				->label('Table');
 		
 		$grid->callback_field('object_id')
 				->label('Object')
@@ -230,7 +230,7 @@ class Logs_Controller extends Controller
 		
 		$breadcrumbs = breadcrumbs::add()
 				->link('logs/show_all', 'Action logs',
-						$this->acl_check_view('Settings_Controller', 'system'))
+						$this->acl_check_view('Logs_Controller', 'logs'))
 				->text($user->get_full_name() . ': ' . $user->login);
 
 		$view = new View('main');
@@ -253,7 +253,7 @@ class Logs_Controller extends Controller
 			$table, $object_id = null, $limit_results = 200,
 			$page_word = null, $page = 1)
 	{
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Logs_Controller', 'logs'))
 			Controller::error(ACCESS);
 		
 		if (!is_numeric($object_id) || !is_string($table))
@@ -263,8 +263,8 @@ class Logs_Controller extends Controller
 			url::redirect('settings/logging');
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$log_model = new Log_Model();
 
@@ -281,7 +281,7 @@ class Logs_Controller extends Controller
 		);
 
 		// create grid
-		$grid = new Grid(url_lang::base() . 'logs/show_all', '', array
+		$grid = new Grid('logs/show_all', '', array
 		(
 			'use_paginator'				=> true,
 			'use_selector'				=> true,
@@ -328,7 +328,7 @@ class Logs_Controller extends Controller
 		
 		$breadcrumbs = breadcrumbs::add()
 				->link('logs/show_all', 'Action logs',
-						$this->acl_check_view('Settings_Controller', 'system'))
+						$this->acl_check_view('Logs_Controller', 'logs'))
 				->disable_translation()
 				->text(__('Object') . ' ' . $table . ':' . $object_id);
 

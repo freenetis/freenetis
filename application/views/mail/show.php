@@ -1,5 +1,5 @@
 <br />
-<?php echo html::anchor('mail/write_message/0/'.$message->id, __('Reply'), array('class' => 'button_link')) ?>
+<?php echo ($from_user && $from_user->id != User_Model::ASSOCIATION) ? html::anchor('mail/write_message/0/'.$message->id, __('Reply'), array('class' => 'button_link')) : '' ?>
 <?php echo html::anchor('mail/delete_message/'.$message->id, __('Delete'), array('class' => 'button_link delete_link')) ?>
 <table class="extended" style="width: 720px; margin-top: 25px">
 	<tr>

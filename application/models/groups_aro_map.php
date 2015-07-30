@@ -35,18 +35,6 @@ class Groups_aro_map_Model extends ORM
 	 * 
 	 * Be wery carefull with editing of this method, whole system can be
 	 * damaged by impropriate edit!
-	 * 
-	 * I have tried to different method of fetching data,
-	 * and for each I have made benchmarks using unit tester
-	 * throught all controllers.
-	 * 
-	 * 1) DB query for each access rights
-	 *    AVG Results:		0,3187821622s	6,4278378378MB
-	 * 
-	 * 2) DB query for all user's rights cached after first of his access request
-	 *    AVG Results:		0,3484608815s	6,4987052342MB
-	 * 
-	 * The first method seems to be better, so here it is :-)
 	 *
 	 * @author Ondřej Fibich
 	 * @staticvar array $cache			Cache of access
@@ -70,11 +58,6 @@ class Groups_aro_map_Model extends ORM
 		// access rights.
 		if ($cache_aro_hierarchy === NULL)
 		{
-////////////////////////////////////////////////////////////////////////////////
-//			// Debug for testing (benchmark)
-//			$start_time = microtime(); 
-////////////////////////////////////////////////////////////////////////////////
-			
 			// Gets all groups id with relation to parent
 			$aro_groups = ORM::factory('aro_group')->select_list('id', 'parent_id', 'id');
 			// Go throught groupd
@@ -99,86 +82,56 @@ class Groups_aro_map_Model extends ORM
 				// Add to cache
 				$cache_aro_hierarchy[$i] = array_unique($final_set);
 			}
-			
-////////////////////////////////////////////////////////////////////////////////
-//			// Debug for testing
-//			
-//			$diff = microtime() - $start_time;
-//			echo 'It tooks: ' . $diff . 'ms <br>';
-//			
-//			foreach ($cache_acl as $i => $v)
-//			{
-//				echo '<b>' . ORM::factory('aro_group', $i)->name . '</b>: ';
-//				sort($v);
-//				
-//				foreach ($v as $id)
-//				{
-//					echo ORM::factory('aro_group', $id)->name . ', ';
-//				}
-//				
-//				echo "<br><br>";
-//			}
-//			
-//			die();
-////////////////////////////////////////////////////////////////////////////////
 		}
 		
 		// Cache key
 		$key = "$user_id#$aco_value#$axo_section_value#$axo_value";
 		
-		// Is in cache?
-		if (!array_key_exists($key, $cache))
+		// Fill in user cache?
+		if (!array_key_exists($user_id, $cache_aro_user))
 		{
-			// Fill in user cache?
-			if (!array_key_exists($user_id, $cache_aro_user))
+			// Get all ARO groups of user
+			$user_in_groups = $this->where('aro_id', $user_id)
+					->select_list('group_id', 'aro_id');
+			// Set cache
+			$cache_aro_user[$user_id] = array();
+			// Add all parents for users group and set it to cache
+			foreach ($user_in_groups as $group_id => $aro_id)
 			{
-				// Get all ARO groups of user
-				$user_in_groups = $this->where('aro_id', $user_id)
-						->select_list('group_id', 'aro_id');
-				// Set cache
-				$cache_aro_user[$user_id] = array();
-				// Add all parents for users group and set it to cache
-				foreach ($user_in_groups as $group_id => $aro_id)
-				{
-					$cache_aro_user[$user_id] = array_merge(
-							$cache_aro_user[$user_id],
-							$cache_aro_hierarchy[$group_id]
-					);
-				}
-				// Discart not unique values
-				$cache_aro_user[$user_id] = array_unique($cache_aro_user[$user_id]);
+				$cache_aro_user[$user_id] = array_merge(
+						$cache_aro_user[$user_id],
+						$cache_aro_hierarchy[$group_id]
+				);
 			}
-			
+			// Discart not unique values
+			$cache_aro_user[$user_id] = array_unique($cache_aro_user[$user_id]);
+
 			// Is user in any group?
 			if (count($cache_aro_user[$user_id]))
 			{
-			// Check and add to cache
-			$cache[$key] = $this->db->query("
-					SELECT COUNT(*) AS count
+				// Check and add to cache
+				$results = $this->db->query("
+						SELECT CONCAT(aco.value, '#', axo_map.section_value, '#',
+							axo_map.value) AS name, COUNT(*) AS count
 						FROM aro_groups
-					LEFT JOIN aro_groups_map ON aro_groups_map.group_id = aro_groups.id
-					LEFT JOIN acl ON acl.id = aro_groups_map.acl_id
-					LEFT JOIN aco_map ON aco_map.acl_id = acl.id
-					LEFT JOIN aco ON aco.value = aco_map.value
-					LEFT JOIN axo_map ON axo_map.acl_id = acl.id
-						WHERE aro_groups.id IN(" . implode(',', $cache_aro_user[$user_id]) . ") AND
-						aco.value = ? AND
-						axo_map.section_value = ? AND
-						axo_map.value = ?
-			", array
-			(
-					$aco_value, $axo_section_value, $axo_value
-			))->current()->count > 0;
-		}
-			// No group, no access :-)
-			else
-			{
-				$cache[$key] = FALSE;
+						JOIN aro_groups_map ON aro_groups_map.group_id = aro_groups.id
+						JOIN acl ON acl.id = aro_groups_map.acl_id
+						JOIN aco_map ON aco_map.acl_id = acl.id
+						JOIN aco ON aco.value = aco_map.value
+						JOIN axo_map ON axo_map.acl_id = acl.id
+						WHERE aro_groups.id IN(" . implode(',', $cache_aro_user[$user_id]) . ")
+						GROUP BY aco.value, axo_map.section_value, axo_map.value
+				");
+
+				foreach ($results as $result)
+				{
+					$cache["$user_id#$result->name"] = ($result->count > 0);
+				}
 			}
 		}
 		
 		// Return access info
-		return $cache[$key];
+		return (array_key_exists($key, $cache) ? $cache[$key] : FALSE);
 	}
 	
 	/**

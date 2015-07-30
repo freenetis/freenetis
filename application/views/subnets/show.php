@@ -8,25 +8,32 @@ if (isset($submenu))
 
 $links = array();
 
-if ($this->acl_check_edit('Devices_Controller', 'subnet'))
+if ($this->acl_check_edit('Subnets_Controller', 'subnet'))
 {
 	$links[] = html::anchor('subnets/edit/' . $subnet->id, __('Edit'));
 }
 
-if ($this->acl_check_delete('Devices_Controller', 'subnet'))
+if ($this->acl_check_delete('Subnets_Controller', 'subnet'))
 {
 	$links[] = html::anchor('subnets/delete/' . $subnet->id, __('Delete'));
 }
 
-if ($this->acl_check_edit('Devices_Controller', 'redirect'))
+if (module::e('notification') &&
+	$this->acl_check_new('Notifications_Controller', 'subnet'))
 {
 	$links[] = html::anchor('notifications/subnet/' . $subnet->id, __('Notifications'));
 }
 
-if ($this->acl_check_view('Devices_Controller', 'subnet'))
+if ($this->acl_check_view('Subnets_Controller', 'subnet'))
 {
-	$links[] = html::anchor('export/csv/subnets/utf-8/' . $subnet->id, __('Export to CSV (utf-8)'));
-	$links[] = html::anchor('export/csv/subnets/windows-1250/' . $subnet->id, __('Export to CSV (windows-1250)'));
+	$links[] = html::anchor(
+		'export/csv/subnets/null/' . $subnet->id,
+		__('Export to CSV'),
+		array
+		(
+			'class' => 'popup_link'
+		)
+	);
 }
 
 echo implode(' | ', $links);
@@ -60,10 +67,30 @@ echo implode(' | ', $links);
 		<th><?php echo __('OSPF area ID') ?></th>
 		<td><?php echo $subnet->OSPF_area_id ?></td>
 	</tr>
+	<?php if ($this->acl_check_view('Subnets_Controller', 'redirect')): ?>
 	<tr>
 		<th><?php echo __('Redirection enabled') ?></th>
 		<td><?php echo ($subnet->redirect == 1) ? __('Yes') : __('No') ?></td>
 	</tr>
+	<?php endif ?>
+	<?php if ($this->acl_check_view('Subnets_Controller', 'dhcp')): ?>
+	<tr>
+		<th><?php echo __('DHCP server') ?> <?php echo help::hint('subnet_dhcp') ?></th>
+		<td><?php echo ($subnet->dhcp == 1) ? __('Yes') : __('No') ?></td>
+	</tr>
+	<?php endif ?>
+	<?php if ($this->acl_check_view('Subnets_Controller', 'dns')): ?>
+	<tr>
+		<th><?php echo __('DNS server') ?> <?php echo help::hint('subnet_dns') ?></th>
+		<td><?php echo ($subnet->dns == 1) ? __('Yes') : __('No') ?></td>
+	</tr>
+	<?php endif ?>
+	<?php if ($this->acl_check_view('Subnets_Controller', 'qos')): ?>
+	<tr>
+		<th><?php echo __('QoS') ?> <?php echo help::hint('subnet_qos') ?></th>
+		<td><?php echo ($subnet->qos == 1) ? __('Yes') : __('No') ?></td>
+	</tr>
+	<?php endif ?>
 	<tr>
 		<th><?php echo __('Cloud') ?></th>
 		<td>

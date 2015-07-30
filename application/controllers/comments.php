@@ -28,7 +28,7 @@ class Comments_Controller extends Controller
 	 * @param integer $comments_thread_id
 	 */
 	public function add($comments_thread_id = NULL)
-	{
+	{	    
 		// bad parameter
 		if (!$comments_thread_id || !is_numeric($comments_thread_id))
 			Controller::warning(PARAMETER);
@@ -46,12 +46,16 @@ class Comments_Controller extends Controller
 		
 		$title = '';
 		
+		// user who add comment
+		$user = new User_Model($this->user_id);
+		
 		switch ($comments_thread->type)
 		{
 			// thread belongs to account
 			case 'account':
 				// access control
-				if (!$this->acl_check_view('Members_Controller', 'comment', $parent->member_id))
+				if (!Settings::get('finance_enabled') ||
+					!$this->acl_check_view('Members_Controller', 'comment', $parent->member_id))
 					Controller::error(ACCESS);
 
 				$link_back_url = Path::instance()->previous();
@@ -66,15 +70,34 @@ class Comments_Controller extends Controller
 				$title = __('Add comment to financial state of member');
 				break;
 				
-			case 'job':
+			// thread belongs to connection_requests
+			case 'connection_request':
 				// access control
-				if (!$this->acl_check_new(get_class($this), 'works', $parent->user->member_id))
+				if (!module::e('connection_request') ||
+					!$this->acl_check_edit('Connection_Requests_Controller', 'request'))
 					Controller::error(ACCESS);
 
-				if (url::slice(url_lang::uri(Path::instance()->previous()), 1, 1) == 'show_work')
-				{
-					$link_back_url = 'users/show_work/' . $parent->id;
+				$link_back_url = Path::instance()->previous();
 
+				$title = __('Add comment to connection request');
+				
+				$breadcrumbs->link('connection_requests/show_all', 'Connection requests',
+								$this->acl_check_view('Connection_requests_Controller', 'request'))
+						->disable_translation()
+						->link('connection_requests/show/' . $parent->id,
+								$parent->ip_address . ' (' . $parent->mac_address . ')',
+								$this->acl_check_view('Connection_requests_Controller', 'request', $parent->member_id))
+						->text($title);
+				break;
+				
+			case 'job':
+				// access control
+				if (!Settings::get('works_enabled') ||
+				    !$this->acl_check_new('Comments_Controller', 'works', $parent->user->member_id))
+					Controller::error(ACCESS);
+
+				if (Path::instance()->uri(TRUE)->previous(0,1) == 'users')
+				{
 					$breadcrumbs->link('members/show_all', 'Members',
 									$this->acl_check_view('Members_Controller', 'members'))
 							->disable_translation()
@@ -88,41 +111,132 @@ class Comments_Controller extends Controller
 									$parent->user->name . " " . $parent->user->surname . " (" . $parent->user->login . ")",
 									$this->acl_check_view('Users_Controller', 'users', $parent->user->member_id))
 							->link('works/show_by_user/' . $parent->user->id, 'Works',
-									$this->acl_check_view('Users_Controller', 'work', $parent->user->member_id))
+									$this->acl_check_view('Works_Controller', 'work', $parent->user->member_id))
 							->disable_translation()
 							->link('users/show_work/' . $parent->id, __('ID') . ' ' . $parent->id,
-									$this->acl_check_view('Users_Controller', 'work', $parent->user->member_id))
+									$this->acl_check_view('Works_Controller', 'work', $parent->user->member_id))
 							->enable_translation();
 				}
 				else
 				{
-					$link_back_url = 'works/show/' . $parent->id;
-
-					switch ($parent->state)
-					{
-						case 0:
-						case 1:
-							$breadcrumbs->link('works/pending', 'Pending works',
-									$this->acl_check_view('Users_Controller', 'work'));
-							break;
-						case 2:
-							$breadcrumbs->link('works/rejected', 'Rejected works',
-									$this->acl_check_view('Users_Controller', 'work'));
-							break;
-						case 3:
-							$breadcrumbs->link('works/approved', 'Approved works',
-									$this->acl_check_view('Users_Controller', 'work'));
-							break;
-					}
-					
-					$breadcrumbs->disable_translation()
+					$breadcrumbs
+							->link('works/pending', 'Works',
+								$this->acl_check_view('Works_Controller', 'work'))
+							->disable_translation()
 							->link('works/show/' . $parent->id, 
 									__('ID') . ' ' . $parent->id,
-									$this->acl_check_view('Users_Controller', 'work', $parent->user->member_id))
+									$this->acl_check_view('Works_Controller', 'work', $parent->user->member_id))
 							->enable_translation();
 				}
-				$breadcrumbs->text('Add comment to work');
+				
+				$breadcrumbs->text('Add comment');
 				$title = __('Add comment to work');
+				
+				$link_back_url = Path::instance()->previous();
+				
+				$type = Watcher_Model::WORK;
+				
+				$subject = mail_message::format('work_comment_add_subject');
+				$body = mail_message::format('work_comment_add', array
+				(
+					$user->name.' '.$user->surname,
+					$parent->user->name.' '.$parent->user->surname,
+					url_lang::base().'works/show/'.$parent->id
+				));
+				
+				break;
+			
+			// thread belongs to log queues
+			case 'log_queue':
+				// access control
+				if (!$this->acl_check_new('Log_queues_Controller', 'comments'))
+					Controller::error(ACCESS);
+
+				$link_back_url = Path::instance()->previous();
+
+				$title = __('Add comment to log');
+				$tname = Log_queue_Model::get_type_name($parent->type);
+				
+				$breadcrumbs->link('log_queues/show_all', 'Errors and logs')
+						->disable_translation()
+						->link('log_queues/show/' . $parent->id, $tname . ' (' . $parent->id . ')')
+						->text($title);
+				break;
+				
+			case 'request':
+				// access control
+				if (!Settings::get('approval_enabled') ||
+					!$this->acl_check_edit('Comments_Controller', 'requests'))
+					Controller::error(ACCESS);
+				
+				$title = __('Add comment to request');
+				
+				if (Path::instance()->uri(TRUE)->previous(0,1) == 'users')
+				{
+					$breadcrumbs
+						->link('members/show_all', 'Members',
+							$this->acl_check_view('Members_Controller', 'members'))
+					->disable_translation()
+					->link('members/show/'.$parent->user->member->id,
+							'ID ' . $parent->user->member->id . ' - ' .
+							$parent->user->member->name,
+							$this->acl_check_view(
+									'Members_Controller', 'members',
+									$parent->user->member->id
+							)
+					)->enable_translation()
+					->link('users/show_by_member/' . $parent->user->member_id,
+							'Users',
+							$this->acl_check_view(
+									'Users_Controller', 'users',
+									$parent->user->member_id
+							)
+					)->disable_translation()
+					->link('users/show/'.$parent->user->id,
+							$parent->user->name . ' ' . $parent->user->surname .
+							' (' . $parent->user->login . ')',
+							$this->acl_check_view(
+									'Users_Controller','users',
+									$parent->user->member_id
+							)
+					)->enable_translation()
+					->link('requests/show_by_user/'.$parent->user->id, 'Requests',
+							$this->acl_check_view(
+									'Requests_Controller', 'request',
+									$parent->user->member_id
+							)
+					)->link('users/show_request/'.$parent->id, 'ID '.$parent->id,
+							$this->acl_check_view(
+								'Requests_Controller', 'request',
+								$parent->user->member_id
+					));
+				}
+				else
+				{
+					$breadcrumbs
+						->link('requests/show_all', 'Requests',
+							$this->acl_check_view('Requests_Controller', 'request'))
+						->link('requests/show/'.$parent->id, 'ID '.$parent->id,
+							$this->acl_check_view(
+								'Comments_Controller', 'requests',
+								$parent->user->member_id
+						));
+				}
+				
+				$breadcrumbs->text('Add comment');
+				
+				$link_back_url = Path::instance()->previous();
+				
+				$type = Watcher_Model::REQUEST;
+				
+				$subject = mail_message::format('request_comment_add_subject');
+				$body = mail_message::format('request_comment_add', array
+				(
+					$user->name.' '.$user->surname,
+					$parent->user->name.' '.$parent->user->surname,
+					url_lang::base().'requests/show/'.$parent->id
+				));
+				
 				break;
 			
 			default:
@@ -130,7 +244,7 @@ class Comments_Controller extends Controller
 				break;
 		}
 
-		$form = new Forge(url::base(TRUE) . url::current(TRUE));
+		$form = new Forge();
 
 		$form->textarea('text')
 				->rules('required');
@@ -140,17 +254,41 @@ class Comments_Controller extends Controller
 		// form is validate
 		if ($form->validate())
 		{
-			$form_data = $form->as_array();
-
+			$form_data = $form->as_array(FALSE);
+			
 			$comment = new Comment_Model();
-			$comment->comments_thread_id = $comments_thread_id;
-			$comment->user_id = $this->session->get('user_id');
-			$comment->datetime = date('Y-m-d h:i:s');
-			$comment->text = $form_data['text'];
-
-			if ($comment->save())
+			
+			try
 			{
+				$comment->transaction_start();
+				
+				$comment->comments_thread_id = $comments_thread_id;
+				$comment->user_id = $this->user_id;
+				$comment->datetime = date('Y-m-d h:i:s');
+				$comment->text = $form_data['text'];
+
+				$comment->save_throwable();
+				
+				if (isset($type))
+				{		
+					// send message about comment adding to all watchers
+					Mail_message_Model::send_system_message_to_item_watchers(
+						$subject,
+						$body,
+						$type,
+						$parent->id
+					);
+				
+				}
+				
+				$comment->transaction_commit();
 				status::success('Comment has been successfully added');
+			}
+			catch (Exception $e)
+			{
+				$comment->transaction_rollback();
+				status::error('Error - Cannot add comment', $e);
+				Log::add_exception($e);
 			}
 
 			$this->redirect($link_back_url);
@@ -190,12 +328,16 @@ class Comments_Controller extends Controller
 
 		$breadcrumbs = breadcrumbs::add();
 		
+		// user who add comment
+		$user = new User_Model($this->user_id);
+		
 		switch ($comment->comments_thread->type)
 		{
 			// thread belongs to account
 			case 'account':
 				// access control
-				if (!$this->acl_check_view('Members_Controller', 'comment', $parent->member_id))
+				if (!Settings::get('finance_enabled') ||
+					!$this->acl_check_view('Members_Controller', 'comment', $parent->member_id))
 					Controller::error(ACCESS);
 				
 				$link_back_url = 'transfers/show_by_account/' . $parent->id;
@@ -208,17 +350,52 @@ class Comments_Controller extends Controller
 						->link($link_back_url, 'Transfers')
 						->text('Edit comment');
 				break;
+			
+			// thread belongs to connection_requests
+			case 'connection_request':
+				// access control
+				if (!module::e('connection_request') ||
+					!$this->acl_check_edit('Connection_Requests_Controller', 'request'))
+					Controller::error(ACCESS);
+
+				$link_back_url = Path::instance()->previous();
+
+				$title = __('Edit comment');
+				
+				$breadcrumbs->link('connection_requests/show_all', 'Connection requests',
+								$this->acl_check_view('Connection_requests_Controller', 'request'))
+						->disable_translation()
+						->link('connection_requests/show/' . $parent->id,
+								$parent->ip_address . ' (' . $parent->mac_address . ')',
+								$this->acl_check_view('Connection_requests_Controller', 'request', $parent->member_id))
+						->text($title);
+				break;
+				
+			// thread belongs to log queues
+			case 'log_queue':
+				// access control
+				if (!$this->acl_check_edit('Log_queues_Controller', 'comments'))
+					Controller::error(ACCESS);
+
+				$link_back_url = Path::instance()->previous();
+
+				$title = __('Edit comment');
+				$tname = Log_queue_Model::get_type_name($parent->type);
+				
+				$breadcrumbs->link('log_queues/show_all', 'Errors and logs')
+						->disable_translation()
+						->link('log_queues/show/' . $parent->id, $tname . ' (' . $parent->id . ')')
+						->text($title);
+				break;
 				
 			case 'job':
 				// access control
-				if (!$this->acl_check_edit(get_class($this), 'works', $comment->user->member_id))
+				if (!Settings::get('works_enabled') ||
+				    !$this->acl_check_edit('Comments_Controller', 'works', $comment->user->member_id))
 					Controller::error(ACCESS);
 
-				if (url::slice(url_lang::uri(Path::instance()->previous()), 1, 1) == 'show_work')
+				if (Path::instance()->uri(TRUE)->previous(0,1) == 'users')
 				{
-					$link_back_url = 'users/show_work/' . $parent->id;
-					
-					
 					$breadcrumbs->link('members/show_all', 'Members',
 									$this->acl_check_view('Members_Controller', 'members'))
 							->disable_translation()
@@ -232,41 +409,112 @@ class Comments_Controller extends Controller
 									$parent->user->name . " " . $parent->user->surname . " (" . $parent->user->login . ")",
 									$this->acl_check_view('Users_Controller', 'users', $parent->user->member_id))
 							->link('works/show_by_user/' . $parent->user->id, 'Works',
-									$this->acl_check_view('Users_Controller', 'work', $parent->user->member_id))
+									$this->acl_check_view('Works_Controller', 'work', $parent->user->member_id))
 							->disable_translation()
 							->link('users/show_work/' . $parent->id, __('ID') . ' ' . $parent->id,
-									$this->acl_check_view('Users_Controller', 'work', $parent->user->member_id))
+									$this->acl_check_view('Works_Controller', 'work', $parent->user->member_id))
 							->enable_translation();
 				}
 				else
 				{
-					$link_back_url = 'works/show/' . $parent->id;
-
-					switch ($parent->state)
-					{
-						case 0:
-						case 1:
-							$breadcrumbs->link('works/pending', 'Pending works',
-									$this->acl_check_view('Users_Controller', 'work'));
-							break;
-						case 2:
-							$breadcrumbs->link('works/rejected', 'Rejected works',
-									$this->acl_check_view('Users_Controller', 'work'));
-							break;
-						case 3:
-							$breadcrumbs->link('works/approved', 'Approved works',
-									$this->acl_check_view('Users_Controller', 'work'));
-							break;
-					}
-					
-					$breadcrumbs->disable_translation()
+					$breadcrumbs
+							->link('works/pending', 'Works',
+								$this->acl_check_view('Works_Controller', 'work'))
+							->disable_translation()
 							->link('works/show/' . $parent->id, 
 									__('ID') . ' ' . $parent->id,
-									$this->acl_check_view('Users_Controller', 'work', $parent->user->member_id))
+									$this->acl_check_view('Works_Controller', 'work', $parent->user->member_id))
 							->enable_translation();
 				}
 				
 				$breadcrumbs->text('Edit comment');
+				
+				$link_back_url = Path::instance()->previous();
+				
+				$type = Watcher_Model::WORK;
+				
+				$subject = mail_message::format('work_comment_update_subject');
+				$body = mail_message::format('work_comment_update', array
+				(
+					$user->name.' '.$user->surname,
+					$parent->user->name.' '.$parent->user->surname,
+					url_lang::base().'works/show/'.$parent->id
+				));
+				
+				break;
+			
+			case 'request':
+				// access control
+				if (!Settings::get('approval_enabled') || !$this->acl_check_edit('Comments_Controller', 'requests'))
+					Controller::error(ACCESS);
+				
+				$title = __('Add comment to request');
+				
+				if (Path::instance()->uri(TRUE)->previous(0,1) == 'users')
+				{
+					$breadcrumbs
+						->link('members/show_all', 'Members',
+							$this->acl_check_view('Members_Controller', 'members'))
+					->disable_translation()
+					->link('members/show/'.$parent->user->member->id,
+							'ID ' . $parent->user->member->id . ' - ' .
+							$parent->user->member->name,
+							$this->acl_check_view(
+									'Members_Controller', 'members',
+									$parent->user->member->id
+							)
+					)->enable_translation()
+					->link('users/show_by_member/' . $parent->user->member_id,
+							'Users',
+							$this->acl_check_view(
+									'Users_Controller', 'users',
+									$parent->user->member_id
+							)
+					)->disable_translation()
+					->link('users/show/'.$parent->user->id,
+							$parent->user->name . ' ' . $parent->user->surname .
+							' (' . $parent->user->login . ')',
+							$this->acl_check_view(
+									'Users_Controller','users',
+									$parent->user->member_id
+							)
+					)->enable_translation()
+					->link('requests/show_by_user/'.$parent->user->id, 'Requests',
+							$this->acl_check_view(
+									'Requests_Controller', 'request',
+									$parent->user->member_id
+							)
+					)->link('users/show_request/'.$parent->id, 'ID '.$parent->id,
+							$this->acl_check_view(
+								'Requests_Controller', 'request',
+								$parent->user->member_id
+					));
+				}
+				else
+				{
+					$breadcrumbs
+						->link('requests/show_all', 'Requests',
+							$this->acl_check_view('Requests_Controller', 'request'))
+						->link('requests/show/'.$parent->id, 'ID '.$parent->id,
+							$this->acl_check_view(
+								'Comments_Controller', 'requests',
+								$parent->user->member_id
+						));
+				}
+				
+				$breadcrumbs->text('Add comment');
+				
+				$link_back_url = Path::instance()->previous();
+				
+				$type = Watcher_Model::REQUEST;
+				
+				$subject = mail_message::format('request_comment_update_subject');
+				$body = mail_message::format('request_comment_update', array
+				(
+					$user->name.' '.$user->surname,
+					$parent->user->name.' '.$parent->user->surname,
+					url_lang::base().'requests/show/'.$parent->id
+				));
 				
 				break;
 			
@@ -286,18 +534,40 @@ class Comments_Controller extends Controller
 		// form is validate
 		if ($form->validate())
 		{
-			$form_data = $form->as_array();
+			$form_data = $form->as_array(FALSE);
 
-			$comment = new Comment_Model($comment_id);
-			$comment->datetime = date('Y-m-d h:i:s');
-			$comment->text = $form_data['text'];
-
-			if ($comment->save())
+			try
 			{
+				$comment->transaction_start();
+			
+				$comment->datetime = date('Y-m-d h:i:s');
+				$comment->text = $form_data['text'];
+
+				$comment->save_throwable();
+				
+				if (isset($type))
+				{		
+					// send message about comment updating to all watchers
+					Mail_message_Model::send_system_message_to_item_watchers(
+						$subject,
+						$body,
+						$type,
+						$parent->id
+					);
+				
+				}
+			
+				$comment->transaction_commit();
 				status::success('Comment has been successfully updated');
 			}
+			catch(Exception $e)
+			{
+				$comment->transaction_rollback();
+				status::error('Error - Cannot update comment', $e);
+				Log::add_exception($e);
+			}
 
-			url::redirect($link_back_url);
+			$this->redirect($link_back_url);
 		}
 
 		$title = __('Edit comment');
@@ -328,41 +598,121 @@ class Comments_Controller extends Controller
 		// comment doesn't exist
 		if (!$comment->id)
 			Controller::error(RECORD);
-
+		
 		// finds parent of comment thread
 		$parent = $comment->comments_thread->get_parent();
+		
+		// user who add comment
+		$user = new User_Model($this->user_id);
 
 		switch ($comment->comments_thread->type)
 		{
 			// thread belongs to account
 			case 'account':
 				// access control
-				if (!$this->acl_check_view('Members_Controller', 'comment', $parent->member_id))
+				if (!Settings::get('finance_enabled') ||
+					!$this->acl_check_view('Members_Controller', 'comment', $parent->member_id))
 					Controller::error(ACCESS);
 
 				$link_back_url = 'transfers/show_by_account/' . $parent->id;
+
 				break;
-				
+
+			// thread belongs to connection_requests
+			case 'connection_request':
+				// access control
+				if (!module::e('connection_request') ||
+					!$this->acl_check_edit('Connection_Requests_Controller', 'request'))
+					Controller::error(ACCESS);
+
+				$link_back_url = Path::instance()->previous();
+
+				break;
+
+			// thread belongs to log queues
+			case 'log_queue':
+				// access control
+				if (!$this->acl_check_delete('Log_queues_Controller', 'comments'))
+					Controller::error(ACCESS);
+
+				$link_back_url = Path::instance()->previous();
+
+				break;
+
 			case 'job':
 				// access control
-				if (!$this->acl_check_delete(get_class($this), 'works', $comment->user->member_id))
+				if (!Settings::get('works_enabled') ||
+					!$this->acl_check_delete('Comments_Controller', 'works', $comment->user->member_id))
 					Controller::error(ACCESS);
+
+				$link_back_url = Path::instance()->previous();
 				
-				$link_back_url = $this->redirect(Path::instance()->previous());
+				$type = Watcher_Model::WORK;
 				
+				$subject = mail_message::format('work_comment_delete_subject');
+				$body = mail_message::format('work_comment_delete', array
+				(
+					$user->name.' '.$user->surname,
+					$parent->user->name.' '.$parent->user->surname,
+					url_lang::base().'works/show/'.$parent->id
+				));
+
 				break;
 				
+			case 'request':
+				// access control
+				if (!Settings::get('approval_enabled') ||
+					!$this->acl_check_edit('Comments_Controller', 'requests'))
+					Controller::error(ACCESS);
+				
+				$link_back_url = Path::instance()->previous();
+				
+				$type = Watcher_Model::REQUEST;
+				
+				$subject = mail_message::format('request_comment_delete_subject');
+				$body = mail_message::format('request_comment_delete', array
+				(
+					$user->name.' '.$user->surname,
+					$parent->user->name.' '.$parent->user->surname,
+					url_lang::base().'requests/show/'.$parent->id
+				));
+				
+				break;
+
 			default:
 				Controller::error(RECORD);
 				break;
 		}
-
-		if ($comment->delete())
+		
+		try
 		{
+			$comment->transaction_start();
+			
+			$comment->delete_throwable();
+			
+			if (isset($type))
+			{		
+				// send message about comment adding to all watchers
+				Mail_message_Model::send_system_message_to_item_watchers(
+					$subject,
+					$body,
+					$type,
+					$parent->id
+				);
+
+			}
+			
+			$comment->transaction_commit();
 			status::success('Comment has been successfully deleted');
 		}
+		catch(Exception $e)
+		{
+			$comment->transaction_rollback();
+			status::error('Error - Cannot delete comment', $e);
+			Log::add_exception($e);
+		}
 
-		url::redirect($link_back_url);
+		$this->redirect($link_back_url);
 	}
 
 }

@@ -37,6 +37,18 @@ class Device_logs_Controller extends Controller
 	);
 	
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Shows all logs of all devices
 	 * 
 	 * @author Michal Kliment
@@ -50,7 +62,7 @@ class Device_logs_Controller extends Controller
 			$order_by_direction = 'DESC', $page_word = null, $page = 1)
 	{
 		// access control
-		if (!$this->acl_check_view('Devices_Controller', 'devices'))
+		if (!$this->acl_check_view('Device_logs_Controller', 'device_log'))
 			Controller::error(ACCESS);
 		
 		$filter_form = new Filter_form();
@@ -179,7 +191,7 @@ class Device_logs_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+		if (!$this->acl_check_view('Device_logs_Controller', 'device_log', $device->user->member_id))
 			Controller::error(ACCESS);
 		
 		$filter_form = new Filter_form(NULL, url_lang::current(3));

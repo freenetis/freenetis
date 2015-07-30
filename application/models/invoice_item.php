@@ -25,10 +25,10 @@
  * @property double $contractual_increase
  * @property boolean $service
  * @property double $price
- * @property double $price_vat
+ * @property double $vat
  */
 class Invoice_item_Model extends ORM
-{
+{	
     protected $belongs_to = array('invoice');
 
     /**

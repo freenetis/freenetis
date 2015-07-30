@@ -34,6 +34,18 @@ class Ip_addresses_Controller extends Controller
 	protected $ip_address_id;
 	
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Index redirects to show all
 	 */
 	public function index()
@@ -52,14 +64,14 @@ class Ip_addresses_Controller extends Controller
 			$limit_results = 50, $order_by = 'ip_address',
 			$order_by_direction = 'asc', $page_word = null, $page = 1)
 	{
-		if (!$this->acl_check_view('Devices_Controller', 'ip_address'))
+		if (!$this->acl_check_view('Ip_addresses_Controller', 'ip_address'))
 			Controller::error(ACCESS);
 		
 		$ip_model = new Ip_address_Model();
 				
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		$filter_form = new Filter_form('ip');
 		
@@ -87,6 +99,15 @@ class Ip_addresses_Controller extends Controller
 		$filter_form->add('service')
 			->type('select')
 			->values(arr::rbool());
+		
+		if (module::e('notification'))
+		{
+			$filter_form->add('whitelisted')
+					->type('select')
+					->label('Whitelist')
+					->values(Ip_address_Model::get_whitelist_types());
+		}
+		
 		
 		$total_ip = $ip_model->count_all_ip_addresses($filter_form->as_sql());
 		
@@ -116,18 +137,38 @@ class Ip_addresses_Controller extends Controller
 			'filter'					=> $filter_form
 		)); 
 
-		if ($this->acl_check_new('Devices_Controller', 'ip_address'))
+		if ($this->acl_check_new('Ip_addresses_Controller', 'ip_address'))
 		{
 			$grid->add_new_button('ip_addresses/add', __('Add new IP address'));
 		}
 		
-		$grid->order_callback_field('ip_address')
-				->label('IP address')
-				->callback('callback::ip_address_field');
+		$grid->order_field('ip_address')
+				->label('IP address');
 		
 		$grid->order_link_field('subnet_id')
 				->link('subnets/show', 'subnet_name')
 				->label('Subnet');
+		
+		$grid->order_callback_field('gateway')
+				->label('Gateway')
+				->help(help::hint('gateway'))
+				->callback('boolean')
+				->class('center');
+		
+		$grid->order_callback_field('service')
+				->label('Service')
+				->help(help::hint('service'))
+				->callback('boolean')
+				->class('center');
+		
+		if (module::e('notification'))
+		{
+			$grid->order_callback_field('whitelisted')
+					->label('Whitelist')
+					->help(help::hint('Whitelist'))
+					->callback('whitelisted_field')
+					->class('center');
+		}
 		
 		$grid->order_callback_field('device_name')
 				->label('Device name')
@@ -135,14 +176,23 @@ class Ip_addresses_Controller extends Controller
 		
 		$actions = $grid->grouped_action_field();
 		
-		if ($this->acl_check_edit('Devices_Controller','ip_address'))
+		if ($this->acl_check_view('Ip_addresses_Controller', 'ip_address'))
+		{
+			$actions->add_action('id')
+					->icon_action('show')
+					->url('ip_addresses/show')
+					->class('popup_link');
+		}
+		
+		if ($this->acl_check_edit('Ip_addresses_Controller', 'ip_address'))
 		{
 			$actions->add_action('id')
 					->icon_action('edit')
-					->url('ip_addresses/edit');
+					->url('ip_addresses/edit')					
+					->class('popup_link');
 		}
 		
-		if ($this->acl_check_delete('Devices_Controller','ip_address'))
+		if ($this->acl_check_delete('Ip_addresses_Controller', 'ip_address'))
 		{
 			$actions->add_action('id')
 					->icon_action('delete')
@@ -181,7 +231,7 @@ class Ip_addresses_Controller extends Controller
 		$member = $ip_address->iface->device->user->member;
 		$member_id = $member->id;
 
-		if (!$this->acl_check_view('Devices_Controller', 'ip_address', $member_id))
+		if (!$this->acl_check_view('Ip_addresses_Controller', 'ip_address', $member_id))
 			Controller::error(ACCESS);
 			 
 		$device = $ip_address->iface->device; 	 
@@ -272,7 +322,7 @@ class Ip_addresses_Controller extends Controller
 					->link(
 						'devices/show_iface/'.$iface->id,
 						$iface_name, $this->acl_check_view(
-							'Devices_Controller', 'iface',
+							'Ifaces_Controller', 'iface',
 							$iface->device->user->member_id
 						)
 					);
@@ -282,7 +332,7 @@ class Ip_addresses_Controller extends Controller
 				// breadcrumbs menu
 				$breadcrumbs = breadcrumbs::add()
 					->link('ip_addresses/show_all', 'IP addresses',
-							$this->acl_check_view('Devices_Controller', 'ip_address'));
+							$this->acl_check_view('Ip_addresses_Controller', 'ip_address'));
 			}
 			
 		}
@@ -293,6 +343,7 @@ class Ip_addresses_Controller extends Controller
 		$view = new View('main');
 		$view->title = __('IP address detail') . ' - ' . $ip_address->ip_address;
 		$view->breadcrumbs = $breadcrumbs->html();
+		$view->action_logs = action_logs::object_last_modif($ip_address, $ip_address_id);
 		$view->content = new View('ip_addresses/show');
 		$view->content->ip_address = $ip_address;
 		$view->content->member = $member; 	 
@@ -314,7 +365,7 @@ class Ip_addresses_Controller extends Controller
 	 */
 	public function add($device_id = NULL, $iface_id = NULL)
 	{
-		if (!$this->acl_check_new('Devices_Controller', 'ip_address'))
+		if (!$this->acl_check_new('Ip_addresses_Controller', 'ip_address'))
 			Controller::error(ACCESS);
 		
 		$breadcrumbs = breadcrumbs::add();
@@ -356,10 +407,10 @@ class Ip_addresses_Controller extends Controller
 				
 				$breadcrumbs->link(
 							'ifaces/show_all', 'Interfaces',
-							$this->acl_check_view('Devices_Controller', 'ip_address')
+							$this->acl_check_view('Ifaces_Controller', 'iface')
 						)->link(
 							'ifaces/show/' . $iface->id, strval($iface),
-							$this->acl_check_view('Devices_Controller', 'iface')
+							$this->acl_check_view('Ifaces_Controller', 'iface')
 						)->text('Add new IP address');
 				
 				$arr_ifaces = array
@@ -376,7 +427,7 @@ class Ip_addresses_Controller extends Controller
 		{
 			$breadcrumbs->link(
 						'ip_addresses/show_all', 'IP addresses',
-						$this->acl_check_view('Devices_Controller', 'ip_address')
+						$this->acl_check_view('Ip_addresses_Controller', 'ip_address')
 					)->text('Add new IP address');
 			
 			$arr_ifaces = array
@@ -399,13 +450,14 @@ class Ip_addresses_Controller extends Controller
 				->label('Interface name')
 				->rules('required')
 				->options($arr_ifaces)
-				->style('width:520px');
+				->style('width:520px')
+				->callback(array($this, 'valid_mac_address_unique_in_subnet'));
 		
 		$this->form->input('ip_address')
 				->label('IP address')
 				->rules('required|valid_ip_address')
 				->callback(array($this, 'valid_ip'))
-				->style('width:200px');		
+				->style('width:200px');
 		
 		$this->form->dropdown('subnet_id')
 				->label('Select subnet name')
@@ -417,7 +469,8 @@ class Ip_addresses_Controller extends Controller
 		$this->form->dropdown('gateway')
 				->label(__('Gateway').':&nbsp;'.help::hint('gateway'))
 				->options(arr::rbool())
-				->selected('0');
+				->selected('0')
+				->callback(array($this, 'valid_gateway'));
 		
 		$this->form->dropdown('service')
 				->label(__('Service').':&nbsp;'.help::hint('service'))
@@ -432,7 +485,7 @@ class Ip_addresses_Controller extends Controller
 			$form_data = $this->form->as_array();
 
 			$ip_address = new Ip_address_Model();
-			
+
 			// gets number of maximum of acceptable repeating of operation
 			// after reaching of deadlock and time of waiting between
 			// other attempt to make transaction (#254)
@@ -446,28 +499,34 @@ class Ip_addresses_Controller extends Controller
 				try // try to make DB transction
 				{
 					$ip_address->transaction_start();
+					
 					$ip_address->delete_ip_address_with_member($form_data['ip_address']);
+					
 					$ip_address->iface_id = $form_data['iface_id'];
 					$ip_address->ip_address = $form_data['ip_address'];
 					$ip_address->subnet_id = $form_data['subnet_id'];
 					$ip_address->gateway = $form_data['gateway'];
 					$ip_address->service = $form_data['service'];
-					$ip_address->whitelisted = Ip_address_Model::NO_WHITELIST;
 					$ip_address->member_id = NULL;
 					$ip_address->save_throwable();
+					
+					// expired subnets (#465)
+					ORM::factory('subnet')->set_expired_subnets($ip_address->subnet_id);
+					
 					$ip_address->transaction_commit();
-			
+
 					try
 					{
 						Allowed_subnets_Controller::update_enabled(
-										$ip_address->iface->device->user->member->id, array($ip_address->subnet_id)
+								$ip_address->iface->device->user->member->id,
+								array($ip_address->subnet_id)
 						);
 					}
 					catch (Exception $e)
 					{
 						status::warning('Error - cannot update allowed subnets of member.');
 					}
-			
+
 					// redirect
 					status::success('IP address is successfully saved.');
 					$this->redirect($linkback);
@@ -475,7 +534,7 @@ class Ip_addresses_Controller extends Controller
 				catch (Exception $e) // failed => rollback and wait 100ms before next attempt
 				{
 					$ip_address->transaction_rollback();
-		
+
 					if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
 					{
 						Log::add_exception($e);
@@ -505,7 +564,7 @@ class Ip_addresses_Controller extends Controller
 	 */
 	public function edit($ip_address_id = NULL)
 	{
-		if (!$this->acl_check_new('Devices_Controller', 'ip_address'))
+		if (!$this->acl_check_edit('Ip_addresses_Controller', 'ip_address'))
 			Controller::error(ACCESS);
 
 		if (!is_numeric($ip_address_id))
@@ -517,6 +576,7 @@ class Ip_addresses_Controller extends Controller
 			Controller::error(RECORD);
 		
 		$this->ip_address_id = $ip_address_id;
+		
 		$device = $ip_address->iface->device;
 		
 		$arr_ifaces = array
@@ -537,7 +597,7 @@ class Ip_addresses_Controller extends Controller
 				->options($arr_ifaces)
 				->selected($ip_address->iface_id)
 				->style('width:500px')
-				->add_button('ifaces', 'add', $device->id);
+				->callback(array($this, 'valid_mac_address_unique_in_subnet'));
 		
 		$this->form->input('ip_address')
 				->label('IP address')
@@ -557,17 +617,13 @@ class Ip_addresses_Controller extends Controller
 		$this->form->dropdown('gateway')
 				->label(__('Gateway').':&nbsp;'.help::hint('gateway'))
 				->options(arr::rbool())
-				->selected($ip_address->gateway);
+				->selected($ip_address->gateway)
+				->callback(array($this, 'valid_gateway'));
 		
 		$this->form->dropdown('service')
 				->label(__('Service').':&nbsp;'.help::hint('service'))
 				->options(arr::rbool())
 				->selected($ip_address->service);
-		
-		$this->form->dropdown('whitelisted')
-				->label(__('Whitelist').':&nbsp;'.help::hint('whitelist'))
-				->options(Ip_address_Model::get_whitelist_types())
-				->selected($ip_address->whitelisted);
 		
 		$this->form->submit('Save');
 		
@@ -599,11 +655,13 @@ class Ip_addresses_Controller extends Controller
 					$ip_address->subnet_id = $form_data['subnet_id'];
 					$ip_address->gateway = $form_data['gateway'];
 					$ip_address->service = $form_data['service'];
-					$ip_address->whitelisted = $form_data['whitelisted'];
 					$ip_address->member_id = NULL;
 
 					$ip_address->save_throwable();
 
+					// expired subnets (#465)
+					ORM::factory('subnet')->set_expired_subnets($ip_address->subnet_id);
+					
 					$ip_address->transaction_commit();
 
 					$member_id = $device->user->member_id;
@@ -620,8 +678,8 @@ class Ip_addresses_Controller extends Controller
 						try
 						{
 							Allowed_subnets_Controller::update_enabled(
-											$member_id, NULL, NULL,
-											array($old_subnet_id), TRUE
+									$member_id, NULL, NULL,
+									array($old_subnet_id), TRUE
 							);
 						}
 						catch (Exception $e)
@@ -633,29 +691,29 @@ class Ip_addresses_Controller extends Controller
 					try
 					{
 						Allowed_subnets_Controller::update_enabled(
-										$member_id, array($ip_address->subnet_id), array(),
-										array(), TRUE
+								$member_id, array($ip_address->subnet_id), array(),
+								array(), TRUE
 						);
 					}
 					catch (Exception $e)
 					{
 						status::warning('Error - cannot update allowed subnets of member.');
 					}
-				
+
 					status::success('IP address has been successfully updated.');
 					$this->redirect('ip_addresses/show/'.$ip_address->id);
 				}
 				catch (Exception $e) // failed => rollback and wait 100ms before next attempt
 				{
 					$ip_address->transaction_rollback();
-
+					
 					if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
 					{
 						Log::add_exception($e);
 						status::error('Error - Cannot update ip address.');
 						$this->redirect('ip_addresses/show/'.$ip_address->id);
 					}
-
+				
 					usleep($timeout);
 				}
 			}
@@ -667,7 +725,7 @@ class Ip_addresses_Controller extends Controller
 			// breadcrumbs menu
 			$breadcrumbs = breadcrumbs::add()
 					->link('ip_addresses/show_all', 'IP addresses',
-							$this->acl_check_view('Devices_Controller', 'ip_address'))
+							$this->acl_check_view('Ip_addresses_Controller', 'ip_address'))
 					->disable_translation()
 					->text($title);
 
@@ -703,11 +761,11 @@ class Ip_addresses_Controller extends Controller
 		$member_id = $ip_address->iface->device->user->member_id;
 		$subnet_id = $ip_address->subnet_id;
 
-		if (!$this->acl_check_delete('Devices_Controller', 'ip_address', $member_id))
+		if (!$this->acl_check_delete('Ip_addresses_Controller', 'ip_address', $member_id))
 		{
 			Controller::error(ACCESS);
 		}
-
+		
 		// link back
 		$linkback = Path::instance()->previous();
 		
@@ -730,53 +788,58 @@ class Ip_addresses_Controller extends Controller
 			{
 				$ip_address->transaction_start();
 				
+				// expired subnets (#465)
+				ORM::factory('subnet')->set_expired_subnets($ip_address->subnet_id);
+				
 				if ($ip_address->subnet->subnets_owner->id)
 				{
 					$ip_address->member_id = $ip_address->subnet->subnets_owner->member->id;
 					$ip_address->iface_id = NULL;
-	
+					
 					$ip_address->save_throwable();
 				}
 				else
+				{
 					$ip_address->delete_throwable();
+				}
 				
 				$ip_address->transaction_commit();
 				
-			// ip address was the only one of this member
-			// from this subnet -> deletes subnet from allowed subnets of member
-			if (!$ip_address->count_all_ip_addresses_by_member_and_subnet(
-					$member_id, $subnet_id
-				))
-			{
+				// ip address was the only one of this member
+				// from this subnet -> deletes subnet from allowed subnets of member
+				if (!$ip_address->count_all_ip_addresses_by_member_and_subnet(
+						$member_id, $subnet_id
+					))
+				{
 					try
 					{
-				Allowed_subnets_Controller::update_enabled(
+						Allowed_subnets_Controller::update_enabled(
 								$member_id, NULL, NULL, array($subnet_id), TRUE
-				);
-			}
+						);
+					}
 					catch (Exception $e)
 					{
 						status::warning('Error - cannot update allowed subnets of member.');
 					}
 				}
-
+				
 				// redirect
-			status::success('IP address has been successfully deleted.');
+				status::success('IP address has been successfully deleted.');
 				$this->redirect($linkback);
-		}
+			}
 			catch (Exception $e) // failed => rollback and wait 100ms before next attempt
-		{
+			{
 				$ip_address->transaction_rollback();
-		
+				
 				if (++$transaction_attempt_counter >= $max_attempts) // this was last attempt?
-		{
+				{
 					Log::add_exception($e);
 					status::error('Error - cant delete ip address.');
 					$this->redirect($linkback);
-		}
-
+				}
+				
 				usleep($timeout);
-	}
+			}
 		}
 	}
 
@@ -792,9 +855,8 @@ class Ip_addresses_Controller extends Controller
 		{
 			self::error(PAGE);
 		}
-		
-		$method = $this->form->ip_address->method; // <FORM> method = POST, GET, ...
-		$ip = ip2long($this->input->$method('ip_address')); // Submitted values;
+
+		$ip = ip2long($this->input->post('ip_address')); // Submitted values;
 
 
 		if ($ip === FALSE || $ip == -1)
@@ -803,19 +865,30 @@ class Ip_addresses_Controller extends Controller
 			return false;
 		}
 
-		$subnet_id = $this->input->$method('subnet_id');
-		$subnet_model = new Subnet_Model($subnet_id);
-		$subnet = $subnet_model->get_net_and_mask_of_subnet();
+		$subnet_id = $this->input->post('subnet_id');
+		$subnet = new Subnet_Model($subnet_id);
 
 		if ($subnet && $subnet->id)
 		{
-			$this->check_ip($ip, 0 + $subnet->net, $subnet->mask, $input);
+			$net	= ip2long($subnet->network_address);
+			$mask	= ip2long($subnet->netmask);
+			$size	= (~$mask & 0xffffffff)+1;
+			
+			if (($ip & $mask) != $net)
+			{
+				$input->add_error('required', __(
+						'IP address does not match the subnet/mask.'
+				));
+			}
+			else if ($size > 1 && ($ip == $net || $ip == ($net + $size - 1)))
+			{
+				$input->add_error('required', __('Invalid IP address'));
+			}
 		}
 		else
 		{
 			$input->add_error('required', __('Invalid subnet'));
 		}
-
 
 		// checks if exists this ip
 		$ip_model = new ip_address_Model();
@@ -837,27 +910,68 @@ class Ip_addresses_Controller extends Controller
 	} // end of valid_ip
 	
 	/**
-	 * Checks ip address if matches subnet and mask.
+	 * Callback function to validate if MAC address is unique in subnet
 	 * 
-	 * @param string $ip
-	 * @param integer $net
-	 * @param string $mask
-	 * @param object $input
+	 * @author Ondrej Fibich
+	 * @param Form_Field $input 
 	 */
-	private function check_ip($ip, $net, $mask, $input)
+	public function valid_mac_address_unique_in_subnet($input = NULL)
 	{
-		$mask = 0xffffffff << (32 - $mask) & 0xffffffff;
+		// validators cannot be accessed
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
 		
-		if (($ip & $mask) != (int) $net)
+		if ($this->input->post('subnet_id') && $input->value)
 		{
-			$input->add_error('required', __(
-					'IP address does not match the subnet/mask.'
-			));
+			$subnet = new Subnet_Model($this->input->post('subnet_id'));
+			$iface = new Iface_Model($input->value);
+			
+			if ($subnet->id && $iface->id)
+			{
+				if (!$subnet->is_mac_unique_in_subnet($iface->mac, $this->ip_address_id))
+				{
+					$link = html::anchor('/subnets/show/' . $subnet->id, __('subnet', NULL, 1), 'target="_blank"');
+					$m = 'MAC address of this interface is already in the '
+						. 'selected %s assigned to another interface';
+					$input->add_error('required', str_replace('"', '\'', __($m, $link)) . '!');
+				}
+				return;
+			}
 		}
-		else if ($ip == $net || ($ip == ($net | ~$mask)) && ~$mask != 0)
-		{
-			$input->add_error('required', __('Invalid IP address'));
-		}
+		
+		$input->add_error('required', __('Subnet or iface not set.'));
 	}
 	
+	/**
+	 * Callback function to validate if subnet has gateway
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $input
+	 */
+	public function valid_gateway($input = NULL)
+	{
+		// validators cannot be accessed
+		if (empty($input) || !is_object($input))
+		{
+			self::error(PAGE);
+		}
+		
+		$subnet_id = (int) $this->input->post('subnet_id');
+		
+		if ($input->value && $subnet_id)
+		{
+			$subnet = new Subnet_Model($subnet_id);
+			
+			// find gateway of subnet
+			$gateway = $subnet->get_gateway();
+			
+			// gateway already exists
+			if ($gateway && $gateway->id && $this->ip_address_id != $gateway->id)
+			{
+				$input->add_error('required', __('Subnet has already have gateway.'));
+			}
+		}
+	}
 }

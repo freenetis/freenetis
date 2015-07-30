@@ -23,11 +23,11 @@
  * @property integer $address_point_id
  * @property integer $type
  * @property integer $external_type
+ * @property string $vat_organization_identifier
  * @property string $organization_identifier
- * @property string $qos_ceil
- * @property string $qos_rate
  * @property double $entrance_fee
  * @property double $debt_payment_rate
+ * @property date $entrance_date
  * @property double $entrance_fee_left
  * @property date $entrance_fee_date
  * @property date $date
@@ -35,6 +35,7 @@
  * @property date $entrance_form_accepted
  * @property date $leaving_date
  * @property datetime $applicant_registration_datetime
+ * @property date $applicant_connected_from
  * @property integer $locked
  * @property integer $voip_billing_limit
  * @property integer $voip_billing_type
@@ -44,6 +45,8 @@
  * @property Allowed_subnets_count_Model $allowed_subnets_count
  * @property Members_traffic_Model $members_traffic
  * @property Members_domicile_Model $members_domicile
+ * @property integer $speed_class_id
+ * @property Speed_class_Model $speed_class
  * @property ORM_Iterator $allowed_subnets
  * @property ORM_Iterator $invoices
  * @property ORM_Iterator $users
@@ -51,6 +54,11 @@
  * @property ORM_Iterator $transfers
  * @property ORM_Iterator $bank_accounts
  * @property ORM_Iterator $membership_interrupts
+ * @property ORM_Iterator $connection_requests
+ * @property ORM_Iterator $members_whitelists
+ * @property boolean $notification_by_redirection
+ * @property boolean $notification_by_email
+ * @property boolean $notification_by_sms
  */
 class Member_Model extends ORM
 {
@@ -96,10 +104,11 @@ class Member_Model extends ORM
 	protected $has_many = array
 	(
 		'allowed_subnets', 'invoices', 'users', 'accounts',
-		'transfers', 'bank_accounts', 'membership_interrupts'
+		'transfers', 'bank_accounts', 'membership_interrupts',
+		'connection_requests', 'members_whitelists'
 	);
 	
-	protected $belongs_to = array('address_point', 'user');
+	protected $belongs_to = array('address_point', 'user', 'speed_class');
 	
 	/**
 	 * Returns type in string from integer
@@ -163,33 +172,6 @@ class Member_Model extends ORM
 					'users.type' => 1
 				))->orderby('surname')
 				->find_all();
-	}
-	
-	/**
-	 * Gets ID of member account if there is any
-	 *
-	 * @param integer $member_id
-	 * @return integer
-	 */
-	public function get_first_member_account_id($member_id = NULL)
-	{
-		if (empty($member_id))
-		{
-			$member_id = $this->id;
-		}
-		
-		$result = $this->db->query("
-				SELECT a.id
-				FROM accounts a
-				WHERE a.member_id = ?
-		", $member_id);
-		
-		if ($result && $result->count())
-		{
-			return $result->current()->id;
-		}
-		
-		return NULL;
 	}
 	
 	/**
@@ -274,6 +256,7 @@ class Member_Model extends ORM
 					a_comment, a_comments_thread_id, type, entrance_date, leaving_date,
 					redirect_type_id, GROUP_CONCAT(DISTINCT redirect_type SEPARATOR ', ') AS redirect,
 					GROUP_CONCAT(DISTINCT redirect_type_text SEPARATOR ', \n') AS redirect_text,
+					notification_by_redirection, notification_by_email, notification_by_sms,
 					whitelisted, interrupt, 1 AS redirection, 1 AS email, 1 AS sms $select_cloud
 				FROM
 				(
@@ -285,7 +268,8 @@ class Member_Model extends ORM
 						a.comments_thread_id AS a_comments_thread_id,
 						m.type, m.entrance_date, m.leaving_date, redirect_type,
 						redirect_type_id, redirect_type_text, whitelisted,
-						interrupt $select_cloud
+						m.notification_by_redirection, m.notification_by_email,
+						m.notification_by_sms, interrupt $select_cloud
 					FROM 
 					(
 						SELECT m.id,
@@ -293,11 +277,13 @@ class Member_Model extends ORM
 							m.address_point_id,
 							IF(m.registration = 1, ?, ?) AS registration,
 							m.registration AS registrations,
-							IFNULL(t.translated_term, e.value) AS type,
-							IF(mi.id IS NOT NULL, ?, ?) AS membership_interrupt,
+							m.type,
+							IF(mi.id IS NOT NULL, 1, 0) AS membership_interrupt,
 							IF(mi.id IS NOT NULL, 1, 0) AS interrupt,
-							m.organization_identifier, m.comment,
-							m.entrance_date, m.leaving_date, m.entrance_fee
+							m.organization_identifier, m.vat_organization_identifier,
+							m.comment, m.entrance_date, m.leaving_date,
+							m.entrance_fee, m.speed_class_id, m.notification_by_redirection,
+							m.notification_by_email, m.notification_by_sms
 						FROM members m
 						LEFT JOIN enum_types e ON m.type = e.id
 						LEFT JOIN translations t ON e.value = t.original_term AND lang = ?
@@ -309,6 +295,7 @@ class Member_Model extends ORM
 							WHERE  mf.activation_date <= CURDATE() AND mf.deactivation_date >= CURDATE()
 						) mi ON mi.member_id = m.id
 					) AS m
+					LEFT JOIN users u ON u.member_id = m.id
 					LEFT JOIN address_points ap ON m.address_point_id = ap.id
 					LEFT JOIN streets s ON ap.street_id = s.id
 					LEFT JOIN towns t ON ap.town_id = t.id
@@ -334,8 +321,8 @@ class Member_Model extends ORM
 					(
 						SELECT DISTINCT
 							ms.type AS redirect_type_id,
-							IF(ms.type = 4, ? ,IF(ms.type = 5, ?, IF(ms.type = 6, ?, IF(ms.type = 7, ?, ?)))) AS redirect_type,
-							IF(ms.type = 4, ?,IF(ms.type = 5, ?, IF(ms.type = 6, ?, IF(ms.type = 7, ?, ?)))) AS redirect_type_text,
+							IF(ms.type = 4, ?,IF(ms.type = 5, ?, IF(ms.type = 6, ?, IF(ms.type = 7, ?, IF(ms.type = 16, ?, IF(ms.type = 19, ?, ?)))))) AS redirect_type,
+							IF(ms.type = 4, ?,IF(ms.type = 5, ?, IF(ms.type = 6, ?, IF(ms.type = 7, ?, IF(ms.type = 16, ?, IF(ms.type = 19, ?, ?)))))) AS redirect_type_text,
 							IFNULL(u.member_id,ms.member_id) AS member_id
 						FROM
 						(
@@ -350,17 +337,10 @@ class Member_Model extends ORM
 					) ms ON ms.member_id = m.id
 					LEFT JOIN
 					(
-						SELECT IFNULL(ip.whitelisted,0) AS whitelisted, ip.member_id
-						FROM
-						(
-							SELECT ip.whitelisted, IFNULL(u.member_id, ip.member_id) AS member_id
-							FROM ip_addresses ip
-							LEFT JOIN ifaces i ON ip.iface_id = i.id
-							LEFT JOIN devices d ON i.device_id = d.id
-							LEFT JOIN users u ON d.user_id = u.id
-							ORDER BY ip.whitelisted DESC
-						) ip
-						GROUP BY member_id
+						SELECT m2.id AS member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+						FROM members m2
+						LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+							AND mw.since <= CURDATE() AND mw.until >= CURDATE()
 					) ip ON ip.member_id = m.id
 					$join_cloud
 					$where
@@ -372,19 +352,23 @@ class Member_Model extends ORM
 		(
 			__('Yes'),
 			__('No'),
-			__('Yes'),
-			__('No'),
 			Config::get('lang'),
 			Config::get('lang'),
+			// redir shortcuts
 			__('IM'),
 			__('DB'),
 			__('PN'),
 			__('UCP'),
+			__('CE'),
+			__('FM'),
 			__('UM'),
+			// redir texts
 			__('Membership interrupt'),
 			__('Debtor'),
 			__('Payment notice'),
 			__('Unallowed connecting place'),
+			__('Connection test expired'),
+			__('Former member'),
 			__('User message')
 		));
 	}
@@ -392,55 +376,63 @@ class Member_Model extends ORM
 	/**
 	 * Function gets list of registered applicans.
 	 * 
+	 * @param $limit_from starting row
+	 * @param $limit_results number of rows
+	 * @param $order_by sorting column
+	 * @param $order_by_direction sorting direction
+	 * @param string $filter_sql used for filtering
 	 * @return Mysql_Result
 	 */
-	public function get_registered_members()
+	public function get_registered_applicants($limit_from = 0, $limit_results = 50,
+			$order_by = 'id', $order_by_direction = 'asc', $filter_sql = '')
 	{
+		$where = '';
+
+		if ($filter_sql != '')
+			$where = "WHERE $filter_sql";
+
+		// order by direction check
+		if (strtolower($order_by_direction) != 'desc')
+		{
+			$order_by_direction = 'asc';
+		}
+		
 		// query
 		return $this->db->query("
 				SELECT id, id AS member_id, registration, name, street, street_number,
 					town, quarter, variable_symbol, aid, balance, applicant_registration_datetime,
-					GROUP_CONCAT(a_comment SEPARATOR ', \n\n') AS a_comment, comment,
-					a_comments_thread_id, type, entrance_date, leaving_date
+					applicant_connected_from, GROUP_CONCAT(a_comment SEPARATOR ', \n\n') AS a_comment,
+					comment, a_comments_thread_id, type, entrance_date, leaving_date, 0 AS toapprove
 				FROM
 				(
-					SELECT
-						m.id, m.registration, m.name,
-						s.street, ap.street_number, t.town, t.quarter,
-						vs.variable_symbol, a.id AS aid,
-						a.balance, m.applicant_registration_datetime,
-						CONCAT(u.surname,' ',u.name,' (',SUBSTRING(c.datetime,1,10),'):\n',c.text) AS a_comment,
-						a.comments_thread_id AS a_comments_thread_id,
-						m.type, m.entrance_date, m.leaving_date, m.comment
-					FROM members m
-					LEFT JOIN address_points ap ON m.address_point_id = ap.id
-					LEFT JOIN streets s ON ap.street_id = s.id
-					LEFT JOIN towns t ON ap.town_id = t.id
-					LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
-					LEFT JOIN variable_symbols vs ON vs.account_id = a.id
-					LEFT JOIN comments_threads ct ON a.comments_thread_id = ct.id
-					LEFT JOIN comments c ON ct.id = c.comments_thread_id
-					LEFT JOIN users u ON c.user_id = u.id
-					WHERE m.type = ?
-					ORDER BY c.datetime DESC
+					SELECT * FROM
+					(
+						SELECT
+							m.id, m.registration, m.name, m.applicant_connected_from,
+							s.street, ap.street_number, t.town, t.quarter,
+							vs.variable_symbol, a.id AS aid,
+							a.balance, m.applicant_registration_datetime,
+							CONCAT(u.surname,' ',u.name,' (',SUBSTRING(c.datetime,1,10),'):\n',c.text) AS a_comment,
+							a.comments_thread_id AS a_comments_thread_id,
+							m.type, m.entrance_date, m.leaving_date, m.comment
+						FROM members m
+						LEFT JOIN address_points ap ON m.address_point_id = ap.id
+						LEFT JOIN streets s ON ap.street_id = s.id
+						LEFT JOIN towns t ON ap.town_id = t.id
+						LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
+						LEFT JOIN variable_symbols vs ON vs.account_id = a.id
+						LEFT JOIN comments_threads ct ON a.comments_thread_id = ct.id
+						LEFT JOIN comments c ON ct.id = c.comments_thread_id
+						LEFT JOIN users u ON c.user_id = u.id
+						WHERE m.type = ?
+						ORDER BY c.datetime DESC
+					) m
+					$where
 				) AS q
 				GROUP BY id
-				ORDER BY id DESC
-		", self::TYPE_APPLICANT );
-	}
-	
-	/**
-	 * Function gets count of registered applicans.
-	 * 
-	 * @return integer
-	 */
-	public function count_of_registered_members()
-	{
-		return $this->db->query("
-				SELECT IFNULL(COUNT(*), 0) AS count
-				FROM members m
-				WHERE m.type = ?
-		", self::TYPE_APPLICANT)->current()->count;
+				ORDER BY " . $this->db->escape_column($order_by) . " $order_by_direction
+				LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
+		", self::TYPE_APPLICANT);
 	}
 
 	/**
@@ -504,10 +496,11 @@ class Member_Model extends ORM
 								m.name,
 								m.address_point_id,
 								IF(m.registration = 1, ?, ?) AS registration,
-								IFNULL(t.translated_term, e.value) AS type,
-								IF(mi.id IS NOT NULL, ?, ?) AS membership_interrupt,
-								m.organization_identifier, m.comment,
-								m.entrance_date, m.leaving_date, m.entrance_fee
+								m.type,
+								IF(mi.id IS NOT NULL, 1, 0) AS membership_interrupt,
+								m.organization_identifier, m.vat_organization_identifier,
+								m.comment, m.entrance_date, m.leaving_date,
+								m.entrance_fee, m.speed_class_id
 							FROM members m
 							LEFT JOIN enum_types e ON m.type = e.id
 							LEFT JOIN translations t ON e.value = t.original_term AND lang = ?
@@ -519,6 +512,7 @@ class Member_Model extends ORM
 								WHERE  mf.activation_date <= CURDATE() AND mf.deactivation_date >= CURDATE()
 							) mi ON mi.member_id = m.id
 						) AS m
+						LEFT JOIN users u ON u.member_id = m.id
 						LEFT JOIN address_points ap ON m.address_point_id = ap.id
 						LEFT JOIN streets s ON ap.street_id = s.id
 						LEFT JOIN towns t ON ap.town_id = t.id
@@ -526,7 +520,7 @@ class Member_Model extends ORM
 						LEFT JOIN variable_symbols vs ON vs.account_id = a.id 
 						LEFT JOIN comments_threads ct ON a.comments_thread_id = ct.id
 						LEFT JOIN comments c ON ct.id = c.comments_thread_id
-						LEFT JOIN users u ON c.user_id = u.id
+						LEFT JOIN users cu ON c.user_id = cu.id
 						LEFT JOIN enum_types e ON m.type = e.id
 						LEFT JOIN translations f ON e.value = f.original_term AND lang = ?
 						LEFT JOIN
@@ -535,10 +529,10 @@ class Member_Model extends ORM
 								ms.type AS redirect_type_id,
 								IF(ms.type = 4, ? ,IF(ms.type = 5, ?, IF(ms.type = 6, ?, ?))) AS redirect_type,
 								IF(ms.type = 4, ?,IF(ms.type = 5, ?, IF(ms.type = 6, ?, ?))) AS redirect_type_text,
-							IFNULL(u.member_id,ms.member_id) AS member_id, whitelisted
+								IFNULL(u.member_id, ms.member_id) AS member_id
 							FROM
 							(
-								SELECT ms.*, i.device_id, ip.member_id, ip.whitelisted
+								SELECT ms.*, i.device_id, ip.member_id
 								FROM messages ms
 								LEFT JOIN messages_ip_addresses mip ON mip.message_id = ms.id
 								LEFT JOIN ip_addresses ip ON mip.ip_address_id = ip.id
@@ -549,21 +543,10 @@ class Member_Model extends ORM
 						) ms ON ms.member_id = m.id
 						LEFT JOIN
 						(
-							SELECT IFNULL(ip.whitelisted,0) AS whitelisted, ip.member_id
-							FROM
-							(
-								SELECT ip.whitelisted, IFNULL(u.member_id,ip.member_id) AS member_id
-								FROM
-								(
-									SELECT ip.whitelisted, i.device_id, ip.member_id
-									FROM ip_addresses ip
-									LEFT JOIN ifaces i ON ip.iface_id = i.id
-								) ip
-								LEFT JOIN devices d ON ip.device_id = d.id
-								LEFT JOIN users u ON d.user_id = u.id
-								ORDER BY ip.whitelisted DESC
-							) ip
-							GROUP BY member_id
+							SELECT m2.id AS member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+							FROM members m2
+							LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+								AND mw.since <= CURDATE() AND mw.until >= CURDATE()
 						) ip ON ip.member_id = m.id
 						$join_cloud
 						$where
@@ -573,8 +556,6 @@ class Member_Model extends ORM
 				) q2
 		", array
 		(
-			__('Yes'),
-			__('No'),
 			__('Yes'),
 			__('No'),
 			Config::get('lang'),
@@ -589,27 +570,51 @@ class Member_Model extends ORM
 			__('User message')
 		))->current()->total;
 	}
-
+	
 	/**
-	 * Function gets member for registration table.
+	 * Function gets count of registered applicans.
 	 * 
-	 * @param integer $limit
-	 * @param integer $limit_results
-	 * @return Mysql_Result
+	 * @param string $filter_sql used for filtering
+	 * @return integer
 	 */
-	public function get_all_members_to_registration($limit = 0, $limit_results = 50)
+	public function count_all_registered_applicants($filter_sql = '')
 	{
+		$where = '';
+
+		if ($filter_sql != '')
+			$where = "WHERE $filter_sql";
+		
+		// query
 		return $this->db->query("
-			SELECT m.id, m.registration, CONCAT(u.surname,' ',u.name) as name,
-				s.street, ap.street_number, t.town
-			FROM members m
-			LEFT JOIN users u ON m.id = u.member_id and u.type = 1
-			LEFT JOIN address_points ap ON m.address_point_id = ap.id
-			LEFT JOIN streets s ON ap.street_id = s.id
-			LEFT JOIN towns t ON ap.town_id = t.id
-			ORDER BY name ASC
-			LIMIT " . intval($limit) . ", " . intval($limit_results) ."
-		");
+				SELECT COUNT(id) AS total
+				FROM
+				(
+					SELECT id
+					FROM
+					(
+						SELECT
+							m.id, m.registration, m.name, m.applicant_connected_from,
+							s.street, ap.street_number, t.town, t.quarter,
+							vs.variable_symbol, a.id AS aid,
+							a.balance, m.applicant_registration_datetime,
+							CONCAT(u.surname,' ',u.name,' (',SUBSTRING(c.datetime,1,10),'):\n',c.text) AS a_comment,
+							a.comments_thread_id AS a_comments_thread_id,
+							m.type, m.entrance_date, m.leaving_date, m.comment
+						FROM members m
+						LEFT JOIN address_points ap ON m.address_point_id = ap.id
+						LEFT JOIN streets s ON ap.street_id = s.id
+						LEFT JOIN towns t ON ap.town_id = t.id
+						LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
+						LEFT JOIN variable_symbols vs ON vs.account_id = a.id
+						LEFT JOIN comments_threads ct ON a.comments_thread_id = ct.id
+						LEFT JOIN comments c ON ct.id = c.comments_thread_id
+						LEFT JOIN users u ON c.user_id = u.id
+						WHERE m.type = ?
+						ORDER BY c.datetime DESC
+					) AS m
+					$where
+				) q2
+		", self::TYPE_APPLICANT)->current()->total;
 	}
 	
 	/**
@@ -650,82 +655,177 @@ class Member_Model extends ORM
 						redirect_type_id
 					FROM
 					(
-					SELECT
-							m.id, m.registration, m.name,
-							s.street, ap.street_number, t.town, t.quarter,
-							vs.variable_symbol,	m.type, m.entrance_date,
-							m.leaving_date,
-							u.birthday, u.login, m.comment, m.membership_interrupt,
-							ms.redirect_type_id
-					FROM 
-					(
-						SELECT m.id,
-							m.name,
-							m.address_point_id,
-							registration,
+						SELECT
+								m.id, m.registration, m.name,
+								s.street, ap.street_number, t.town, t.quarter,
+								vs.variable_symbol,	m.type, m.entrance_date,
+								m.leaving_date,
+								u.birthday, u.login, m.comment, m.membership_interrupt,
+								ms.redirect_type_id
+						FROM 
+						(
+							SELECT m.id,
+								m.name,
+								m.address_point_id,
+								registration,
 							type, entrance_fee,
-							IF(mi.id IS NOT NULL, 1, 0) AS membership_interrupt,
-							m.comment,	m.entrance_date, m.leaving_date,
-							organization_identifier
-						FROM members m
+								IF(mi.id IS NOT NULL, 1, 0) AS membership_interrupt,
+								m.comment,	m.entrance_date, m.leaving_date,
+								organization_identifier, vat_organization_identifier
+							FROM members m
+							LEFT JOIN
+							(
+								SELECT mi.id, mi.member_id
+								FROM membership_interrupts mi
+								LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id
+								WHERE mf.activation_date <= CURDATE() AND mf.deactivation_date >= CURDATE()
+							) mi ON mi.member_id = m.id
+						) AS m
+						LEFT JOIN address_points ap ON m.address_point_id = ap.id
+						LEFT JOIN streets s ON ap.street_id = s.id
+						LEFT JOIN towns t ON ap.town_id = t.id
+						LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
+						LEFT JOIN variable_symbols vs ON vs.account_id = a.id
+						LEFT JOIN users u ON u.member_id = m.id AND u.type = ?
+						LEFT JOIN enum_types e ON m.type = e.id
+						LEFT JOIN devices d ON d.user_id = u.id
+						LEFT JOIN ifaces i ON i.device_id = d.id
+						LEFT JOIN ip_addresses ip ON ip.iface_id = i.id
+						LEFT JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
 						LEFT JOIN
 						(
-							SELECT mi.id, mi.member_id
-							FROM membership_interrupts mi
-							LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id
-							WHERE mf.activation_date <= CURDATE() AND mf.deactivation_date >= CURDATE()
-						) mi ON mi.member_id = m.id
-					) AS m
-					LEFT JOIN address_points ap ON m.address_point_id = ap.id
-					LEFT JOIN streets s ON ap.street_id = s.id
-					LEFT JOIN towns t ON ap.town_id = t.id
-					LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
-					LEFT JOIN variable_symbols vs ON vs.account_id = a.id
-					LEFT JOIN users u ON u.member_id = m.id AND u.type = ?
-					LEFT JOIN enum_types e ON m.type = e.id
-					LEFT JOIN devices d ON d.user_id = u.id
-					LEFT JOIN ifaces i ON i.device_id = d.id
-					LEFT JOIN ip_addresses ip ON ip.iface_id = i.id
-					LEFT JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
-					LEFT JOIN
-					(
-						SELECT m.*, type AS redirect_type_id
-						FROM messages m
-					) ms ON mip.message_id = ms.id
-					LEFT JOIN
-					(
-						SELECT c.id AS cloud,
-						IFNULL(u.member_id, c.member_id) AS member_id
-						FROM
+							SELECT m.*, type AS redirect_type_id
+							FROM messages m
+						) ms ON mip.message_id = ms.id
+						LEFT JOIN
 						(
-							SELECT c.*, i.device_id, ip.member_id
-							FROM clouds c
-							JOIN clouds_subnets cs ON cs.cloud_id = c.id
-							JOIN subnets s ON cs.subnet_id = s.id
-							JOIN ip_addresses ip ON ip.subnet_id = s.id
-							JOIN ifaces i ON ip.iface_id = i.id
-						) c
-						LEFT JOIN devices d ON c.device_id = d.id
-						LEFT JOIN users u ON d.user_id = u.id
-					) cl ON cl.member_id = m.id
-					$filter_sql
-				) AS q
-				GROUP BY q.id
-				ORDER BY q.id
+							SELECT c.id AS cloud,
+							IFNULL(u.member_id, c.member_id) AS member_id
+							FROM
+							(
+								SELECT c.*, i.device_id, ip.member_id
+								FROM clouds c
+								JOIN clouds_subnets cs ON cs.cloud_id = c.id
+								JOIN subnets s ON cs.subnet_id = s.id
+								JOIN ip_addresses ip ON ip.subnet_id = s.id
+								JOIN ifaces i ON ip.iface_id = i.id
+							) c
+							LEFT JOIN devices d ON c.device_id = d.id
+							LEFT JOIN users u ON d.user_id = u.id
+							GROUP BY c.id, IFNULL(u.member_id, c.member_id)
+						) cl ON cl.member_id = m.id
+						$filter_sql
+					) AS q
+					GROUP BY q.id
+					ORDER BY q.id
 				) AS q
 		", array
 		(
-			Config::get('lang'),
 			User_Model::MAIN_USER
 		));
-		
-		die($this->db->last_query());
 	}
 	
 	/**
-	 * Returns all members
+	 * Function gets selected members.
 	 * 
-	 * @author Michal Kliment
+	 * @param array $ids
+	 * @param boolean $in_set
+	 * 
+	 * @author Jan Dubina
+	 * @return Mysql_Result
+	 */
+	public function get_members_to_sync_vtiger($ids, $in_set)
+	{
+		$filter_sql = '';
+		// where condition
+		if (!empty($ids) || $in_set === false)
+		{
+			if (!empty($ids))
+				if ($in_set === true)
+					$filter_sql = "WHERE m.id IN (" . implode(',', $ids) . ")";
+				else
+					$filter_sql = "WHERE m.id NOT IN (" . implode(',', $ids) . ")";
+				
+			// query
+			return $this->db->query("
+				SELECT m.id, name, type, organization_identifier, vat_organization_identifier,
+						entrance_date, comment, country_name, town, street,
+						street_number, zip_code, email, phone,
+						variable_symbol, employees
+					FROM members m
+					LEFT JOIN
+					(
+						SELECT ap.id, country_name, town, zip_code,
+							street, street_number
+							FROM address_points ap
+							LEFT JOIN countries c
+								ON c.id = ap.country_id
+							LEFT JOIN towns t
+								ON t.id = ap.town_id
+							LEFT JOIN streets s
+								ON s.id = ap.street_id
+					) ap ON ap.id = m.address_point_id
+					LEFT JOIN
+					(
+						SELECT member_id, GROUP_CONCAT(email SEPARATOR ';') AS email
+						FROM users u 
+						RIGHT JOIN 
+						(
+							SELECT user_id, value AS email
+							FROM users_contacts uc 
+							LEFT JOIN contacts c ON uc.contact_id = c.id
+							WHERE c.type = ?
+						) c ON u.id = c.user_id 
+						WHERE type = ?
+						GROUP BY member_id
+					) ce ON ce.member_id = m.id
+					LEFT JOIN
+					(
+						SELECT member_id, GROUP_CONCAT(phone SEPARATOR ';') AS phone
+						FROM users u 
+						RIGHT JOIN 
+						(
+							SELECT user_id, value AS phone
+							FROM users_contacts uc 
+							LEFT JOIN contacts c ON uc.contact_id = c.id
+							WHERE c.type = ?
+						) c ON u.id = c.user_id 
+						WHERE type = ?
+						GROUP BY member_id
+					) cp ON cp.member_id = m.id
+					LEFT JOIN
+					(
+						SELECT member_id, COUNT(id) as employees
+							FROM users
+							GROUP BY member_id
+					) em ON em.member_id = m.id
+					LEFT JOIN
+					(
+						SELECT member_id, variable_symbol
+						FROM accounts a
+						LEFT JOIN variable_symbols vs
+						ON vs.account_id = a.id
+						GROUP BY member_id 
+					) v ON v.member_id = m.id
+					$filter_sql
+			", array(
+						Contact_Model::TYPE_EMAIL,
+						User_Model::MAIN_USER,
+						Contact_Model::TYPE_PHONE,
+						User_Model::MAIN_USER
+			));
+		}
+	}
+	
+	/**
+	 * Returns all members sccording to the type of message.
+	 * This method does not handle whitelists. (members with witelists are
+	 * returned anyway and they must be filtered after).
+	 * 
+	 * THIS IS ONE OF THE MOST IMPORTANT SQL QUERY IN THE WHOLE SYSTEM
+	 * PLEASE BE VERY CAREFUL WITH EDITING OF IT.
+	 * 
+	 * @author Michal Kliment, Ondrej Fibich
 	 * @param string $order_by
 	 * @param string $order_by_direction
 	 * @return MySQL Result 
@@ -735,32 +835,45 @@ class Member_Model extends ORM
 		switch ($type)
 		{
 			case Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE:
-				$where = "WHERE mi.id IS NOT NULL";
+				$where = "AND mi.id IS NOT NULL";
 				$order_by = 'whitelisted ASC, interrupt DESC';
 				break;
 			
 			case Message_Model::DEBTOR_MESSAGE:
-				$where = "WHERE mi.id IS NULL AND a.balance < ".intval(Settings::get('debtor_boundary'))
+				// without interrupted members, former members, applicants
+				$where = "AND mi.id IS NULL " 
+						. " AND m.type <> " . intval(Member_Model::TYPE_APPLICANT)
+						. " AND m.type <> " . Member_Model::TYPE_FORMER
+						. " AND a.balance < ".intval(Settings::get('debtor_boundary'))
 						." AND DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_debtor_immunity'));
-				$order_by = "whitelisted ASC, balance ASC";
+				$order_by = "whitelisted ASC, balance ASC, m.name ASC";
 				break;
 			
 			case Message_Model::PAYMENT_NOTICE_MESSAGE:
-				$where = "WHERE mi.id IS NULL AND a.balance < ".intval(Settings::get('payment_notice_boundary'))."
-				AND
-				(
-					DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_debtor_immunity'))."
-					AND a.balance >= ".intval(Settings::get('debtor_boundary'))."
-					OR DATEDIFF(CURDATE(), m.entrance_date) < ".intval(Settings::get('initial_debtor_immunity'))."
-					AND DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_immunity'))."
-				)";
-				$order_by = "whitelisted ASC, balance ASC";
+				// without interrupted members, former members, applicants, debtors
+				$where = "AND mi.id IS NULL " 
+						. " AND m.type <> " . intval(Member_Model::TYPE_APPLICANT)
+						. " AND m.type <> " . Member_Model::TYPE_FORMER
+						. " AND a.balance < ".intval(Settings::get('payment_notice_boundary'))."
+							AND
+							(
+								DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_debtor_immunity'))."
+								AND a.balance >= ".intval(Settings::get('debtor_boundary'))."
+								OR DATEDIFF(CURDATE(), m.entrance_date) < ".intval(Settings::get('initial_debtor_immunity'))."
+								AND DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_immunity'))."
+							)";
+				$order_by = "whitelisted ASC, balance ASC, m.id ASC";
+				break;
+			
+			case Message_Model::USER_MESSAGE:
+				// no former or interrupted members for user message
+				$where = "WHERE mi.id IS NULL "
+						. " AND m.type <> " . Member_Model::TYPE_FORMER;
+				$order_by = 'm.id';
 				break;
 			
 			default:
-				$where = "";
-				$order_by = 'm.id';
-				break;
+				throw new InvalidArgumentException('Unexceptable mesage type: ' . $type);
 		}
 		
 		return $this->db->query("
@@ -770,15 +883,7 @@ class Member_Model extends ORM
 				a_comment, w.whitelisted,
 				IFNULL(mi.id, 0) AS interrupt,
 				1 AS redirection, 1 AS email, 1 AS sms
-			FROM
-			(
-				SELECT IFNULL(ip.member_id,u.member_id) AS member_id
-				FROM ip_addresses ip
-				LEFT JOIN ifaces i ON ip.iface_id = i.id
-				LEFT JOIN devices d ON i.device_id = d.id
-				LEFT JOIN users u ON d.user_id = u.id
-			) ip
-			JOIN members m ON ip.member_id = m.id
+			FROM members m
 			JOIN accounts a ON a.member_id = m.id AND account_attribute_id = ?
 			LEFT JOIN
 			(
@@ -804,50 +909,15 @@ class Member_Model extends ORM
 			) mi ON mi.member_id = m.id
 			LEFT JOIN
 			(
-				SELECT *
-				FROM
-				(
-						SELECT
-							IFNULL(ip.whitelisted,0) AS whitelisted,
-							IFNULL(ip.member_id,u.member_id) AS member_id
-						FROM ip_addresses ip
-						LEFT JOIN ifaces i ON ip.iface_id = i.id
-						LEFT JOIN devices d ON i.device_id = d.id
-						LEFT JOIN users u ON d.user_id = u.id
-					UNION
-						SELECT IFNULL(uc.whitelisted,0) AS whitelisted, u.member_id
-						FROM users u
-						LEFT JOIN users_contacts uc ON uc.user_id = u.id
-						ORDER BY whitelisted DESC
-				) w
-				GROUP BY member_id
+				SELECT m2.id AS member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+				FROM members m2
+				LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+					AND mw.since <= CURDATE() AND mw.until >= CURDATE()
 			) w ON w.member_id = m.id
-			LEFT JOIN
-			(
-				SELECT ip.member_id, COUNT(*) AS unallowed_count
-				FROM
-				(
-					SELECT *
-					FROM
-					(
-						SELECT ip.subnet_id,
-							IFNULL(ip.member_id, u.member_id) AS member_id
-						FROM ip_addresses ip
-						LEFT JOIN ifaces i ON ip.iface_id = i.id
-						LEFT JOIN devices d ON i.device_id = d.id
-						LEFT JOIN users u ON d.user_id = u.id
-					) ip
-					GROUP BY ip.member_id, ip.subnet_id
-				) ip
-				LEFT JOIN allowed_subnets als ON ip.subnet_id = als.subnet_id
-					AND ip.member_id = als.member_id
-				WHERE ip.member_id <> ? AND IFNULL(als.enabled, 0) = 0
-				GROUP BY ip.member_id
-			) un ON un.member_id = m.id
-			$where
+			WHERE m.id <> ? $where
 			GROUP BY m.id
 			ORDER BY $order_by
-		", array(Account_attribute_Model::CREDIT, self::ASSOCIATION));
+		", Account_attribute_Model::CREDIT, Member_Model::ASSOCIATION);
 	}
 
 	/**
@@ -855,9 +925,10 @@ class Member_Model extends ORM
 	 * 
 	 * @author Jiri Svitak
 	 * @param integer $subnet_id
+	 * @param string $order_by
 	 * @return Mysql_Result
 	 */
-	public function get_members_of_subnet($subnet_id, $order_by = 'id', $order_by_direction = 'asc')
+	public function get_members_of_subnet($subnet_id, $order_by = 'id')
 	{
 		return $this->db->query("
 			SELECT
@@ -898,21 +969,10 @@ class Member_Model extends ORM
 				AND mf.deactivation_date >= CURDATE()
 			LEFT JOIN
 			(
-				SELECT *
-				FROM
-				(
-					SELECT IFNULL(ip.whitelisted,0) AS whitelisted, IFNULL(ip.member_id,u.member_id) AS member_id
-					FROM ip_addresses ip
-					LEFT JOIN ifaces i ON ip.iface_id = i.id
-					LEFT JOIN devices d ON i.device_id = d.id
-					LEFT JOIN users u ON d.user_id = u.id
-					UNION
-					SELECT IFNULL(uc.whitelisted,0) AS whitelisted, u.member_id
-					FROM users u
-					LEFT JOIN users_contacts uc ON uc.user_id = u.id
-					ORDER BY whitelisted DESC
-				) w
-				GROUP BY member_id
+				SELECT m2.id AS member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+				FROM members m2
+				LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+					AND mw.since <= CURDATE() AND mw.until >= CURDATE()
 			) w ON w.member_id = m.id
 			GROUP BY m.id
 			ORDER BY $order_by
@@ -924,10 +984,9 @@ class Member_Model extends ORM
 	 * 
 	 * @param integer $cloud_id
 	 * @param string $order_by
-	 * @param string $order_by_direction
 	 * @return Mysql_Result
 	 */
-	public function get_members_of_cloud($cloud_id, $order_by = 'id', $order_by_direction = 'asc')
+	public function get_members_of_cloud($cloud_id, $order_by = 'id')
 	{
 		return $this->db->query("
 			SELECT
@@ -969,21 +1028,10 @@ class Member_Model extends ORM
 				AND mf.deactivation_date >= CURDATE()
 			LEFT JOIN
 			(
-				SELECT *
-				FROM
-				(
-					SELECT IFNULL(ip.whitelisted,0) AS whitelisted, IFNULL(ip.member_id,u.member_id) AS member_id
-					FROM ip_addresses ip
-					LEFT JOIN ifaces i ON ip.iface_id = i.id
-					LEFT JOIN devices d ON i.device_id = d.id
-					LEFT JOIN users u ON d.user_id = u.id
-					UNION
-					SELECT IFNULL(uc.whitelisted,0) AS whitelisted, u.member_id
-					FROM users u
-					LEFT JOIN users_contacts uc ON uc.user_id = u.id
-					ORDER BY whitelisted DESC
-				) w
-				GROUP BY member_id
+				SELECT m2.id AS member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+				FROM members m2
+				LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+					AND mw.since <= CURDATE() AND mw.until >= CURDATE()
 			) w ON w.member_id = m.id
 			GROUP BY m.id
 			ORDER BY $order_by
@@ -1055,28 +1103,6 @@ class Member_Model extends ORM
 	}
 
 	/**
-	 * Function updates lock status.
-	 * 
-	 * @author Roman Sevcik
-	 */
-	public function update_lock_status()
-	{
-		$this->db->query("UPDATE members SET locked = 0");
-		$this->db->query("UPDATE members SET locked = 1 where type = " . self::TYPE_FORMER);
-		$this->db->query("
-			UPDATE members m,
-			(
-				SELECT m.id as mid
-				FROM members m
-				JOIN membership_interrupts mi ON mi.member_id = m.id
-				JOIN members_fees mf ON mi.members_fee_id = mf.id
-				WHERE mf.activation_date <= CURDATE() AND CURDATE() <= mf.deactivation_date
-			) mi
-			SET m.locked = 1
-			WHERE m.id = mi.mid");
-	}
-
-	/**
 	 * Returns count of all non-former members without membership interrupt in that time and without set-up qos rate
 	 *
 	 * @author Michal Kliment
@@ -1087,8 +1113,7 @@ class Member_Model extends ORM
 		$result = $this->db->query("
 				SELECT COUNT(m.id) AS total
 				FROM members m
-				WHERE m.type <> ? AND
-					(m.qos_rate IS NULL OR m.qos_rate = 0 OR LENGTH(m.qos_rate) = 0) AND
+				WHERE m.type <> ? AND m.speed_class_id IS NULL AND
 					m.id NOT IN
 					(
 						SELECT mi.member_id
@@ -1121,6 +1146,47 @@ class Member_Model extends ORM
 				JOIN users u ON u.member_id = m.id AND u.type = ?
 				ORDER BY name
 		", User_Model::MAIN_USER);
+	}
+	
+	/**
+	 * Gets array of members for selectbox
+	 * 
+	 * @return array[string]
+	 */
+	public static function select_list_grouped($optgroup = TRUE)
+	{
+		$list = array();
+		
+		$assoc = ORM::factory('member', self::ASSOCIATION);
+		
+		if ($optgroup)
+			$list[__('Association')][self::ASSOCIATION] = $assoc->name . ' (ID '.self::ASSOCIATION.')';
+		else
+			$list[self::ASSOCIATION] = $assoc->name . ' (ID '.self::ASSOCIATION.')';
+		
+		$concat = "CONCAT(
+					IF(
+						CONCAT(users.name,' ',users.surname) = members.name,
+						CONCAT(users.surname,' ',users.name),
+						members.name
+					), ' (ID ',members.id,')')";
+		
+		if ($optgroup)
+		{
+			$list[__('Members')] = $assoc
+					->join('users', array('members.id' => 'users.member_id'))
+					->where('members.id !=', self::ASSOCIATION)
+					->select_list('member_id', $concat, array('surname' => 'ASC', 'users.name' => 'ASC'));
+		}
+		else
+		{
+			$list += $assoc
+				->join('users', array('members.id' => 'users.member_id'))
+				->where('members.id !=', self::ASSOCIATION)
+				->select_list('member_id', $concat, array('surname' => 'ASC', 'users.name' => 'ASC'));
+		}
+		
+		return $list;
 	}
 
 	/**
@@ -1175,26 +1241,30 @@ class Member_Model extends ORM
 	}
 
 	/**
-	 * Returns all members belongs to link
+	 * Returns ID of main user of member
 	 *
-	 * @author Michal Kliment
-	 * @param integer $link_id
-	 * @param boolean $with_assoc with association or without association
-	 * @return MySQL iterator object
+	 * @author Ondřej Fibich
+	 * @return integer|null
 	 */
-	public function get_all_by_segment($link_id, $with_assoc = TRUE)
+	public function get_main_user($member_id = NULL)
 	{
-		$where = (!$with_assoc) ? ' AND m.id <> 1' : '';
-
-		return $this->db->query("
-				SELECT m.id
-				FROM members m
-				JOIN users u ON u.member_id = m.id
-				JOIN devices d ON d.user_id = u.id
-				JOIN ifaces i ON i.device_id = d.id
-				WHERE i.link_id = ? $where
-				GROUP BY m.id
-		", array($link_id));
+		if ($member_id === NULL && $this)
+		{
+			$member_id = $this->id;
+		}
+		
+		$result = $this->db->query("
+				SELECT u.id
+				FROM users u
+				WHERE u.member_id = ? AND u.type = ?
+		", array($member_id, User_Model::MAIN_USER));
+		
+		if ($result->count())
+		{
+			return $result->current()->id;
+		}
+		
+		return NULL;
 	}
 	
 	/**
@@ -1244,114 +1314,41 @@ class Member_Model extends ORM
 				DELETE FROM accounts WHERE member_id = ?
 		", $member_id);
 	}
-
+	
 	/**
-	 * Gets members whose at least one ip address is set as whitelisted.
-	 * @author Jiri Svitak
-	 * @return Mysql_Result
+	 * Deletes all devices and IP addresses of the given member or members
+	 * 
+	 * @author Ondrej Fibich
+	 * @param integer|array $member_id	Member ID or multiple IDs
 	 */
-	public function get_whitelisted_members(
-			$limit_from = 0, $limit_results = 50, $order_by = 'id',
-			$order_by_direction = 'asc', $filter_sql = "")
+	public function delete_members_devices($member_id)
 	{
-		$where = "";
-		if ($filter_sql)
-			$where = "WHERE $filter_sql";
-		
-		// order by direction check
-		if (strtolower($order_by_direction) != 'desc')
+		if (!is_array($member_id))
 		{
-			$order_by_direction = 'asc';
+			$member_id = array($member_id);
 		}
 		
-		return $this->db->query("
-			SELECT
-				m.*, COUNT(m.id) AS items_count,
-				GROUP_CONCAT(ip_address ORDER BY INET_ATON(ip_address) SEPARATOR ', \n')
-				AS items_count_title, a_comment
-			FROM
-			(
-				SELECT
-					m.id, IFNULL(f.translated_term, e.value) AS type,
-					m.name, m.name AS member_name, a.balance,
-					a.id AS aid, a.comments_thread_id AS a_comments_thread_id,
-					ip.whitelisted, ip.ip_address, ip.id AS ip_address_id,
-					a_comment
-				FROM
-				(
-					SELECT ip.id, ip.whitelisted, ip.ip_address,
-						IFNULL(u.member_id, ip.member_id) AS member_id
-					FROM ip_addresses ip
-					LEFT JOIN ifaces i ON ip.iface_id = i.id
-					LEFT JOIN devices d ON i.device_id = d.id
-					LEFT JOIN users u ON d.user_id = u.id
-					WHERE ip.whitelisted > 0
-				) ip
-				JOIN members m ON ip.member_id = m.id
-				LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
-				LEFT JOIN
-				(
-					SELECT c.comments_thread_id,
-					GROUP_CONCAT(CONCAT(u.surname,' ',u.name,' (',SUBSTRING(c.datetime,1,10),'):\n',c.text)
-					ORDER BY datetime DESC SEPARATOR ', \n\n') AS a_comment
-					FROM comments c
-					JOIN users u ON c.user_id = u.id
-					GROUP BY c.comments_thread_id
-				) c ON a.comments_thread_id = c.comments_thread_id
-				LEFT JOIN comments_threads ct ON a.comments_thread_id = ct.id
-				LEFT JOIN enum_types e ON m.type = e.id
-				LEFT JOIN  translations f ON e.value = f.original_term AND lang = ?
-				WHERE ip.whitelisted > 0
-			) m
-			$where
-			GROUP BY m.id
-			ORDER BY " . $this->db->escape_column($order_by) . " $order_by_direction
-			LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
-		", Config::get('lang'));
-	}
-
-	/**
-	 * Counts members whose at least one ip address is set as whitelisted.
-	 * @author Jiri Svitak
-	 * @return integer
-	 */
-	public function count_whitelisted_members($filter_sql = '')
-	{
-		$where = "";
-		if ($filter_sql)
+		if (count($member_id) > 0)
 		{
-			$where = "WHERE $filter_sql";
+			$mids = implode(',', array_map('intval', $member_id));
+			// delete devices
+			$this->db->query("
+				DELETE FROM devices WHERE user_id IN (
+					SELECT id FROM users
+					WHERE member_id IN (" . $mids . ")
+				)
+			");
+			// delete IP addresses
+			$this->db->query("
+				DELETE FROM ip_addresses
+				WHERE member_id IN (" . $mids . ")
+			");
+			// delete subnet owner
+			$this->db->query("
+				DELETE FROM subnets_owners
+				WHERE member_id IN (" . $mids . ");
+			");
 		}
-		
-		return $this->db->query("
-			SELECT COUNT(*) AS total FROM
-			(
-				SELECT m.id FROM
-				(
-					SELECT
-						m.id, IFNULL(f.translated_term, e.value) AS type,
-						m.name AS member_name, ip.whitelisted, a.balance
-					FROM
-					(
-						SELECT ip.id, ip.whitelisted, ip.ip_address,
-							IFNULL(u.member_id, ip.member_id) AS member_id
-						FROM ip_addresses ip
-						LEFT JOIN ifaces i ON ip.iface_id = i.id
-						LEFT JOIN devices d ON i.device_id = d.id
-						LEFT JOIN users u ON d.user_id = u.id
-						WHERE ip.whitelisted > 0
-					) ip
-					JOIN members m ON ip.member_id = m.id
-					LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
-					LEFT JOIN comments_threads ct ON a.comments_thread_id = ct.id
-					LEFT JOIN enum_types e ON m.type = e.id
-					LEFT JOIN translations f ON e.value = f.original_term AND lang = ?
-					WHERE ip.whitelisted > 0
-				) m
-				$where
-				GROUP BY m.id
-			) m
-		", Config::get('lang'))->current()->total;
 	}
 	
 	/**
@@ -1397,6 +1394,21 @@ class Member_Model extends ORM
 		return ORM::factory('membership_interrupt')
 			->has_member_interrupt_in_date($member_id, $date);
 	}
+
+	/**
+	 * Has member activates a whitelist?
+	 * 
+	 * @param integer $member_id [optional]
+	 */
+	public function has_whitelist($member_id = NULL)
+	{
+		if ($member_id === NULL)
+			$member_id = $this->id;
+		
+		$mw = new Members_whitelist_Model();
+		
+		return $mw->get_member_whitelists($member_id)->count() > 0;
+	}
 	
 	/**
 	 * Reactivates (rechecks) system messages for current member
@@ -1420,6 +1432,9 @@ class Member_Model extends ORM
 		// has membership interrupt in current date ?
 		$has_membership_interrupt = $member->has_membership_interrupt();
 		
+		// has member any active whitelist?
+		$is_whitelisted = $member->has_whitelist();
+		
 		// finds all ip addresses of member
 		$ip_addresses = ORM::factory('ip_address')
 				->get_ip_addresses_of_member($member->id);
@@ -1429,19 +1444,35 @@ class Member_Model extends ORM
 		
 		// finds ids for system messages
 		
-		$debtor_message_id = $message_model
+		if (Settings::get('finance_enabled'))
+		{
+			$debtor_message_id = $message_model
 				->get_message_id_by_type(
 						Message_Model::DEBTOR_MESSAGE
 				);
 		
-		$payment_notice_message_id = $message_model
+			$payment_notice_message_id = $message_model
 				->get_message_id_by_type(
 						Message_Model::PAYMENT_NOTICE_MESSAGE
 				);
+		}
 		
-		$interrupt_membership_message_id = $message_model
+		if (Settings::get('membership_interrupt_enabled'))
+		{
+			$interrupt_membership_message_id = $message_model
 				->get_message_id_by_type(
 						Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE
+				);
+		}
+		
+		$connection_test_expired_id = $message_model
+				->get_message_id_by_type(
+						Message_Model::CONNECTION_TEST_EXPIRED
+				);
+		
+		$former_member_message_id = $message_model
+				->get_message_id_by_type(
+						Message_Model::FORMER_MEMBER_MESSAGE
 				);
 		
 		// deletes all redirections of member
@@ -1449,10 +1480,63 @@ class Member_Model extends ORM
 		{
 			// deletes all system redirections of member
 			$messages_ip_addresses_model
-				->delete_all_system_redirections_of_ip_address ($ip_address->id);
+				->delete_all_system_redirections_of_ip_address($ip_address->id);
+			
+			// former member?
+			if ($member->type == Member_Model::TYPE_FORMER)
+			{
+				$messages_ip_addresses_model
+					->add_redirection_to_ip_address(
+							$former_member_message_id, $ip_address->id, ''
+					);
+				
+				continue; // nothing more required
+			}
+			
+			// member has membership interrupt
+			if (Settings::get('membership_interrupt_enabled') &&
+				$has_membership_interrupt)
+			{
+				$messages_ip_addresses_model
+					->add_redirection_to_ip_address(
+							$interrupt_membership_message_id, $ip_address->id, ''
+					);
+				
+				continue; // nothing more required
+			}
+			
+			// only delete all if whitelisted or member is applicant
+			if ($is_whitelisted)
+				continue;
+			
+			// applicant test connection
+			if ($member->type == Member_Model::TYPE_APPLICANT)
+			{
+				$actd = Settings::get('applicant_connection_test_duration');
+				$acf = $member->applicant_connected_from;
+				
+				if (!$member->registration && $actd &&
+					!empty($acf) && $acf != '0000-00-00' &&
+					((time() - strtotime($acf)) / 86400 > $actd))
+				{
+					$messages_ip_addresses_model
+						->add_redirection_to_ip_address(
+								$connection_test_expired_id, $ip_address->id, ''
+						);
+				}
+				
+				continue; // no other messages for applicants
+			}
+			
+			// variables
+			$idi = Settings::get('initial_debtor_immunity');
+			$ii = Settings::get('initial_immunity');
+			$ed_diff = (time() - strtotime($member->entrance_date)) / 86400;
 			
 			// member is debtor
-			if ($balance < Settings::get('debtor_boundary'))
+			if (Settings::get('finance_enabled') && !$has_membership_interrupt &&
+				$balance < Settings::get('debtor_boundary') &&
+				($ed_diff >= $idi))
 			{
 				$messages_ip_addresses_model
 					->add_redirection_to_ip_address(
@@ -1461,21 +1545,15 @@ class Member_Model extends ORM
 			}
 			
 			// member is almost debtor
-			if ($balance >= Settings::get('debtor_boundary') &&
-				$balance < Settings::get('payment_notice_boundary'))
+			if (Settings::get('finance_enabled') && !$has_membership_interrupt &&
+				$balance < Settings::get('payment_notice_boundary') && (
+						$balance >= Settings::get('debtor_boundary') &&
+						($ed_diff >= $idi)
+				) || (($ed_diff < $idi) && ($ed_diff >= $ii)))
 			{
 				$messages_ip_addresses_model
 					->add_redirection_to_ip_address(
 							$payment_notice_message_id, $ip_address->id, ''
-					);
-			}
-			
-			// member has membership interrupt
-			if ($has_membership_interrupt)
-			{
-				$messages_ip_addresses_model
-					->add_redirection_to_ip_address(
-							$interrupt_membership_message_id, $ip_address->id, ''
 					);
 			}
 		}
@@ -1501,6 +1579,21 @@ class Member_Model extends ORM
 	}
 	
 	/**
+	 * Adds today former members (members that have set leaving date that is less
+	 * or equal than today and their type is not former).
+	 * 
+	 * @author Ondrej Fibich
+	 */
+	public function add_today_former_members()
+	{
+		$this->db->query("
+			UPDATE members SET type = ? , locked = 1
+			WHERE type <> ? AND leaving_date <= ? AND leaving_date IS NOT NULL
+				AND leaving_date <> '0000-00-00'
+		", self::TYPE_FORMER, self::TYPE_FORMER, date('Y-m-d'));
+	}
+	
+	/**
 	 * Returns members with set-up qos ceil or rate
 	 * 
 	 * @author Michal Kliment
@@ -1509,13 +1602,141 @@ class Member_Model extends ORM
 	public function get_members_qos_ceil_rate ()
 	{
 		return $this->db->query("
-			SELECT id,
-				IF(qos_ceil IS NOT NULL AND qos_ceil <> '', qos_ceil, '0') AS qos_ceil,
-				IF(qos_rate IS NOT NULL AND qos_rate <> '', qos_rate, '0') AS qos_rate
+			SELECT m.id, sc.d_ceil, sc.d_rate, sc.u_ceil, sc.u_rate
 			FROM members m
-			WHERE (qos_ceil IS NOT NULL AND qos_ceil <> '') OR
-				(qos_rate IS NOT NULL AND qos_rate <> '')
+			JOIN speed_classes sc ON sc.id = m.speed_class_id
 			ORDER BY m.id
 		");
+	}
+	
+	/**
+	 * Returns today former members (for auto notification)
+	 * 
+	 * @author Ondrej Fibich
+	 * @return Database_Result
+	 */
+	public function get_today_former_members()
+	{
+		return $this->db->query("
+			SELECT m.id AS member_id, w.whitelisted
+			FROM members m
+			LEFT JOIN
+			(
+				SELECT m2.id AS member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+				FROM members m2
+				LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+					AND mw.since <= CURDATE() AND mw.until >= CURDATE()
+			) w ON w.member_id = m.id
+			WHERE m.leaving_date = ?
+			GROUP BY m.id
+		", date('Y-m-d'));
+	}
+	
+	/**
+	 * Returns all former members (for auto redirection)
+	 * 
+	 * @author Ondrej Fibich
+	 * @return Database_Result
+	 */
+	public function get_all_former_members()
+	{
+		return $this->db->query("
+			SELECT m.id AS member_id, w.whitelisted
+			FROM members m
+			LEFT JOIN
+			(
+				SELECT m2.id AS member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+				FROM members m2
+				LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+					AND mw.since <= CURDATE() AND mw.until >= CURDATE()
+			) w ON w.member_id = m.id
+			WHERE m.type = ?
+			GROUP BY m.id
+		", self::TYPE_FORMER);
+	}
+	
+	/**
+	 * Returns all interrupted members (for auto redirection)
+	 * 
+	 * @author Ondrej Fibich
+	 * @param string $date Date in format Y-m-d [optional]
+	 * @param integer $operation Operation [optional]
+	 *								1 .. date must be between interrupted interval
+	 *								2 .. date must be begin of interrupted interval
+	 *								3 .. date must be end of interrupted interval
+	 * @return Database_Result
+	 */
+	public function get_interrupted_members_on($date = NULL, $operation = 1)
+	{
+		if (empty($date))
+		{
+			$date = date('Y-m-d');
+		}
+		
+		$op = '';
+		
+		// select op
+		switch ($operation)
+		{
+			case 2: // begin
+				$op = "= mf.activation_date";
+				break;
+			case 3: // end
+				$op = "= mf.deactivation_date";
+				break;
+			default: // between (1)
+				$op = "BETWEEN mf.activation_date AND mf.deactivation_date";
+				break;
+		}
+		
+		return $this->db->query("
+			SELECT mi.member_id, w.whitelisted
+			FROM membership_interrupts mi
+			JOIN members_fees mf ON mi.members_fee_id = mf.id
+			LEFT JOIN
+			(
+				SELECT m2.id AS member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+				FROM members m2
+				LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+					AND mw.since <= CURDATE() AND mw.until >= CURDATE()
+			) w ON w.member_id = mi.member_id
+			WHERE ? $op
+			GROUP BY mi.member_id
+		", $date);
+	}
+	
+	/**
+	 * Returns all former members without debt (used to membership transfer)
+	 * 
+	 * @author Michal Kliment
+	 * @return Database_Result
+	 */
+	public function get_all_former_members_without_debt()
+	{
+		return $this->db->query("
+			SELECT m.*
+			FROM members m
+			JOIN accounts a ON a.member_id = m.id
+			WHERE m.type = ? AND a.balance >= 0
+		", self::TYPE_FORMER);
+	}
+	
+	/**
+	 * Return credit account of member
+	 * 
+	 * @author Michal Kliment
+	 * @param type $member_id
+	 * @return type
+	 */
+	public function get_credit_account($member_id = NULL)
+	{
+		if (!$member_id && $this)
+			$member_id = $this->id;
+		
+		$account_model = new Account_Model();
+		
+		return $account_model->get_account_by_account_attribute_and_member(
+			Account_attribute_Model::CREDIT, $member_id
+		);
 	}
 }

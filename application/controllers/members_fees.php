@@ -20,6 +20,17 @@
 class Members_fees_Controller extends Controller
 {
 	/**
+	 * Constructor, only test if finance is enabled
+	 */
+	public function __construct()
+	{		
+		parent::__construct();
+		
+		if (!Settings::get('finance_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Function to show tariffs of member
 	 * For each fee type shows independent grid
 	 * 
@@ -88,7 +99,8 @@ class Members_fees_Controller extends Controller
 			{
 				$members_fees_grids[$fee_type_id]->add_new_button(
 						'members_fees/add/'.$member->id.'/'.$fee_type_id,
-						__('Add new')
+						__('Add new'),
+						array('class' => 'popup_link')
 				);
 			}
 
@@ -111,6 +123,8 @@ class Members_fees_Controller extends Controller
 			$members_fees_grids[$fee_type_id]->callback_field('status')
 					->class('center')
 					->callback('Members_fees_Controller::status_field');
+			
+			$members_fees_grids[$fee_type_id]->callback_field('comment');
 
 			$actions = $members_fees_grids[$fee_type_id]->grouped_action_field();
 			
@@ -120,7 +134,8 @@ class Members_fees_Controller extends Controller
 				$actions->add_conditional_action()
 						->icon_action('edit')
 						->condition('special_type_id_is_not_membership_interrupt')
-						->url('members_fees/edit');
+						->url('members_fees/edit')
+						->class('popup_link');
 			}
 
 			// access control
@@ -143,7 +158,8 @@ class Members_fees_Controller extends Controller
 		if ($this->acl_check_new('Members_Controller', 'fees', $member->id))
 		{
 			$links[] = html::anchor(
-					'members_fees/add/'.$member->id, __('Add new tariff')
+					'members_fees/add/'.$member->id, __('Add new tariff'),
+					array('class' => 'popup_link')
 			);
 		}
 
@@ -341,7 +357,8 @@ class Members_fees_Controller extends Controller
 			), $arr_fee_types);
 
 			// finds all fees
-			$fees = $fee_model->get_all_fees('type_id');
+			$total_fees = $fee_model->count_all();
+			$fees = $fee_model->get_all_fees(0, $total_fees, 'type_id');
 		}
 
 		// converts to array
@@ -387,18 +404,20 @@ class Members_fees_Controller extends Controller
 				->label('Fee')
 				->options($arr_fees)
 				->rules('required')
-				->add_button('fees', 'add', $fee_type_id)
+				->add_button('fees', 'add', $fee_type_id."?popup=1")
 				->style('width: 600px');
-
-		$form->input('from')
-				->label('Date from')
-				->rules('required|valid_date_string')
-				->callback(array($this, 'valid_from'))->value($from);
 		
-		$form->input('to')
+		$form->date('from')
+				->label('Date from')
+				->rules('required')
+				->callback(array($this, 'valid_from'))
+				->value(strtotime($from));
+		
+		$form->date('to')
 				->label('Date to')
-				->rules('valid_date_string')
 				->callback(array($this, 'valid_to'));
+		
+		$form->textarea('comment');
 
 		$form->submit('Save');
 
@@ -407,53 +426,83 @@ class Members_fees_Controller extends Controller
 		{
 			// converts form data to array
 			$form_data = $form->as_array();
-
-			$from = $form_data['from'];
-			$to = $form_data['to'];
-
-			// to is empthy? uses fee's end date
-			if ($to == '')
-			{
-				$fee = new Fee_Model($form_data['fee_id']);
-				$to = $fee->to;
-			}
-
+			
 			$members_fee = new Members_fee_Model();
-			$members_fee->member_id = $form_data['member_id'];
-			$members_fee->fee_id = $form_data['fee_id'];
-			$members_fee->activation_date = $from;
-			$members_fee->deactivation_date = $to;
-			$members_fee->save();
 
-			status::success('Tariff has been successfully added.');
-	 		url::redirect('members_fees/show_by_member/'.$form_data['member_id']);
-		}
+			try
+			{
+				$members_fee->transaction_start();
+				
+				$member = new Member_Model($form_data['member_id']);
+				
+				$from = date('Y-m-d', $form_data['from']);
 
-		// member_id is set
-		if ($member_id)
-		{
-			// fee_type_id is set
-			if ($fee_type_id)
-				// writes title with member name and fee type name
-				$title = __('Add new tariff of type %s to member',
-						$arr_fee_types[$fee_type_id]
-				).' '.$member->member_name;
-			else
-				// writes title with only member name
-				$title = __('Add new tariff to member')
-					. ' '.$member->member_name;
+				// to is empthy? uses fee's end date
+				if (empty($form_data['to']))
+				{
+					$fee = new Fee_Model($form_data['fee_id']);
+					$to = $fee->to;
+				}
+				else
+				{
+					$to = date('Y-m-d', $form_data['to']);
+				}
+
+				$members_fee->member_id = $member->id;
+				$members_fee->fee_id = $form_data['fee_id'];
+				$members_fee->activation_date = $from;
+				$members_fee->deactivation_date = $to;
+				$members_fee->comment = $form_data['comment'];
+				$members_fee->save_throwable();
+				
+				Accounts_Controller::recalculate_member_fees(
+					$member->get_credit_account()->id
+				);	
+
+				ORM::factory ('member')
+					->reactivate_messages($member->id);
+				
+				$members_fee->transaction_commit();
+
+				status::success('Tariff has been successfully added.');
+			}
+			catch (Exception $e)
+			{
+				$members_fee->transaction_rollback();
+				Log::add_exception($e);
+				status::success('Error - Cannot add tariff.');
+			}
+			
+	 		$this->redirect('members_fees/show_by_member/'.$form_data['member_id']);
 		}
 		else
-			// writes general title
-			$title = __('Add new tariff');
-		
-		$view = new View('main');
-		$view->title = $title;
-		$view->breadcrumbs = $breadcrumbs->html();
-		$view->content = new View('form');
-		$view->content->form = $form->html();
-		$view->content->headline = $title;
-		$view->render(TRUE);
+		{
+			// member_id is set
+			if ($member_id)
+			{
+				// fee_type_id is set
+				if ($fee_type_id)
+					// writes title with member name and fee type name
+					$title = __('Add new tariff of type %s to member',
+							$arr_fee_types[$fee_type_id]
+					).' '.$member->member_name;
+				else
+					// writes title with only member name
+					$title = __('Add new tariff to member')
+						. ' '.$member->member_name;
+			}
+			else
+				// writes general title
+				$title = __('Add new tariff');
+
+			$view = new View('main');
+			$view->title = $title;
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('form');
+			$view->content->form = $form->html();
+			$view->content->headline = $title;
+			$view->render(TRUE);
+		}
 	}
 
 	/**
@@ -542,17 +591,20 @@ class Members_fees_Controller extends Controller
 				->rules('required')
 				->style('width: 620px');
 
-		$form->input('from')
+		$form->date('from')
 				->label('Date from')
-				->rules('required|valid_date_string')
+				->rules('required')
 				->callback(array($this, 'valid_from'))
-				->value($members_fee->activation_date);
+				->value(strtotime($members_fee->activation_date));
 		
-		$form->input('to')
+		$form->date('to')
 				->label('Date to')
-				->rules('required|valid_date_string')
+				->rules('required')
 				->callback(array($this, 'valid_to'))
-				->value($members_fee->deactivation_date);
+				->value(strtotime($members_fee->deactivation_date));
+		
+		$form->textarea('comment')
+				->value($members_fee->comment);
 
 		$form->submit('Save');
 
@@ -561,45 +613,67 @@ class Members_fees_Controller extends Controller
 		{
 			$form_data = $form->as_array();
 
-			$members_fee = new Members_fee_Model($members_fee_id);
-			$members_fee->activation_date = $form_data['from'];
-			$members_fee->deactivation_date = $form_data['to'];
-			$members_fee->save();
+			try
+			{
+				$members_fee->transaction_start();
+				
+				$members_fee->activation_date = date('Y-m-d', $form_data['from']);
+				$members_fee->deactivation_date = date('Y-m-d', $form_data['to']);
+				$members_fee->comment = $form_data['comment'];
+				
+				$members_fee->save_throwable();
+				
+				Accounts_Controller::recalculate_member_fees(
+					$members_fee->member->get_credit_account()->id
+				);	
 
-			status::success('Tariff has been successfully updated.');
-	 		url::redirect('members_fees/show_by_member/'.$form_data['member_id']);
+				ORM::factory ('member')
+					->reactivate_messages($members_fee->member->id);
+				
+				$members_fee->transaction_commit();
+				status::success('Tariff has been successfully updated.');
+			}
+			catch (Exception $e)
+			{
+				$members_fee->transaction_rollback();
+				status::error('Error - Cannot update tariff.', $e);
+				Log::add_exception($e);
+			}
+
+	 		$this->redirect('members_fees/show_by_member/'.$form_data['member_id']);
 		}
-		
-		
-		// breadcrumbs
-		$breadcrumbs = breadcrumbs::add()
-				->link('members/show_all', 'Members',
-						$this->acl_check_view('Members_Controller', 'members'))
-				->disable_translation()
-				->link('members/show/'.$members_fee->member->id,
-						'ID ' . $members_fee->member->id . ' - ' . 
-						$members_fee->member->name,
-						$this->acl_check_view(
-								'Members_Controller', 'members',
-								$members_fee->member->id
-						)
-				)->enable_translation()
-				->link('members_fees/show_by_member/' . $members_fee->member->id, 'Tariffs',
-						$this->acl_check_view(
-								'Members_Controller', 'fees',
-								$members_fee->member->id
-						)
-				)->text($members_fee->fee->name . ' (' . $members_fee->fee->fee . ')')
-				->text('Edit tariff');
+		else
+		{
+			// breadcrumbs
+			$breadcrumbs = breadcrumbs::add()
+					->link('members/show_all', 'Members',
+							$this->acl_check_view('Members_Controller', 'members'))
+					->disable_translation()
+					->link('members/show/'.$members_fee->member->id,
+							'ID ' . $members_fee->member->id . ' - ' . 
+							$members_fee->member->name,
+							$this->acl_check_view(
+									'Members_Controller', 'members',
+									$members_fee->member->id
+							)
+					)->enable_translation()
+					->link('members_fees/show_by_member/' . $members_fee->member->id, 'Tariffs',
+							$this->acl_check_view(
+									'Members_Controller', 'fees',
+									$members_fee->member->id
+							)
+					)->text($members_fee->fee->name . ' (' . $members_fee->fee->fee . ')')
+					->text('Edit tariff');
 
-		$view = new View('main');
-		$view->title = __('Edit tariff of member').
-				' '.$members_fee->member->name;
-		$view->breadcrumbs = $breadcrumbs->html();
-		$view->content = new View('form');
-		$view->content->form = $form->html();
-		$view->content->headline = __('Edit tariff of member').' '.$members_fee->member->name;
-		$view->render(TRUE);
+			$view = new View('main');
+			$view->title = __('Edit tariff of member').
+					' '.$members_fee->member->name;
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('form');
+			$view->content->form = $form->html();
+			$view->content->headline = __('Edit tariff of member').' '.$members_fee->member->name;
+			$view->render(TRUE);
+		}
 	}
 
 	/**
@@ -630,15 +704,37 @@ class Members_fees_Controller extends Controller
 			status::warning('Read-only tariff cannot be deleted.');
 			url::redirect('members_fees/show_by_member/'.$members_fee->member_id);
 		}
-
-		// stores member_id to later redirect to list of his tariffs
+		
 		$member_id = $members_fee->member_id;
+		
+		try
+		{
+			$members_fee->transaction_start();
+			
+			// stores member to later redirect to list of his tariffs
+			$member = new Member_Model($members_fee->member_id);
+			
+			// deletes members fee
+			$members_fee->delete_throwable();
+			
+			Accounts_Controller::recalculate_member_fees(
+				$member->get_credit_account()->id
+			);	
 
-		// deletes members fee
-		$members_fee->delete();
+			ORM::factory ('member')
+				->reactivate_messages($member->id);
+			
+			$members_fee->transaction_commit();
+			status::success('Tariff has been successfully deleted.');
+		}
+		catch (Exception $e)
+		{
+			$members_fee->transaction_rollback();
+			Log::add_exception($e);
+			status::error('Error - Cannot delete tariff.', $e);
+		}
 
-		status::success('Tariff has been successfully deleted.');
-	 	url::redirect('members_fees/show_by_member/'.$member_id);
+	 	$this->redirect('members_fees/show_by_member/'.$member_id);
 	}
 
 	/* ----------- CALLBACK FUNCTIONS --------------------------------------- */
@@ -657,7 +753,7 @@ class Members_fees_Controller extends Controller
 			self::error(PAGE);
 		}
 		
-		$from = trim($input->value);
+		$from = date('Y-m-d', trim($input->value));
 		$to = trim($this->input->post('to'));
 
 		// members_fee_id is set only if is callback call from edit function
@@ -721,13 +817,16 @@ class Members_fees_Controller extends Controller
 			self::error(PAGE);
 		}
 		
-		$value = trim($input->value);
-
-		$fee = new Fee_Model($this->input->post('fee_id'));
-
 		// value is empthy? uses fee's end date
-		if ($value == '')
+		if (empty($value))
+		{
+			$fee = new Fee_Model($this->input->post('fee_id'));
 			$value = $fee->to;
+		}
+		else
+		{
+			$value = date('Y-m-d', trim($input->value));
+		}
 
 		// to cannot be smaller then from
 		if ($this->input->post('from') > $value)

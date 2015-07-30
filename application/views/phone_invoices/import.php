@@ -1,5 +1,5 @@
 <h2><?php echo __('Import invoice') ?></h2><br />
-<p>
+<p id="phone_invoice_import_hint">
     <?php echo __('Open Vodafone invoice in Adobe Reader'); ?>.<br />
     <?php echo __('Using CTRL+A copy text to input'); ?>.
 </p>
@@ -12,7 +12,7 @@
         });
     });
 
---></script>
+//--></script>
 <?php if (isset($error)): ?>
 <p class="error"><?php echo $error; ?></p>
 <?php endif; ?>

@@ -1,4 +1,4 @@
-<h2><?php echo $headline ?><div style="float: right; font-weight: normal; font-size: 65%"><?php echo module_state::get_state('logging', TRUE) ?></div></h2>
+<h2><?php echo $headline ?><div style="float: right; font-weight: normal; font-size: 65%"><?php echo module::get_state('logging', TRUE) ?></div></h2>
 
 <ul class="tabs">
     <?php foreach ($this->sections as $url => $name): ?>	

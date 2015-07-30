@@ -19,6 +19,17 @@
  */
 class Money
 {
+	/**
+	 * Formats given amount of money.
+	 *
+	 * @author Ondrej Fibich
+	 * @param double $amount
+	 * @return string Formated money string
+	 */
+	public static function format($amount)
+	{
+		return str_replace(' ', '&nbsp;', number_format(doubleval($amount), 2, ',', ' '));
+	}
 	
 	/**
 	 * Finds all payments by given payment rate

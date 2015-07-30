@@ -3,13 +3,14 @@
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 		<title><?php echo __('Setup config') ?> - FreenetIS</title>
+		<?php echo html::link('media/images/favicon.ico', 'shorcut icon', 'image/x-icon', FALSE); ?>
 		<?php echo html::stylesheet('media/css/installation.css') ?>
 	</head>
 
 	<body>
 
 		<div id="main">
-			<h1><span>FreenetIS</span></h1>
+			<h1><span>FreenetIS</span><i><?php echo Version::get_version() ?></i></h1>
 			<div class="flags">
 				<?php echo special::create_language_flags(array('cs' => 'Česky', 'en' => 'English')) ?>
 			</div>

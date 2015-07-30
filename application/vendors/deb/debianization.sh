@@ -13,7 +13,15 @@ if [ $# -lt 1 ]; then
     exit 1
 fi
 
-NAMES=(freenetis freenetis-monitoring freenetis-redirection freenetis-ulogd freenetis-ssh-keys)
+CONFIG="./debianization.conf"
+
+if [ -r $CONFIG ]; then
+	echo "Loading configuration file"
+	. $CONFIG
+fi
+
+NAMES=(freenetis freenetis-monitoring freenetis-redirection freenetis-dhcp \
+	   freenetis-ssh-keys freenetis-qos)
 DEBIANS=(lenny squeeze wheezy)
 VERSION=$1
 
@@ -41,23 +49,43 @@ mkdir deb_packages
 
 # call all debianization utils #################################################
 
+root_dir=`pwd`
+
 for name in ${NAMES[*]}
 do
+	name_mod=`echo $name | sed 's/-/_/g'`
 	for debian in ${DEBIANS[*]}
 	do
-	deb_sh=./$name/debianization.sh
-	
-	if [ -f "$deb_sh" ]; then
-			./$deb_sh "$VERSION" "$debian"
-
-		if [ $? -eq 0 ]; then
-				green_echo ">>>> [$name+$debian] debianized"
-		else
-				red_echo ">>>> [$name+$debian] an error occured during debianization"
+		# get dir from config or default
+		conf_var_name="${name_mod}_debianization"
+		eval_str="echo \${${conf_var_name}}"
+		deb_dir_sh=`eval "$eval_str"`
+		if [[ -z "$deb_dir_sh" ]]; then
+			deb_dir_sh="./$name/"
 		fi
-	else
+
+		deb_sh="$deb_dir_sh/debianization.sh"
+
+		# run debianization
+		if [ -f "$deb_sh" ]; then
+			cd "$deb_dir_sh"
+			./debianization.sh "$VERSION" "$debian"
+			
+			if [ $? -eq 0 ]; then
+				green_echo ">>>> [$name+$debian] debianized"
+				# move builded packages
+				if [ -d "deb_packages" ]; then
+					mkdir -p "$root_dir/deb_packages"
+					mv -f deb_packages/* "$root_dir/deb_packages"
+				fi
+			else
+				red_echo ">>>> [$name+$debian] an error occured during debianization"
+			fi
+			
+			cd "$root_dir"
+		else
 			red_echo ">>>> [$name+$debian] not debianized (debianization utility is missing)"
-	fi
-done
+		fi
+	done
 done
 

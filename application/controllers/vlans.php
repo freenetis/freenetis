@@ -21,6 +21,18 @@ class Vlans_Controller extends Controller
 	private $_vlan_id = NULL;
 	
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Redirects to show all
 	 */
 	public function index()
@@ -42,12 +54,12 @@ class Vlans_Controller extends Controller
 			$page_word = null, $page = 1)
 	{
 
-		if (!$this->acl_check_view('Devices_Controller', 'vlan'))
+		if (!$this->acl_check_view('Vlans_Controller', 'vlan'))
 			Controller::error(ACCESS);
 
 		// get new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$vlan_model = new Vlan_Model();
 		$total_vlans = $vlan_model->count_all_vlans();
@@ -78,7 +90,7 @@ class Vlans_Controller extends Controller
 			'limit_results'				=> $limit_results
 		));
 
-		if ($this->acl_check_new('Devices_Controller', 'vlan'))
+		if ($this->acl_check_new('Vlans_Controller', 'vlan'))
 		{
 			$grid->add_new_button('vlans/add', 'Add new vlan');
 		}
@@ -98,38 +110,36 @@ class Vlans_Controller extends Controller
 		
 		$actions = $grid->grouped_action_field();
 		
-		if ($this->acl_check_view('Devices_Controller', 'vlan'))
+		if ($this->acl_check_view('Vlans_Controller', 'vlan'))
 		{
 			$actions->add_action()
 					->icon_action('show')
 					->url('vlans/show');
 		}
 		
-		if ($this->acl_check_edit('Devices_Controller', 'vlan'))
+		if ($this->acl_check_edit('Vlans_Controller', 'vlan'))
 		{
 			$actions->add_action()
 					->icon_action('edit')
 					->url('vlans/edit');
 		}
 		
-		if ($this->acl_check_delete('Devices_Controller', 'vlan'))
+		if ($this->acl_check_delete('Vlans_Controller', 'vlan'))
 		{
 			$actions->add_action()
 					->icon_action('delete')
-					->url('vlans/delete');
+					->url('vlans/delete')
+					->class('delete_link');
 		}
 		
 		$grid->datasource($query);
-		
-		$this->template = new stdClass();
-		$this->template->content = $grid;
 
 
 		$view = new View('main');
 		$view->title = __('Vlans list');
 		$view->breadcrumbs = __('Vlans');
 		$view->content = new View('show_all');
-		$view->content->table = $this->template->content;
+		$view->content->table = $grid;
 		$view->content->headline = __('Vlans list');
 		$view->render(TRUE);
 	}
@@ -153,7 +163,7 @@ class Vlans_Controller extends Controller
 			Controller::error(RECORD);
 		}
 
-		if (!$this->acl_check_view('Devices_Controller', 'vlan'))
+		if (!$this->acl_check_view('Vlans_Controller', 'vlan'))
 		{
 			Controller::error(ACCESS);
 		}
@@ -177,6 +187,7 @@ class Vlans_Controller extends Controller
 				->callback('callback::ports_field');
 		
 		$grid->callback_field('ip_address')
+				->label('IP address')
 				->callback('callback::ip_address_field');
 		
 		$grid->datasource($vlan->get_devices_of_vlan());
@@ -225,7 +236,7 @@ class Vlans_Controller extends Controller
 	 */
 	public function add()
 	{
-		if (!$this->acl_check_new('Devices_Controller', 'vlan'))
+		if (!$this->acl_check_new('Vlans_Controller', 'vlan'))
 			Controller::error(ACCESS);
 
 		$vlan = new Vlan_Model();
@@ -276,7 +287,7 @@ class Vlans_Controller extends Controller
 			{
 				$vlan->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - Cannot add new VLAN.');
+				status::error('Error - Cannot add new VLAN.', $e);
 				
 				$this->redirect('show_all');
 			}
@@ -287,7 +298,7 @@ class Vlans_Controller extends Controller
 
 			$breadcrumbs = breadcrumbs::add()
 					->link('vlans/show_all', 'VLANs',
-							$this->acl_check_view('Devices_Controller', 'vlan'))
+							$this->acl_check_view('Vlans_Controller', 'vlan'))
 					->text('Add');
 
 			$view = new View('main');
@@ -320,14 +331,14 @@ class Vlans_Controller extends Controller
 			Controller::warning(RECORD);
 		}
 
-		if (!$this->acl_check_edit('Devices_Controller', 'vlan'))
+		if (!$this->acl_check_edit('Vlans_Controller', 'vlan'))
 		{
 			Controller::error(1);
 		}
 		
 		$this->_vlan_id = $vlan_id;
 
-		$form = new Forge('vlans/edit/' . $vlan_id);
+		$form = new Forge();
 
 		$form->group('Basic data');
 
@@ -376,7 +387,7 @@ class Vlans_Controller extends Controller
 			{
 				$vlan->transaction_rollback();
 				
-				status::error('Error - Cannot update VLAN.');
+				status::error('Error - Cannot update VLAN.', $e);
 				
 				$this->redirect('show_all');
 			}
@@ -386,10 +397,10 @@ class Vlans_Controller extends Controller
 		{
 			$breadcrumbs = breadcrumbs::add()
 					->link('vlans/show_all', 'VLANs',
-							$this->acl_check_view('Devices_Controller', 'vlan'))
+							$this->acl_check_view('Vlans_Controller', 'vlan'))
 					->disable_translation()
 					->link('vlans/show/' . $vlan->id, $vlan->name,
-							$this->acl_check_view('Devices_Controller', 'vlan'))
+							$this->acl_check_view('Vlans_Controller', 'vlan'))
 					->enable_translation()
 					->text('Edit');
 
@@ -422,7 +433,7 @@ class Vlans_Controller extends Controller
 			Controller::error(RECORD);
 		
 		// access control
-		if (!$this->acl_check_delete('Devices_Controller', 'vlan'))
+		if (!$this->acl_check_delete('Vlans_Controller', 'vlan'))
 			Controller::error(ACCESS);
 		
 		if ($vlan->delete())

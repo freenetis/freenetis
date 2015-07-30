@@ -12,6 +12,6 @@
 <p><?php echo __('Setup config done') .'. '. __('If your database is not prepared, on next page you will be asked to set some information about main user and organization'); ?>
 </p>
 <?php echo form::open(url_lang::base().'login') ?>
-<?php echo form::submit('submit', __('Next step').' >>>') ?>
+<?php echo form::submit('submit', __('Next step').' >>>', ' class="submit"') ?>
 <?php echo form::close() ?>
 <?php endif ?>

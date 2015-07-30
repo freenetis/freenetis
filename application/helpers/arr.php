@@ -318,16 +318,16 @@ class arr {
 	 * @param   array   array to convert
 	 * @return  object
 	 */
-	public static function to_object(array $array, $class = 'stdClass')
+	public static function to_object(array $array, $class = 'stdClass', $recursively = TRUE)
 	{
 		$object = new $class;
 		
 		foreach ($array as $key => $value)
 		{
-			if (is_array($value))
+			if ($recursively && is_array($value))
 			{
 				// Convert the array to an object
-				$value = arr::to_object($value, $class);
+				$value = arr::to_object($value, $class, $recursively);
 			}
 
 			// Add the value to the object
@@ -579,6 +579,27 @@ class arr {
 			0 => __('No'),
 			1 => __('Yes')
 		);
+	}
+	
+	/**
+	 * Remove values given by charlist (seperated by comma) from array
+	 * 
+	 * @author Michal Kliment <kliment@freenetis.org>
+	 * @param type $array
+	 * @param type $charlist
+	 * @return type
+	 */
+	public static function trim($array = array(), $charlist = '')
+	{
+		$charlist = explode(',', $charlist);
+		
+		foreach ($array as $key => $val)
+		{
+			if (in_array($val, $charlist))
+				unset ($array[$key]);
+		}
+		
+		return $array;
 	}
 
 } // End arr

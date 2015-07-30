@@ -58,7 +58,7 @@ $info_query = "
 	FROM members
 	LEFT JOIN
 	(
-		SELECT ip.ip_address, ip.whitelisted, subnet_name,
+		SELECT ip.ip_address, subnet_name,
 			mm.name AS member_name, mm.id AS member_id,
 			(
 				SELECT GROUP_CONCAT(vs.variable_symbol) AS variable_symbol
@@ -69,7 +69,7 @@ $info_query = "
 			login, a.balance
 		FROM
 		(
-			SELECT ip.ip_address, ip.whitelisted, s.name AS subnet_name,
+			SELECT ip.ip_address, s.name AS subnet_name,
 				IFNULL(ip.member_id,u.member_id) AS member_id, u.login
 			FROM ip_addresses ip
 			LEFT JOIN ifaces i ON ip.iface_id = i.id
@@ -107,8 +107,8 @@ $suffix_query = "SELECT name, value FROM config WHERE name = 'suffix'";
 $suffix_result = mysql_query($suffix_query, $link) or die(mysql_error());
 $suffix_array = mysql_fetch_array($suffix_result);
 $logo = '';
-if ($suffix_array &&
-	isset($suffix_array['value']))
+
+if ($suffix_array && isset($suffix_array['value']))
 {
 	$logo = $suffix_array['value'].'redirect/logo';
 }
@@ -123,7 +123,8 @@ mysql_close($link);
 <?php // useful settings for expiration prevent caching of this website ?>
 <meta http-equiv="Expires" content="0" />
 <meta http-equiv="Cache-Control" content="No-Cache" />
-<title>Freenetis</title>
+<title>FreenetIS</title>
+<link href="../media/images/favicon.ico" rel="shorcut icon" type="image/x-icon" />
 <link href="../media/css/style.css" rel="stylesheet" type="text/css" />
 <style type="text/css">
 #content-padd h2 {margin: 10px 0px;}

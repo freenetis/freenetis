@@ -1,6 +1,6 @@
 <?php
 /**	
- * JavaScript funcionality for adding ofdevice especially form building.
+ * JavaScript funcionality for adding of device especially form building.
  * 
  * @author Ondřej Fibich
  */
@@ -12,14 +12,17 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	
 	// WARNING! be very careful during changing of form in controller,
 	// this ID is dynamic, change of code in controller may broke it!
-	var $eth_ifaces_group = $('#group-5');
-	var $wlan_ifaces_group = $('#group-6');
-	var $port_group = $('#group-7');
-	var $internal_group = $('#group-8');
+	var $eth_ifaces_group = $('#group-<?php echo 4 + Settings::get('finance_enabled') ?>');
+	var $wlan_ifaces_group = $('#group-<?php echo 5 + Settings::get('finance_enabled') ?>');
+	var $port_group = $('#group-<?php echo 6 + Settings::get('finance_enabled') ?>');
+	var $internal_group = $('#group-<?php echo 7 + Settings::get('finance_enabled') ?>');
 	
 	// values for dropdowns
 	var subnets_options = '<option value="">---- <?php echo __('Select subnet') ?> ----</option><?php foreach ($arr_subnets as $k => $v): ?><option value="<?php echo $k ?>"><?php echo $v ?></option><?php endforeach; ?>';
 	var devices_options = '<option value="">---- <?php echo __('Select device') ?> ----</option><?php foreach ($arr_devices as $k_u => $v_u): ?><optgroup label="<?php echo $k_u ?>"><?php foreach ($v_u as $k => $v): ?><option value="<?php echo $k ?>"><?php echo $v ?></option><?php endforeach; ?></optgroup><?php endforeach; ?>';
+	
+	// subnets with gateway
+	var gateway_subnets = [<?php echo implode(', ',array_keys($arr_gateway_subnets)) ?>];
 	
 	// port modes asociative array
 	var port_modes = new Array();
@@ -45,7 +48,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		
 		// dialog button action submit
 		$('#dialog_ip_address_detail form button').unbind('click').click(function ()
-		{
+		{	
 			if ($('#dialog_ip_address_detail form').valid())
 			{
 				// fill in hidden fields
@@ -62,6 +65,52 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			modal: true,
 			position: ['center', 100]
 		});
+		
+		return false;
+	}
+	
+	/**
+	 * Try find device and iface to which is device connected
+	 * 
+	 * @author Michal Kliment
+	*/
+	function get_connected_to_device_and_iface()
+	{
+		var $this = $(this);
+		var $img = $this.find('img');
+		var loader = '<?php echo url::base() ?>media/images/icons/animations/ajax-loader.gif';
+		
+		if ($img.attr('src') == loader)
+			return false; // waiting
+		
+		var index = $this.parent().prev().prev().find('input[type="text"]').attr('name').substr('mac'.length);
+		
+		var mac_address = $('input[name="mac' + index + '"]').val();
+		var subnet_id = $('select[name="subnet' + index + '"]').val();
+		
+		if (mac_address != '' && subnet_id)
+		{
+			var oldSrc = $this.find('img').attr('src');
+			$img.attr('src', loader);
+			
+			$.getJSON('<?php echo url_lang::base() ?>/json/get_connected_to_device_and_iface/', {mac_address:mac_address,subnet_id:subnet_id}, function (data)
+			{	
+				if (data.state)
+				{				
+					$('select[name="connected' + index + '"] option[value="'+data.device_id+'"]').attr("selected", true);
+					$('select[name="connected' + index + '"]').trigger('change');
+					
+					$('select[name="connected_iface' + index + '"] option[value="'+data.iface_id+'"]').attr("selected", true);
+					$('select[name="connected_iface' + index + '"]').trigger('change');
+				}
+				else
+				{
+					alert (data.message);
+				}
+			});
+			
+			$img.attr('src', oldSrc);
+		}
 		
 		return false;
 	}
@@ -326,6 +375,10 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	 */
 	function change_connected(event, iface_id)
 	{
+		$.ajaxSetup({
+			async: false
+		});
+		
 		var $eif = $(this).parent().find('select[name^="connected_iface["]');
 		var $ety = $(this).parent().parent().find('input[name^="type["]');
 		
@@ -405,6 +458,10 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 
 			$eif.html(options.join('')).trigger('change');
 		});
+		
+		$.ajaxSetup({
+			async: true
+		});
 	}
 	
 	/**
@@ -444,10 +501,11 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				}
 			});
 		}
+		
+		var type = $p.find('input[name^="type["]').val();
 
 		if (!made)
 		{
-			var type = $p.find('input[name^="type["]').val();
 			var default_name = (type == <?php echo Iface_Model::TYPE_WIRELESS ?>) ? '<?php echo __('air') ?>' : '<?php echo __('cable') ?>';
 			var device_id = $(this).parent().find('select[name^="connected["] option:selected').val();
 
@@ -480,6 +538,27 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			$p.find('input[name^="wireless_channel_width["]').val(null);
 			$p.find('input[name^="wireless_polarization["]').val(null);
 		}
+		
+		// inform user if the new connection will break some old connection (#397)
+		if (type == <?php echo Iface_Model::TYPE_PORT ?> || type == <?php echo Iface_Model::TYPE_ETHERNET ?>)
+		{
+			$.ajax({
+				method:		'get',
+				dataType:	'json',
+				url:		'<?php echo url_lang::base(); ?>json/get_iface_and_device_connected_to_iface?iface_id=' + iface_id,
+				success:	function (v)
+				{
+					if (v && v.device && v.iface)
+					{
+						var m = '<?php echo __('Interface that you choosed is connected to another interface') ?>:\n\n';
+						m += '<?php echo __('Device') ?>: ' + v.device.id + ', ' + v.device.name + '\n';
+						m += '<?php echo __('Interface') ?>: ' + v.iface.name + ', ' + v.iface.mac + '\n\n';
+						m += '<?php echo __('If you do not change this connected to option, link between these devices will be destroyed') ?>!';
+						alert(m);
+					}
+				}
+			});
+		}
 	}
 	
 	/**
@@ -487,6 +566,11 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	 */
 	function use_row()
 	{
+		var mac = $(this).parent().parent().find('input[name^="mac["]').val();
+		var subnet = $(this).parent().parent().find('select[name^="subnet["]').val();
+			
+		$(this).parent().parent().find('.get_connected_to_device_and_iface').toggle(mac != '' && subnet != '')
+		
 		$(this).parent().parent().find('input[name^="use["]')
 				.attr('checked', true).trigger('change');
 	}
@@ -589,13 +673,18 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	 * @param async			Is request to server asynchronious [optional]
 	 */
 	function reload_suggestions(e, async)
-	{
+	{		
 		if (async == undefined)
 		{
 			async = true;
 		}
 		
 		suggest_connected_to = new Array();
+		
+		if ('<?php echo Settings::get('device_add_auto_link_enabled') ?>' !== '1')
+		{
+			return; // suggestion are not enabled in settings
+		}
 		
 		if (parseInt($('#user_id').val()))
 		{
@@ -651,11 +740,13 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	 * @param $group		Group on which the form is created
 	 * @param data			Data (device templates form)
 	 * @param start_index	Start index of counter
+	 * @param default_iface Default iface index or -1 if there is no default in this group
 	 * @return integer		The value of counter after creating
 	 */
-	function create_form_of_group($group, data, start_index)
+	function create_form_of_group($group, data, start_index, default_iface)
 	{
-		var html_buffer = ['<tr><td colspan="2">'];
+		var id = substr($group.attr('id'), strlen('group-'));
+		var html_buffer = ['<tr class="group-' + id + '-items"><td colspan="2">'];
 		
 		html_buffer.push('<table class="extended" style="width: 100%"><tr>');
 		
@@ -777,14 +868,37 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			html_buffer.push('<td><label class="device_add_label"><?php echo __('Name') ?>: </label>');
 			html_buffer.push('<b class="iface_name">');
 			html_buffer.push(item['name']);
-			html_buffer.push('</b><br />');
+			html_buffer.push('</b> ');
+			html_buffer.push('<a href="#" title="<?php echo __('Add details to interface') ?>" class="device_add_detail_button add_detail_to_iface">');
+			html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/settings.gif')) ?>');
+			html_buffer.push('</a><br />');
 			
 			if (data['has_mac'])
 			{
+				var auto_fill = false;
+				
 				html_buffer.push('<label class="device_add_label">MAC: </label>');
 				html_buffer.push('<input type="text" name="mac[');
 				html_buffer.push(i);
-				html_buffer.push(']" class="mac_address" style="width: 12em" />');
+				html_buffer.push(']" ');
+				
+				<?php if (!empty($connection_request_model)): ?>
+				// add mac from request
+				if ((default_iface >= 0) && (i == default_iface))
+				{
+					auto_fill = true;
+					html_buffer.push('value="<?php echo $connection_request_model->mac_address ?>" ');
+				}
+				<?php endif; ?>
+				
+				html_buffer.push('class="mac_address mac_address_check" style="width: 12em" />');
+				
+				if (!auto_fill) // auto loading of MAC addresses
+				{
+					html_buffer.push('<a href="#" title="<?php echo __('Automatically load mac address') ?>" class="device_add_detail_button load_mac" style="display:none">');
+					html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/reload.png')) ?>');
+					html_buffer.push('</a>');
+				}
 			}
 			else if (data['type'] == <?php echo Iface_Model::TYPE_PORT ?>)
 			{
@@ -793,9 +907,6 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			}
 			
 			html_buffer.push(iface_hid);
-			html_buffer.push('<a href="#" title="<?php echo __('Add details to interface') ?>" class="device_add_detail_button add_detail_to_iface">');
-			html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/settings.gif')) ?>');
-			html_buffer.push('</a>');
 			html_buffer.push('</td>');
 			
 			if (data['has_ip'])
@@ -804,7 +915,17 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				html_buffer.push('<label class="device_add_label">IP: </label>');
 				html_buffer.push('<input type="text" name="ip[');
 				html_buffer.push(i);
-				html_buffer.push(']" style="width:11em" class="ip_address ip_address_check" />');
+				html_buffer.push(']" ');
+				
+				<?php if (!empty($connection_request_model)): ?>
+				// add mac from request
+				if ((default_iface >= 0) && (i == default_iface))
+				{
+					html_buffer.push('value="<?php echo $connection_request_model->ip_address ?>" ');
+				}
+				<?php endif; ?>
+				
+				html_buffer.push('style="width:14em" class="ip_address ip_address_check" />');
 				html_buffer.push(ip_hiddden);
 				html_buffer.push('<a href="#" class="device_add_detail_button add_detail_to_ip" title="<?php echo __('Add details to IP address') ?>">');
 				html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/settings.gif')) ?>');
@@ -812,7 +933,17 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				html_buffer.push('<label class="device_add_label"><?php echo __('Subnet') ?>: </label>');
 				html_buffer.push('<select name="subnet[');
 				html_buffer.push(i);
-				html_buffer.push(']" style="width: 11em">');
+				html_buffer.push(']" ');
+				
+				<?php if (!empty($connection_request_model)): ?>
+				// add mac from request
+				if ((default_iface >= 0) && (i == default_iface))
+				{
+					html_buffer.push('class="subnet_fill_in_connection_request_model_value" ');
+				}
+				<?php endif; ?>
+				
+				html_buffer.push('style="min-width: 14em; max-width: 22em; width: auto">');
 				html_buffer.push(subnets_options);
 				html_buffer.push('</select>');
 				html_buffer.push('</td>');
@@ -865,7 +996,18 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/ico_add.gif', 'style' => 'width:10px;height:10px')) ?>');
 				html_buffer.push('</a>');
 				html_buffer.push('<a href="#" class="device_add_detail_button refresh_ifaces dispNone" title="<?php echo __('Refresh interfaces of device') ?>">');
-				html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/refresh.gif')) ?>');
+				html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/refresh.png')) ?>');
+				html_buffer.push('</a>');
+				html_buffer.push('<a href="#" class="device_add_detail_button get_connected_to_device_and_iface');
+				<?php if (!empty($connection_request_model)): ?>
+				// enable getting on connection request (MAC and subnet aready filled in)
+				if (i != default_iface)
+				{
+					html_buffer.push(' dispNone');
+				}
+				<?php endif; ?>
+				html_buffer.push('" title="<?php echo __('Get Connected to device and iface') ?>">');
+				html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/reload.png')) ?>');
 				html_buffer.push('</a>');
 				html_buffer.push('<a href="#" class="device_add_detail_button add_detail_to_link" title="<?php echo __('Add details to link') ?>">');
 				html_buffer.push('<?php echo html::image(array('src' => 'media/images/icons/settings.gif')) ?>');
@@ -881,7 +1023,13 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		html_buffer.push('</table></td></tr>');
 		
 		$group.after(html_buffer.join(''));
-			
+		
+		// hide group if there is no default iface
+		if (default_iface === -1)
+		{
+			$group.find('.group-button').trigger('click');
+		}
+		
 		return i;
 	}
 	
@@ -898,6 +1046,35 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		var internals = device_template_value[<?php echo Iface_Model::TYPE_INTERNAL ?>];
 		var i = 0;
 		
+		// get default iface
+		var default_iface = null;
+		
+		// not set? => choose any thing
+		if (device_template_value['default_iface'] == undefined)
+		{
+			if (eths.count)
+				default_iface = '<?php echo Iface_Model::TYPE_ETHERNET ?>:0';
+			else if (wlans.count)
+				default_iface = '<?php echo Iface_Model::TYPE_WIRELESS ?>:0';
+			else if (ports.count)
+				default_iface = '<?php echo Iface_Model::TYPE_PORT ?>:0';
+			else if (internals.count)
+				default_iface = '<?php echo Iface_Model::TYPE_INTERNAL ?>:0';
+			else
+				default_iface = '-1:-1'; // undefined
+		}
+		else
+		{
+			default_iface = device_template_value['default_iface'];
+		}
+		
+		// default values
+		var default_parts = default_iface.split(':');
+		var default_eth = (default_parts[0] == '<?php echo Iface_Model::TYPE_ETHERNET ?>') ? default_parts[1] : -1;
+		var default_wlan = (default_parts[0] == '<?php echo Iface_Model::TYPE_WIRELESS ?>') ? default_parts[1] : -1;
+		var default_port = (default_parts[0] == '<?php echo Iface_Model::TYPE_PORT ?>') ? default_parts[1] : -1;
+		var default_int = (default_parts[0] == '<?php echo Iface_Model::TYPE_INTERNAL ?>') ? default_parts[1] : -1;
+		
 		// trade name
 		$eth_ifaces_group.before($('<input>', {
 			name:	'trade_name',
@@ -908,7 +1085,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		// ethernet
 		if (eths['count'] > 0)
 		{
-			i = create_form_of_group($eth_ifaces_group, eths, i);
+			i = create_form_of_group($eth_ifaces_group, eths, i, default_eth);
 			$eth_ifaces_group.show();
 		}
 		else
@@ -920,7 +1097,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		// wireless
 		if (wlans['max_count'] > 0)
 		{
-			i = create_form_of_group($wlan_ifaces_group, wlans, i);
+			i = create_form_of_group($wlan_ifaces_group, wlans, i, default_wlan);
 			$wlan_ifaces_group.show();
 		}
 		else
@@ -932,7 +1109,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		// port
 		if (ports['count'] > 0)
 		{
-			i = create_form_of_group($port_group, ports, i);
+			i = create_form_of_group($port_group, ports, i, default_port);
 			$port_group.show();
 		}
 		else
@@ -944,7 +1121,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		// internal
 		if (internals['count'] > 0)
 		{
-			i = create_form_of_group($internal_group, internals, i);
+			i = create_form_of_group($internal_group, internals, i, default_int);
 			$internal_group.show();
 		}
 		else
@@ -956,6 +1133,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		// activate all actions and events
 		$('.add_detail_to_iface').click(add_detail_to_iface);
 		$('.add_detail_to_ip').click(add_detail_to_ip);
+		$('.get_connected_to_device_and_iface').click(get_connected_to_device_and_iface);
 		$('.add_detail_to_link').click(add_detail_to_link);
 		$('.a_filter_devices').click(filter_devices);
 		$('.refresh_ifaces').click(refresh_ifaces);
@@ -965,6 +1143,11 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		$('select[name^="connected["]').change(change_connected);
 		$('select[name^="connected_iface["]').change(change_connected_iface);
 		$('input[name^="_device_filter["]').change(change_filter_connected);
+		
+		<?php if (!empty($connection_request_model)): ?>
+		$('.subnet_fill_in_connection_request_model_value').val(<?php echo $connection_request_model->subnet_id ?>);
+		<?php endif; ?>
+		
 	
 		// set default value of filter
 		var $filters = $('input[name^="_device_filter["]');
@@ -976,15 +1159,30 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			reload_suggestions($filters.get(0), false);
 		}
 
-		// set suggestion on first elements of each group
-		for (var i in suggest_connected_to)
+		// suggestion for default iface (#281)
+		if (device_template_value['default_iface'] != undefined)
 		{
+			var i = default_parts[0];
 			var sug = suggest_connected_to[i];
-
-			if (sug.device_id != undefined && sug.iface_id != undefined)
+			
+			if (sug != undefined && sug.device_id != undefined && sug.iface_id != undefined)
 			{
 				$('.connected_first_' + i + ' option[value="' + sug.device_id + '"]').attr('selected', true);
 				$('.connected_first_' + i).trigger('change', sug.iface_id);
+			}
+		}
+		// set suggestion on first elements of each group
+		else
+		{
+			for (var i in suggest_connected_to)
+			{
+				var sug = suggest_connected_to[i];
+
+				if (sug.device_id != undefined && sug.iface_id != undefined)
+				{
+					$('.connected_first_' + i + ' option[value="' + sug.device_id + '"]').attr('selected', true);
+					$('.connected_first_' + i).trigger('change', sug.iface_id);
+				}
 			}
 		}
 	}
@@ -999,7 +1197,8 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	{
 		var fields = [
 			'device_type', 'user_id', 'device_template_id', 'town_id',
-			'street_id', 'street_number', 'country_id', 'gpsx', 'gpsy'
+			'street_id', 'street_number', 'country_id', 'gpsx', 'gpsy',
+			'active_links', 'town', 'district', 'street', 'zip'
 		];
 		
 		for (var i in fields)
@@ -1007,19 +1206,51 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			var $el = $('#' + fields[i]);
 			var text = $el.val();
 			
-			if ($el[0].nodeName == 'SELECT')
+			if ($el.length)
 			{
-				text = $el.find('option:selected').text();
+				if ($el[0].nodeName == 'SELECT')
+				{
+					text = $el.find('option:selected').text();
+				}
+
+				if ($el.attr('multiple') == 'multiple')
+				{
+					var parent_table = $el.parent().parent();
+
+					// remove options dropdown
+					parent_table.children().first().remove();
+					// remove move buttons
+					parent_table.children().first().remove();
+
+					// remove search boxes
+					parent_table.next().remove();
+
+					$el.find('option').each(function(){
+						var $input = $('<input>', {
+							type:	'hidden',
+							name:	$el.attr('name'),
+							value:	$(this).val()
+						});
+
+						$el.parent().append($('<p>').html('<b>'+$(this).text()+'</b>')).append($input);
+						$input.attr('id', fields[i]);
+					});
+
+					// remove dropdown
+					$el.remove();
+				}
+				else
+				{
+					var $input = $('<input>', {
+						type:	'hidden',
+						name:	$el.attr('name'),
+						value:	$el.val()
+					});
+
+					$el.after($('<b>').text(text)).after($input).remove();
+					$input.attr('id', fields[i]);
+				}
 			}
-			
-			var $input = $('<input>', {
-				type:	'hidden',
-				name:	$el.attr('name'),
-				value:	$el.val()
-			});
-			
-			$el.after($('<b>').text(text)).after($input).remove();
-			$input.attr('id', fields[i]);
 		}
 	}
 	
@@ -1061,8 +1292,57 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			{
 				if ($(this).validate().form())
 				{
+					var isValid = true;
+					// check if all IP addresses are unique
+					var ips = [];
+					$.each($('input[name^="ip["]'), function (i, v)
+					{
+						var ip = trim($(v).val());
+						if (ip.length)
+						{
+							if (ips.indexOf(ip) == -1)
+							{
+								ips.push(trim($(v).val()));
+							}
+							else
+							{
+								alert('<?php echo __('Some IP addresses are same, please change them') ?>!');
+								isValid = false;
+							}
+							
+							var gateway = $(v).parent().children('input[name^="gateway["]').val();
+							
+							var subnet_id = $(v).parent().children('select[name^="subnet["]').val();
+							
+							// subnet has already have gateway
+							if (in_array(subnet_id, gateway_subnets) && gateway == 1)
+							{
+								alert('<?php echo __('Subnet has already have gateway') ?>');
+								isValid = false;
+							}
+						}
+					});
+					// check if all MAC addresses are unique
+					var macs = [];
+					$.each($('input[name^="mac["]'), function (i, v)
+					{
+						var mac = trim($(v).val());
+						if (mac.length)
+						{
+							if (macs.indexOf(mac) == -1)
+							{
+								macs.push(trim($(v).val()));
+							}
+							else
+							{
+								alert('<?php echo __('Some MAC addresses are same, please change them') ?>!');
+								isValid = false;
+							}
+						}
+					});
+								
 					// send form
-					return true;
+					return isValid;
 				}
 				
 				return false;
@@ -1121,6 +1401,9 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			{
 				$('#device_name').val(name_parts[0] + ' ' + text);
 			}
+			
+			// trigger change
+			$('#device_template_id').change();
 		});
 		
 		// change add button href for prefilled enum type in add form dialog
@@ -1135,4 +1418,87 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			button.attr('href', rtrim(parts[0], '0123456789/') + '/' + value + parts[1]);
 		}
 	});
+	
+	// on change template update selected active links
+	$('#device_template_id').change(function ()
+	{
+		var value = $(this).val();
+		
+		$.getJSON('<?php echo url_lang::base() ?>json/get_device_template_active_links?template='+value, function(data)
+		{
+			var options = [];
+			
+			multiple_select_search(this.id, '');
+
+			$('#active_links option').attr('selected', true);
+			$('#active_links_right_button').click();
+				
+			$.each(data, function(key, val)
+			{
+				$('#active_links_options option[value='+val.id+']').attr('selected', true);
+			});
+			
+			$('#active_links_left_button').click();
+		});
+	});
+	
+	// automatically load MAC address
+	$('.load_mac').live('click', function ()
+	{
+		var $this = $(this);
+		var $img = $this.find('img');
+		var loader = '<?php echo url::base() ?>media/images/icons/animations/ajax-loader.gif';
+		
+		if ($img.attr('src') == loader)
+			return false; // waiting
+		
+		var index = $this.parent().find('input[type="text"]').attr('name').substr('mac'.length);
+		var ip = $('input[name="ip' + index + '"]').val();
+		var subnet_id = $('select[name="subnet' + index + '"]').val();
+		
+		if (ip.length && subnet_id.length)
+		{
+			var oldSrc = $this.find('img').attr('src');
+			$img.attr('src', loader);
+			// get MAC
+			$.getJSON('<?php echo url_lang::base() ?>/json/obtain_mac_address', {ip_address:ip,subnet_id:subnet_id}, function (data)
+			{
+				$img.attr('src', oldSrc);
+				
+				if (data.state)
+				{
+					$('input[name="mac' + index + '"]').val(data.mac);
+					$('input[name="mac' + index + '"]').trigger('change');
+					$this.hide();
+				}
+				else
+				{
+					alert('<?php echo __('Cannot load mac address, reason') ?>:\n' + data.message);
+				}
+			});
+		}
+		
+		return false;
+	});
+	
+	// change visibility of MAc autofill after setting of a value to IP and subnet fields
+	$('input[name^="ip["], select[name^="subnet["]').live('keyup change', function ()
+	{
+		var ip = $(this).parent().find('input[name^="ip["]').val();
+		var subnet_id = $(this).parent().find('select[name^="subnet["]').val();
+		
+		if (subnet_id.match(/^[0-9]+$/) && ip.match(/^([0-9]{1,3}\.){3}([0-9]{1,3})$/))
+		{
+			$(this).parent().parent().find('.load_mac').show();
+		}
+		else
+		{
+			$(this).parent().parent().find('.load_mac').hide();
+		}
+	});
+	
+	<?php if (!empty($connection_request_model)): ?>
+	// confirm first part of form after loading
+	$('#device_add_form').submit();
+	<?php endif ?>
 	

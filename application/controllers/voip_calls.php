@@ -22,6 +22,20 @@
 class VoIP_calls_Controller extends Controller
 {
 	/**
+	 * Only check whether is VoIP enabled
+	 * 
+	 * @author Michal Kliment
+	 */
+	public function __construct()
+	{
+	    parent::__construct();
+	    
+	    // voip is not enabled, quit
+	    if (!Settings::get('voip_enabled'))
+		Controller::error (ACCESS);
+	}
+    
+	/**
 	 * Redirects to show all
 	 */	
 	public function index()
@@ -69,8 +83,8 @@ class VoIP_calls_Controller extends Controller
 		else
 			$to = time();
 
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array('type', 'callee');
@@ -251,8 +265,8 @@ class VoIP_calls_Controller extends Controller
 		else
 			$to = time();
 
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array('type', 'callee');
@@ -423,8 +437,8 @@ class VoIP_calls_Controller extends Controller
 		else
 			$to = time();
 
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array('type', 'callee');

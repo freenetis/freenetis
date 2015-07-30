@@ -44,7 +44,6 @@ class Contacts_Controller extends Controller
 		}
 
 		$contact_model = new Contact_Model($contact_id);
-		$country_model = new Country_Model();
 
 		$view = new View('main');
 		$view->title = __('Administration of additional contacts');
@@ -65,14 +64,12 @@ class Contacts_Controller extends Controller
 		));
 
 		$grid_contacts->field('id')
-				->label(__('ID'));
+				->label('ID');
 
 		$grid_contacts->callback_field('type')
-				->label(__('Type'))
-				->callback('Users_Controller::additional_contacts_type_callback');
+				->callback('callback::additional_contacts_type_callback');
 
-		$grid_contacts->field('value')
-				->label(__('Value'));
+		$grid_contacts->field('value');
 
 		$actions = $grid_contacts->grouped_action_field();
 
@@ -101,7 +98,7 @@ class Contacts_Controller extends Controller
 		$grid_private_contacts = NULL;
 		$grid_contacts->datasource($contact_model->find_all_users_contacts($user_id));
 
-		if ($this->acl_check_new(
+		if (Settings::get('phone_invoices_enabled') && $this->acl_check_new(
 				'Private_phone_contacts_Controller', 'contacts',
 				$user->member_id
 			))
@@ -114,17 +111,14 @@ class Contacts_Controller extends Controller
 			));
 
 			$grid_private_contacts->field('id')
-					->label(__('ID'));
+					->label('ID');
 
 			$grid_private_contacts->callback_field('type')
-					->label(__('Type'))
-					->callback('Users_Controller::additional_contacts_type_callback');
+					->callback('callback::additional_contacts_type_callback');
 
-			$grid_private_contacts->field('value')
-					->label(__('Value'));
+			$grid_private_contacts->field('value');
 
-			$grid_private_contacts->field('description')
-					->label(__('Description'));
+			$grid_private_contacts->field('description');
 
 			$actions = $grid_private_contacts->grouped_action_field();
 
@@ -199,7 +193,7 @@ class Contacts_Controller extends Controller
 		{
 			Controller::error(RECORD);
 		}
-
+		
 		$this->_contact_id = NULL;
 
 		$contact_model = new Contact_Model($contact_id);
@@ -236,55 +230,66 @@ class Contacts_Controller extends Controller
 		$form->input('value')
 				->rules('required')
 				->callback(array($this, 'valid_value'));
+		
+		if (Settings::get('email_enabled'))
+		{
+			$form->checkbox('mail_redirection')
+				->label(__('Inner mail redirection enabled to this e-mail box') . '?');
+		}
 
 		$form->submit('Add');
 
 		if ($form->validate())
 		{
-			$issaved = TRUE;
-			$message_added = FALSE;
-
 			// search for contacts
 			$contact_id = $contact_model->find_contact_id(
 					$form->type->value, $form->value->value
 			);
 
-			if ($contact_id)
+			try
 			{
-				$contact_model = ORM::factory('contact', $contact_id);
+				$country_model->transaction_start();
+				$form_values = $form->as_array();
 				
-				$issaved = $issaved && $contact_model->add($user);
-				$issaved = $issaved && $contact_model->save();
-			}
-			else
-			{ // add whole contact
-				$contact_model->type = $form->type->value;
-				$contact_model->value = $form->value->value;
-				$issaved = $issaved && $contact_model->save();
-
-				$issaved = $issaved && $contact_model->add($user);
-
-				if ($form->type->value == Contact_Model::TYPE_PHONE)
+				if ($contact_id)
 				{
-					$country = ORM::factory('country', $form->country_code->value);
-					$issaved = $issaved && $contact_model->add($country);
+					$contact_model = new Contact_Model($contact_id);
+					$contact_model->add($user);
+					$contact_model->save_throwable();
 				}
+				else
+				{ // add whole contact
+					$contact_model->type = $form_values['type'];
+					$contact_model->value = $form_values['value'];
+					$contact_model->save_throwable();
 
-				$issaved = $issaved && $contact_model->save();
-			}
+					$contact_model->add($user);
 
-			if ($issaved)
-			{
-				if (!$message_added)
-				{
-					status::success('Additional contacts have been successfully updated');
+					if ($contact_model->type == Contact_Model::TYPE_PHONE)
+					{
+						$country = ORM::factory('country', $form_values['country_code']);
+						$contact_model->add($country);
+					}
+					else if (Settings::get('email_enabled') &&
+						$contact_model->type == Contact_Model::TYPE_EMAIL)
+					{
+						$redirect = $form_values['mail_redirection'] ? 1 : 0;
+						$contact_model->set_user_redirected_email($user->id, $redirect);
+					}
+
+					$contact_model->save_throwable();
 				}
+				
+				$country_model->transaction_commit();
+				status::success('Additional contacts have been successfully updated');
+				$this->redirect('contacts/show_by_user/',$user_id);
 			}
-			else
+			catch (Exception $e)
 			{
-				status::error('Error - cant update additional contacts');
+				$country_model->transaction_rollback();
+				status::error('Error - cant update additional contacts', $e);
+				Log::add_exception($e);
 			}
-			$this->redirect('contacts/show_by_user/',$user_id);
 		}
 		else
 		{
@@ -399,23 +404,45 @@ class Contacts_Controller extends Controller
 				->rules($rules)
 				->value($contact_model->value)
 				->callback(array($this, 'valid_value'));
+		
+		// inner mail redirection option
+		if (Settings::get('email_enabled') &&
+			$contact_model->type == Contact_Model::TYPE_EMAIL)
+		{
+			$form->checkbox('mail_redirection')
+					->label(__('Inner mail redirection enabled to this e-mail box') . '?')
+					->checked($contact_model->is_user_redirected_email($user_id));
+		}
 
 		$form->submit('Update');
 
 		if ($form->validate())
 		{
-				$contact_model->value = $form->value->value;
-
-			if ($contact_model->save())
+			try
+			{
+				$contact_model->transaction_start();
+				$form_data = $form->as_array();
+				// contact
+				$contact_model->value = $form_data['value'];
+				$contact_model->save_throwable();
+				// mail redirection
+				if (Settings::get('email_enabled') &&
+					$contact_model->type == Contact_Model::TYPE_EMAIL)
 				{
-					status::success('Additional contacts have been successfully updated');
+					$redirect = $form_data['mail_redirection'] ? 1 : 0;
+					$contact_model->set_user_redirected_email($user_id, $redirect);
 				}
-				else
-				{
-					status::error('Error - cant update additional contacts');
-				}
-
-			$this->redirect('contacts/show_by_user/',$user_id);
+				// ok
+				$contact_model->transaction_commit();
+				status::success('Additional contacts have been successfully updated');
+				$this->redirect('contacts/show_by_user/', $user_id);
+			}
+			catch (Exception $ex)
+			{
+				$contact_model->transaction_rollback();
+				status::error('Error - cant update additional contacts', $ex);
+				Log::add_exception($ex);
+			}
 		}
 		else
 		{
@@ -507,7 +534,7 @@ class Contacts_Controller extends Controller
 		// phone and emails can be deleted only if there is another contacts
 		// each user has to have one phone and one email
 		// this rule can be obtain if user who make this action has admin rules
-		if (!$this->acl_check_delete('Settings_Controller', 'system'))
+		if (!$this->acl_check_delete('Users_Controller', 'additional_contacts_admin_delete'))
 		{
 			if ($contact_model->type == Contact_Model::TYPE_EMAIL ||
 				$contact_model->type == Contact_Model::TYPE_PHONE)
@@ -575,18 +602,18 @@ class Contacts_Controller extends Controller
 			
 			// search for contacts
 			$duplicip_contacts = $contact_model->find_contacts($type, trim($input->value));
-
+			
 			foreach ($duplicip_contacts as $c)
 			{
 				if ($c->id && ($c->id != $this->_contact_id))
 				{
 					if ($contact_model->count_all_users_contacts_relation($c->id) > 0)
 					{
-					$input->add_error('required', __('Contact is already in database'));
+						$input->add_error('required', __('Contact is already in database'));
 						break;
+					}
 				}
 			}
 		}
 	}
-}
 }

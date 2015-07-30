@@ -17,17 +17,18 @@ VERSION=$1
 DEBIAN=$2
 
 # create dirs ##################################################################
-mkdir deb_packages/tmp
-cd deb_packages/tmp
+mkdir ../deb_packages/tmp
+cd ../deb_packages/tmp
 
-mkdir DEBIAN
-mkdir var
-mkdir var/www
-mkdir var/www/${NAME}
-mkdir etc
-mkdir etc/freenetis
-mkdir etc/freenetis/https
-mkdir etc/cron.d
+mkdir -m 755 DEBIAN
+mkdir -m 755 usr
+mkdir -m 755 usr/share
+mkdir -m 755 usr/share/${NAME}
+mkdir -m 755 usr/share/doc
+mkdir -m 755 usr/share/doc/${NAME}
+mkdir -m 755 etc
+mkdir -m 755 etc/freenetis
+mkdir -m 755 etc/freenetis/https
 
 # copy content of package ######################################################
 
@@ -39,7 +40,7 @@ if [ $? -ne 0 ]; then
 	exit 2
 fi
 
-cd tmp/var/www/${NAME}
+cd tmp/usr/share/${NAME}
 
 tar -xvf /tmp/${NAME}_packaging.tar.gz 1>/dev/null
 
@@ -53,29 +54,66 @@ rm /tmp/${NAME}_packaging.tar.gz
 cd ../../../
 
 # remove dev parts of FN
-rm -rf var/www/${NAME}/application/vendors/deb
-rm -rf var/www/${NAME}/application/vendors/unit_tester
-rm -rf var/www/${NAME}/application/vendors/redirection
-rm -rf var/www/${NAME}/application/vendors/qos
-rm -rf var/www/${NAME}/application/controllers/unit_tester.php
-rm -rf var/www/${NAME}/application/views/unit_tester
+rm -rf usr/share/${NAME}/application/vendors/deb
+rm -rf usr/share/${NAME}/application/vendors/unit_tester
+rm -rf usr/share/${NAME}/application/vendors/redirection
+rm -rf usr/share/${NAME}/application/vendors/monitoring
+rm -rf usr/share/${NAME}/application/vendors/qos
+rm -rf usr/share/${NAME}/application/vendors/ssh-keys
+rm -rf usr/share/${NAME}/application/vendors/dhcp
+rm -rf usr/share/${NAME}/application/vendors/axo_doc
+rm -rf usr/share/${NAME}/application/controllers/unit_tester.php
+rm -rf usr/share/${NAME}/application/views/unit_tester
+rm -rf usr/share/${NAME}/application/vendors/phpwhois/testsuite.php
 # remove hidden
-rm -rf var/www/${NAME}/.htaccess
-rm -rf var/www/${NAME}/config.php
-rm -rf var/www/${NAME}/upload/*
-rm -rf var/www/${NAME}/logs
-rm -rf var/www/${NAME}/doc
+rm -rf usr/share/${NAME}/.htaccess
+rm -rf usr/share/${NAME}/config.php
+rm -rf usr/share/${NAME}/upload/*
+rm -rf usr/share/${NAME}/logs
+rm -rf usr/share/${NAME}/doc
+rm -rf usr/share/${NAME}/tests
 # remove .svn
-rm -rf `find var/www/${NAME} -type d -name .svn`
+rm -rf `find usr/share/${NAME} -type d -name .svn`
+
+# change permissions
+find usr/share/${NAME} -type d -exec chmod 0755 {} \;
+find usr/share/${NAME} -type f -exec chmod 0644 {} \;
+find usr/share/${NAME} -type f -name *.pl -exec chmod +x {} \;
 
 # copy config file
 cp ../../freenetis/freenetis.conf etc/freenetis/
+chmod 0644 etc/freenetis/freenetis.conf
 
-# copy cron file
-cp ../../freenetis/freenetis.cron etc/cron.d/freenetis
+# doc ##########################################################################
+
+# change log
+cat ../../${NAME}/changelog >> usr/share/doc/${NAME}/changelog
+
+# debian change log is same
+cp usr/share/doc/${NAME}/changelog usr/share/doc/${NAME}/changelog.Debian
+
+# copyright
+echo "This package was debianized by Ondrej Fibich <ondrej.fibich@gmail.com> on `date -R`" >> usr/share/doc/${NAME}/copyright
+echo "It was downloaded from <http://freenetis.org/>\n" >> usr/share/doc/${NAME}/copyright
+echo "Copyright:" >> usr/share/doc/${NAME}/copyright
+cat ../../../../../AUTHORS >> usr/share/doc/${NAME}/copyright
+echo "\nLicense:" >> usr/share/doc/${NAME}/copyright
+cat ../../../../../COPYING >> usr/share/doc/${NAME}/copyright
+echo "\nOn Debian systems, the complete text of the GNU General" >> usr/share/doc/${NAME}/copyright
+echo "Public License can be found in \`/usr/share/common-licenses/GPL-3'.\n" >> usr/share/doc/${NAME}/copyright
+echo -n "The Debian packaging is (C) `date +%Y`, Ondrej Fibich <ondrej.fibich@gmail.com> and" >> usr/share/doc/${NAME}/copyright
+echo " it is licensed under the GPL, see above.\n" >> usr/share/doc/${NAME}/copyright
+
+# rights
+chmod 644 usr/share/doc/${NAME}/changelog usr/share/doc/${NAME}/changelog.Debian \
+		  usr/share/doc/${NAME}/copyright
+
+# compress doc
+gzip --best usr/share/doc/${NAME}/changelog 
+gzip --best usr/share/doc/${NAME}/changelog.Debian
 
 # count size
-SIZE=`du -s var | cut -f1`
+SIZE=`du -s usr | cut -f1`
 
 # calculate checksum ###########################################################
 
@@ -90,49 +128,31 @@ echo "Version: ${VERSION}-${DEBIAN}" >> DEBIAN/control
 echo "Installed-Size: ${SIZE}" >> DEBIAN/control
 cat ../../${NAME}/control >> DEBIAN/control
 
-# change log
-
-cat ../../${NAME}/changelog >> DEBIAN/changelog
-
-# copywriting
-
-echo "This package was debianized by Ondrej Fibich <ondrej.fibich@gmail.com> on" >> DEBIAN/copyright
-date -R >> DEBIAN/copyright
-echo "" >> DEBIAN/copyright
-echo "It was downloaded from <http://freenetis.org/>" >> DEBIAN/copyright
-echo "" >> DEBIAN/copyright
-echo "Upstream Author:" >> DEBIAN/copyright
-cat var/www/${NAME}/AUTHORS >> DEBIAN/copyright
-echo "" >> DEBIAN/copyright
-echo "License:" >> DEBIAN/copyright
-cat var/www/${NAME}/COPYING >> DEBIAN/copyright
-
 # scripts ######################################################################
 
+cp -a -f ../../${NAME}/preinst DEBIAN/preinst
 cp -a -f ../../${NAME}/postinst DEBIAN/postinst
+cp -a -f ../../${NAME}/prerm DEBIAN/prerm
 cp -a -f ../../${NAME}/postrm DEBIAN/postrm
 cp -a -f ../../${NAME}/templates DEBIAN/templates
 cp -a -f ../../${NAME}/config DEBIAN/config
 cp -a -f ../../${NAME}/conffiles DEBIAN/conffiles
 
-chmod +x DEBIAN/postinst DEBIAN/postrm DEBIAN/config
+chmod 755 DEBIAN/preinst DEBIAN/postinst DEBIAN/prerm DEBIAN/postrm DEBIAN/config
+chmod 0644 DEBIAN/templates DEBIAN/conffiles DEBIAN/md5sums
 
 # create deb ###################################################################
 
 # change owner of files to root (security)
 cd ..
-sudo chown -hR root:root *
+fakeroot chown -hR root:root *
 cd tmp
-sudo chmod ugo+w var/www/${NAME}
-sudo chmod ugo+w var/www/${NAME}/upload
-sudo mkdir -m 0777 var/www/${NAME}/logs
-sudo chmod g-w etc/cron.d/freenetis
 
 # make package
 cd ..
-sudo dpkg-deb -b tmp ${NAME}_${VERSION}+${DEBIAN}.deb
+fakeroot dpkg-deb -b tmp ${NAME}_${VERSION}+${DEBIAN}.deb
 
 # clean-up mess ################################################################
 
 # clean
-sudo rm -rf tmp
+rm -rf tmp

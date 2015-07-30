@@ -236,6 +236,8 @@ sub Parse($$$)
 			next if ($dir eq $HELPER_DIR) and not ($method_details =~ /(static)/);
 			# Controllers not allows static methods
 			next if ($dir eq $CONROLLER_DIR) and ($method_details =~ /(static)/);
+			# Controllers not allows valid_* methods
+			next if ($dir eq $CONROLLER_DIR) and ($method_name =~ /(valid_)/);
 			
 			# Skip method if autogeneration is off (add old method to file)
 			my $index = $tag . "#" . $file_name . "#" . $method_name;

@@ -275,7 +275,7 @@
 			return (ret == '1');
 	    }
 
-		--></script>
+		//--></script>
 
 	<?php if ($intelligent_select_on)
 		echo html::anchor(url_lang::current(), __('Inteligent select'), array('id' => 'a_inteligent_select')) . ' | '; ?>

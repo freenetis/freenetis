@@ -11,9 +11,6 @@
  * 
  */
 
-// url for registration to FreenetIS.org
-define('REGISTER_URL', 'http://dev.freenetis.org/register.php');
-
 /**
  * Controller performs installation of FreenetIS
  * 
@@ -305,13 +302,15 @@ class Installation_Controller extends Controller
 				->help(help::hint('login_name'))
 				->callback(array($this, 'valid_username'));
 		
+		$pass_min_len = Settings::get('security_password_length');
+		
 		$form->password('password')
-				->rules('required|length[3,50]')
-				->class('password')
+				->rules('required|length['.$pass_min_len.',50]')
+				->class('main_password')
 				->title(url_lang::lang('help.password'));
 		
 		$form->password('confirm_password')
-				->rules('required|length[3,50]')
+				->rules('required|length['.$pass_min_len.',50]')
 				->matches($form->password);
 		
 		// association
@@ -374,6 +373,12 @@ class Installation_Controller extends Controller
 		
 		$form->group('Fees');
 		
+		$form->input('deduct_day')
+				->rules('valid_numeric')
+				->help(help::hint('deduct_day'))
+				->rules('required')
+				->value(15);
+		
 		$form->input('entrance_fee')
 				->rules('valid_numeric')
 				->help(help::hint('entrance_fee'));
@@ -407,16 +412,6 @@ class Installation_Controller extends Controller
 		$form->input('currency')
 				->rules('required')
 				->value($currency);
-		
-		$link = html::anchor('http://www.freenetis.org', 'FreenetIS.org', array
-		(
-				'target' => '_blank'
-		));
-		
-		$form->checkbox('register_install')
-				->label(__('Register to %s', $link))
-				->help(help::hint('register_install'))
-				->checked(TRUE);
 		
 		// submit button
 		
@@ -461,6 +456,9 @@ class Installation_Controller extends Controller
 					try
 					{
 						$town_model->transaction_start();
+						
+						// set deduct day
+						Settings::set('deduct_day', max(1, min(31, $form_data['deduct_day'])));
 
 						// first member is special, it represents association
 						$member = new Member_Model();
@@ -697,6 +695,14 @@ class Installation_Controller extends Controller
 						$default_penalty->deactivation_date = $to;
 						$default_penalty->priority = 1;
 						$default_penalty->save_throwable();
+						
+						// permament whitelist
+						$members_whitelist = new Members_whitelist_Model();
+						$members_whitelist->member_id = $member->id;
+						$members_whitelist->permanent = 1;
+						$members_whitelist->since = date('Y-m-d');
+						$members_whitelist->until = '9999-12-31';
+						$members_whitelist->save_throwable();
 
 						// system settings
 						Settings::set('title', $form_data['title']);
@@ -732,8 +738,8 @@ class Installation_Controller extends Controller
 					catch (Exception $e)
 					{
 						$town_model->transaction_rollback();
-
-						throw new Exception(__('Installation has failed'), $e);
+						Log::add_exception($e);
+						throw new Exception(__('Installation has failed') . ': ' . $e);
 					}
 
 					// array for store error
@@ -745,17 +751,6 @@ class Installation_Controller extends Controller
 					// set subdirectory
 					$suffix = substr(server::script_name(),0,-9);
 					Settings::set('suffix', $suffix);
-
-					// send registration data
-					if ($form_data['register_install'])
-					{
-						@file_get_contents(
-								REGISTER_URL .
-								'?name=' . urlencode($form_data['name']) .
-								'&email=' . urlencode($form_data['email']) .
-								'&address=' . urlencode($address_point->__toString())
-						);
-					}
 
 					$view = new View('installation/done');
 
@@ -794,7 +789,9 @@ class Installation_Controller extends Controller
 			self::error(PAGE);
 		}
 		
-		if (preg_match('/^[a-z]{1}[a-z0-9]+$/', $input->value) == 0)
+		$username_regex = Settings::get('username_regex');
+		
+		if (preg_match($username_regex, $input->value) == 0)
 		{
 			$input->add_error(
 					'required', __(

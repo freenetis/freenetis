@@ -17,7 +17,7 @@
 		<th><?php echo __('Member name') ?></th>
 		<td><?php echo $member->name ?></td>
 	</tr>
-	<?php if ($member->id != 1) { ?>
+	<?php if (!$is_association && isset($variable_symbols)) { ?>
 	<tr>
 		<th><?php echo __('Variable symbols').'&nbsp;'.help::hint('variable_symbol') ?></th>
 		<td>
@@ -30,12 +30,24 @@
 	<tr>
 		<td colspan="2"><?php echo  html::anchor(url_lang::base().'variable_symbols/show_by_account/'.$account->id,__('Administrate variable symbols')) ?></td>
 	</tr>
-	<?php }} ?>
-	<?php if ($this->acl_check_view('Members_Controller', 'entrance_date', $member->id)) { ?>
+	<?php if (Settings::get('self_registration') && $member->applicant_connected_from) { ?>
 	<tr>
-		<th><?php echo  __('Entrance date').'&nbsp;'.help::hint('entrance_date') ?></th>
+		<th><?php echo  __('Connected from') ?></th>
+		<td><?php echo $member->applicant_connected_from ?></td>
+	</tr>
+	<?php } ?>
+	<?php }} ?>
+	<?php if ($this->acl_check_view('Members_Controller', 'entrance_date', $member->id) && $member->type != Member_Model::TYPE_APPLICANT) { ?>
+	<tr>
+		<th><?php echo  __('Entrance date').'&nbsp;'.help::hint('entrance_date', Settings::get('deduct_day')) ?></th>
 		<td><?php echo  $member->entrance_date ?></td>
 	</tr>
+	<?php if ($this->acl_check_view('Membership_transfers_Controller', 'membership_transfer', $member->id) && $membership_transfer_to_member): ?>
+	<tr>
+		<th><?php echo  __('Membership transfer from').' '.help::hint('membership_transfer') ?></th>
+		<td><?php echo html::anchor(url_lang::base().'members/show/'.$membership_transfer_to_member->member_id, $membership_transfer_to_member->member_name) ?></td>
+	</tr>
+	<?php endif ?>
 	<?php } ?>
 	<?php if ($this->acl_check_view('Members_Controller', 'leaving_date', $member->id)  &&  $member->leaving_date != '0000-00-00') { ?>
 	<tr>
@@ -43,10 +55,22 @@
 		<td><?php echo  $member->leaving_date ?></td>
 	</tr>
 	<?php } ?>
-	<?php if ($member->organization_identifier) { ?>
+	<?php if ($this->acl_check_view('Membership_transfers_Controller', 'membership_transfer', $member->id) && $membership_transfer_from_member): ?>
+	<tr>
+		<th><?php echo  __('Membership transfer to').' '.help::hint('membership_transfer') ?></th>
+		<td><?php echo html::anchor(url_lang::base().'members/show/'.$membership_transfer_from_member->member_id, $membership_transfer_from_member->member_name) ?></td>
+	</tr>
+	<?php endif ?>
+	<?php if ($member->organization_identifier && $this->acl_check_view('Members_Controller', 'organization_id')) { ?>
 	<tr>
 		<th><?php echo __('Organization identifier') ?></th>
 		<td><?php echo trim($member->organization_identifier) ?></td>
+	</tr>
+	<?php } ?>
+	<?php if ($member->vat_organization_identifier && $this->acl_check_view('Members_Controller', 'vat_organization_identifier')) { ?>
+	<tr>
+		<th><?php echo __('VAT organization identifier') ?></th>
+		<td><?php echo trim($member->vat_organization_identifier) ?></td>
 	</tr>
 	<?php } ?>
 	<tr>
@@ -126,7 +150,7 @@
 					</td>
 					<?php if ($this->acl_check_view('Address_points_Controller', 'address_point')): ?>
 					<td style="border: none; padding: 0 0 0 10px;">
-						<a href="<?php echo url_lang::base() ?>address_points/show/<?php echo $member->members_domicile->address_point->id ?>" target="_blank" style="float: right; text-decoration: none;">
+						<a href="<?php echo url_lang::base() ?>address_points/show/<?php echo $member->members_domicile->address_point->id ?>" target="_blank" style="float: right; text-decoration: none;" class="popup_link">
 							<?php echo html::image(array
 								(
 									'width'		=> 16,
@@ -164,7 +188,7 @@
 	<tr>
 		<th colspan="2"><?php echo  __('Other information') ?></th>
 	</tr>
-	<?php if ($member->id != 1) { ?>
+	<?php if (!$is_association) { ?>
 	<tr>
 		<th><?php echo  __('Registration') ?></th>
 		<td><?php echo ($member->registration) ? __('Yes') : __('NO') ?></td>
@@ -188,7 +212,7 @@
 	<?php } ?>
 </table>
 <table class="extended" cellspacing="0" style="float:left; margin-left:10px; width:360px;">
-	<?php if ($member->id != 1) { ?>
+	<?php if (!$is_association && isset($account)) { ?>
 	<tr>
 		<th colspan="2"><?php echo  __('Account information') ?></th>
 	</tr>
@@ -196,36 +220,60 @@
 		<th><?php echo __('Current credit').'&nbsp;'.help::hint('current_credit') ?></th>
 		<td>
 			<?php
-			$class = ($comments != '') ? 'help' : '';
+			$class = ($comments != '') ? 'help more' : '';
 			
 			echo "<span class='".$class."' title='".$comments."'>".number_format((float) $account->balance, 2, ',', ' ').' '.$this->settings->get('currency')."</span> ";
 					
 			if ($this->acl_check_new('Accounts_Controller', 'transfers'))
-					echo html::anchor(url_lang::base().'transfers/add_member_fee_payment_by_cash/'.$member->id, html::image(array('src' => url::base().'media/images/icons/purse.png')), array('title' => __('Add member fee payment by cash'), 'class' => 'action-icon popup_link'));
-			
-			echo html::anchor('transfers/payment_calculator/'.$account->id, html::image(array('src' => url::base().'media/images/icons/calculate.png')), array('title' => __('Calculate'), 'class' => 'action-icon popup_link'));
+					echo html::anchor(url_lang::base().'transfers/add_member_fee_payment_by_cash/'.$member->id, html::image(array('src' => url::base().'media/images/icons/purse.png', 'width' => 16, 'height' => 16)), array('title' => __('Add member fee payment by cash'), 'class' => 'action-icon popup_link'));
+			if ($member->type != Member_Model::TYPE_APPLICANT)
+			{
+				echo html::anchor('transfers/payment_calculator/'.$account->id, html::image(array('src' => url::base().'media/images/icons/calculate.png')), array('title' => __('Calculate'), 'class' => 'action-icon popup_link'));
+			}
 
 			if ($this->acl_check_view ('Members_Controller','comment',$member->id))
-					echo html::anchor(($account->comments_thread_id ? (url_lang::base().'comments/add/'.$account->comments_thread_id) : (url_lang::base().'comments_threads/add/account/'.$account->id)), html::image(array('src' => url::base().'media/images/icons/comment_add.png')), array('title' => __('Add comment to financial state of member'), 'class' => 'action-icon popup_link'));
+					echo html::anchor(($account->comments_thread_id ? (url_lang::base().'comments/add/'.$account->comments_thread_id) : (url_lang::base().'comments_threads/add/account/'.$account->id)), html::image(array('src' => url::base().'media/images/icons/comment_add.png', 'width' => 16, 'height' => 16)), array('title' => __('Add comment to financial state of member'), 'class' => 'action-icon popup_link'));
 			?>
 		</td>
 	</tr>
-	<?php if (isset($expiration_date)) { ?>
+	<?php if ($member->type != Member_Model::TYPE_APPLICANT) { ?>
+	<?php if (isset($expiration_date) && ($entrance_fee_paid == $member->entrance_fee)) { ?>
 	<tr>
 		<th><?php echo __('Payed to').'&nbsp;'.help::hint('payed_to') ?></th>
 		<td><?php echo $expiration_date ?></td>
+	</tr>
+	<?php } ?>
+	<?php if (isset($fee)) { ?>
+	<tr>
+		<th><?php echo __('Monthly member fee').'&nbsp;'.help::hint('monthly_member_fee') ?></th>
+		<td><?php echo number_format((float)$fee, 2, ',', ' ').' '.$this->settings->get('currency') ?></td>
 	</tr>
 	<?php } ?>
 	<tr>
 		<th><?php echo __('Entrance fee').'&nbsp;'.help::hint('entrance_fee') ?></th>
 		<td><?php echo number_format((float)$member->entrance_fee, 2, ',', ' ').' '.$this->settings->get('currency') ?></td>
 	</tr>
+	<?php if ($member->debt_payment_rate && $member->debt_payment_rate != $member->entrance_fee):  ?>
 	<tr>
 		<th><?php echo __('Monthly instalment of entrance').'&nbsp;'.help::hint('entrance_fee_instalment') ?></th>
 		<td><?php echo number_format((float)$member->debt_payment_rate, 2, ',', ' ').' '.$this->settings->get('currency') ?></td>
 	</tr>
+	<?php endif ?>
+	<?php if ($entrance_fee_paid != $member->entrance_fee): ?>
+	<tr>
+		<th><?php echo __('Paid amount from entrance').'&nbsp;'.help::hint('entrance_fee_paid') ?></th>
+		<td><?php echo number_format((float)$entrance_fee_paid, 2, ',', ' ').' '.$this->settings->get('currency') ?></td>
+	</tr>
+	<?php endif ?>
+	<?php if ($entrance_fee_left): ?>
+	<tr>
+		<th><?php echo __('Remaining amount from entrance').'&nbsp;'.help::hint('entrance_fee_left') ?></th>
+		<td><?php echo number_format((float)$entrance_fee_left, 2, ',', ' ').' '.$this->settings->get('currency') ?></td>
+	</tr>
+	<?php endif ?>
 	<?php } ?>
-	<?php if ($billing_has_driver && ($billing_account != null))
+	<?php } ?>
+	<?php if (Settings::get('voip_enabled') && $billing_has_driver && ($billing_account != null))
 	{ ?>
 	<tr>
 		<th colspan="2"><?php echo  __('VoIP information') ?></th>
@@ -236,7 +284,7 @@
 	</tr>
 	<tr>
 		<th><?php echo  __('Current credit') ?></th>
-		<td><?php echo $billing_account->ballance.' '.$billing_account->currency.(($member->id != 1)? '&nbsp;&nbsp;-&nbsp;&nbsp;'.html::anchor(url_lang::base().'transfers/add_voip/'.$account->id, __('Recharge')):''); ?></td>
+		<td><?php echo $billing_account->ballance.' '.$billing_account->currency.((!$is_association)? '&nbsp;&nbsp;-&nbsp;&nbsp;'.html::anchor(url_lang::base().'transfers/add_voip/'.$account->id, __('Recharge')):''); ?></td>
 	</tr>
 	<tr>
 		<th><?php echo  __('Limit') ?></th>
@@ -257,31 +305,31 @@
 		<td><?php echo '<b style="color:darkorange" title="'.__('Registration will be activated after midnight.').'">'.__('Waiting for registration').'</b>' ?></td>
 	</tr>
 	<?php } ?>
-	<?php if ($this->acl_check_view('Members_Controller', 'qos_ceil', $member->id) ||
-		$this->acl_check_view('Members_Controller', 'qos_rate', $member->id)
+	<?php if ($this->acl_check_view('Members_Controller', 'qos_ceil', $member->id) &&
+			$this->acl_check_view('Members_Controller', 'qos_rate', $member->id) &&
+			$member->speed_class_id
 		)
 	{ ?>
 	<tr>
-		<th colspan="2"><?php echo  __('Traffic') ?> + <?php echo  __('QoS') ?></th>
+		<th colspan="2"><?php echo  __('QoS') ?></th>
 	</tr>
-	<?php } ?>
-	<?php
-	if ($this->acl_check_view('Members_Controller', 'qos_ceil', $member->id))
-	{ ?>
+	<tr>
+		<th><?php echo  __('Speed class') ?></th>
+		<td><?php echo $member->speed_class->name ?></td>
+	</tr>
 	<tr>
 		<th><?php echo  __('QoS ceil') ?>&nbsp;<?php echo help::hint('qos_ceil') ?></th>
-		<td><?php echo  $member->qos_ceil ?></td>
+		<td><?php callback::speed_class_ceil_field($member->speed_class, 'ceil') ?></td>
 	</tr>
-	<?php } ?>
-	<?php
-	if ($this->acl_check_view('Members_Controller', 'qos_rate', $member->id))
-	{ ?>
 	<tr>
 		<th><?php echo  __('QoS rate') ?>&nbsp;<?php echo help::hint('qos_rate') ?></th>
-		<td><?php echo  $member->qos_rate ?></td>
+		<td><?php callback::speed_class_rate_field($member->speed_class, 'rate') ?></td>
 	</tr>
 	<?php } ?>
 	<?php if (Settings::get('ulogd_enabled') && $this->acl_check_view('Ulogd_Controller', 'member', $member->id)) { ?>
+	<tr>
+		<th colspan="2"><?php echo  __('Traffic') ?></th>
+	</tr>
 	<tr>
 		<th><?php echo __('Today traffic') ?></th>
 		<td><?php echo network::size($today_traffic->upload) ?> / <?php echo network::size($today_traffic->download) ?></td>
@@ -362,7 +410,7 @@
 		<td><?php echo  __('Phone') ?></td>
 		<td>
 	        <?php
-			if ($this->acl_check_view('Settings_Controller', 'system') && valid::phone($contact->value))
+			if (Settings::get('sms_enabled') && $this->acl_check_new('Sms_Controller', 'sms') && valid::phone($contact->value))
 			{
 				echo html::anchor('sms/send/'.$contact->value, html::image(array('src' => 'media/images/icons/send_sms.png', 'alt' => __('Send SMS'), 'title' => __('Send SMS'))), array('title' => __('Send SMS')));
 			}
@@ -374,13 +422,13 @@
     		<table class="picturebox">
     			<tr>
         			<td><?php echo  __('E-mail') ?></td>
-        			<td><?php
+        			<td><?php if (Settings::get('email_enabled')):
 						echo  form::open(url_lang::base().'email') ;
 						echo  form::hidden('email_member_id', $member->id );
 						echo  form::hidden('address', $contact->value );
 						echo  form::imagebutton('submit', url::base().'media/images/icons/write_email.png', array('title' => __('Send e-mail'), 'style' => 'width:16px; height:16px; border-width: 0px 0px 0px 0px; border-spacing: 0px;'));
 						echo  form::close();
-					?></td>
+					endif ?></td>
 				</tr>
 			</table>
 		</th>
@@ -400,19 +448,25 @@
 <br class = "clear" />
 <br/>
 
+<?php if (!empty($users_grid)): ?>
 <h3><?php echo __('Users')?></h3>
 <?php echo $users_grid ?>
 <br />
+<?php endif ?>
 
-<?php if ($this->acl_check_edit('Messages_Controller', 'member')) { ?>
+<?php if (!empty($redir_grid)): ?>
 <h3><?php echo __('IP addresses')?></h3>
 <?php echo $redir_grid ?>
 <br />
-<?php } ?>
+<?php endif ?>
 
+<?php if (Settings::get('voip_enabled') && !empty($voip_grid)): ?>
 <h3><?php echo __('VoIP')?></h3>
 <?php echo $voip_grid ?>
 <br />
+<?php endif ?>
 
+<?php if ($member->type != Member_Model::TYPE_APPLICANT && !empty($membership_interrupts_grid)): ?>
 <h3><?php echo __('Membership interrupts')?></h3>
 <?php echo $membership_interrupts_grid ?>
+<?php endif ?>

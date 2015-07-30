@@ -25,6 +25,7 @@
  * @property date $activation_date
  * @property date $deactivation_date
  * @property integer $priority
+ * @property string $comment
  * @property ORM_Iterator $membership_interrupts
  */
 class Members_fee_Model extends ORM
@@ -85,7 +86,7 @@ class Members_fee_Model extends ORM
 				SELECT mf.*, f.readonly, f.type_id AS fee_type_id,
 					IFNULL(t.translated_term,et.value) AS fee_type_name,
 					f.name AS fee_name, f.fee AS fee_fee, 1 AS status,
-					f.special_type_id
+					f.special_type_id, mf.comment
 				FROM members_fees mf
 				LEFT JOIN fees f ON mf.fee_id = f.id
 				LEFT JOIN enum_types et ON f.type_id = et.id
@@ -115,6 +116,66 @@ class Members_fee_Model extends ORM
 		", date('Y-m-d'), date('Y-m-d'), $type_id, $member_id);
 		
 		return ($result && $result->count()) ? $result->current() : null;
+	}
+	
+	/**
+	 * Caclulate additional payment for services before membership
+	 * 
+	 * @author Ondřej Fibich
+	 * @see Members_Controller#approve_applicant
+	 * @param integer $applicant_id	Member ID
+	 * @param string $connected_from Y-m-d format
+	 * @param string $entrance_date	Y-m-d format
+	 * @return double
+	 */
+	public function calculate_additional_payment_of_applicant($connected_from, $entrance_date)
+	{
+		if (empty($connected_from) || ($connected_from == '0000-00-00'))
+		{
+			return 0;
+		}
+		
+		$fee_model = new Fee_Model();
+		$amount = 0;
+		$current_year = date('Y', strtotime($entrance_date));
+		$current_month = date('m', strtotime($entrance_date));
+		$year = date('Y', strtotime($connected_from));
+		$month = date('m', strtotime($connected_from));
+		$deduct_day = max(1, min(31, Settings::get('deduct_day')));
+		
+		// will be payed later in ordinary member fees
+		if (date('d', strtotime($entrance_date)) <= $deduct_day)
+		{
+			if (--$current_month <= 0)
+			{
+				$current_month = 12;
+				$year--;
+			}
+		}
+
+		// get payment (loop gets default regular member fees)
+		while ($year <= $current_year)
+		{
+			$to_month = ($year == $current_year) ? $current_month : 12;
+
+			while ($month <= $to_month)
+			{
+				$date = date('Y-m-d', mktime(0, 0, 0, $month, $deduct_day, $year));
+				$fee = $fee_model->get_default_fee_by_date_type($date, 'regular member fee');
+				
+				if ($fee && $fee->id)
+				{
+					$amount += $fee->fee;
+				}
+					
+				$month++;
+			}
+
+			$month = 1;
+			$year++;
+		}
+		
+		return $amount;
 	}
 
 }

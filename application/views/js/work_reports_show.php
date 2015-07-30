@@ -9,6 +9,47 @@
 if (FALSE): ?><script type="text/javascript"><?php endif
 
 ?>
+	// user can vote
+	if ($('select[name^="vote"]').length > 0)
+	{
+		$('#work_report__show_descr').remove();
+		$('<a href="#" id="work_report__show_descr"><?php echo __('Show whole descriptions') ?></a>').insertBefore("#work_reports__show_grid-wrapper");
+		
+		vote_options = $('select[name^="vote"]').first().find('option');
+		if (vote_options.length > 0)
+		{
+			$('<spa> | </span>').insertBefore("#work_reports__show_grid-wrapper");
+		}
+		
+		prev = false;
+		
+		// shows only selectable vote options
+		vote_options.each(function()
+		{
+			if (prev === true)
+			{
+				$('<spa> | </span>').insertBefore("#work_reports__show_grid-wrapper");
+			}
+			
+			switch ($(this).val())
+			{
+				case '0':
+					$('<a href="#" id="mark_all_abstain"><?php echo __('Set votes to') . ' ' . __('Abstain', '', 1) ?></a>').insertBefore("#work_reports__show_grid-wrapper");
+					prev = true;
+					break;
+				case '-1':
+					$('<a href="#" id="mark_all_disagree"><?php echo __('Set votes to') . ' ' . __('Disagree', '', 1) ?></a>').insertBefore("#work_reports__show_grid-wrapper");
+					prev = true;
+					break;
+				case '1':
+					$('<a href="#" id="mark_all_agree"><?php echo __('Set votes to') . ' ' . __('Agree', '', 1) ?></a>').insertBefore("#work_reports__show_grid-wrapper");
+					prev = true;
+					break;
+				default:
+					prev = false;
+			}
+		});
+	}
 	
 	$('#mark_all_abstain').click(function ()
 	{

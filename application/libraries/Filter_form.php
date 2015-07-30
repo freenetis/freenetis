@@ -92,6 +92,21 @@ class Filter_form
 	 * @var boolean
 	 */
 	protected $can_add = FALSE;
+	
+	/**
+	 * Indicates whether the filter form configuration was loaded from database.
+	 *
+	 * @var boolean
+	 */
+	protected $loaded_from_saved_query = FALSE;
+	
+	/**
+	 * Indicates whether the filter form configuration that was loaded from
+	 * database is default.
+	 *
+	 * @var boolean
+	 */
+	protected $loaded_from_default_saved_query = FALSE;
 
 	/**
 	 *  Definition of constants
@@ -309,6 +324,12 @@ class Filter_form
 		'select_number' => 'key',
 		'network_address' => 'value'
 	);
+	
+	/**
+	 * Boolean value whether it is first load of filters (#442)
+	 * @var boolean
+	 */
+	protected $first_load = FALSE;
 
 	/**
 	 * Constructor, sets table name and compiles values from $_GET
@@ -352,6 +373,10 @@ class Filter_form
 			$operations = $data["opers"];
 			$values = $data["values"];
 			$tables = $data["tables"];
+			
+			$this->loaded_from_saved_query = TRUE;
+			
+			$this->first_load = FALSE;
 		}
 		// load query from URL
 		else
@@ -363,11 +388,14 @@ class Filter_form
 			$tables = Input::instance()->get('tables');
 			
 			$this->can_add = TRUE;
+			$this->loaded_from_saved_query = FALSE;
+			
+			$this->first_load = FALSE;
 		}
 
 		$this->keys = Input::instance()->get('keys');
 		$this->vals = Input::instance()->get('vals');
-		
+
 		// query is empty, use default from database
 		if (!$on && !$types && !$operations && !$values && !$tables && $this->default_query_id)
 		{
@@ -380,6 +408,10 @@ class Filter_form
 			$tables = $data["tables"];
 			
 			$this->can_add = FALSE;
+			$this->loaded_from_saved_query = TRUE;
+			$this->loaded_from_default_saved_query = TRUE;
+			
+			$this->first_load = TRUE;
 		}
 
 		// load data
@@ -402,7 +434,11 @@ class Filter_form
 			}
 		}
 		else
+		{
 			$this->can_add = FALSE;
+			
+			$this->first_load = TRUE;
+		}
 	}
 
 	/**
@@ -437,12 +473,21 @@ class Filter_form
 	 * @param string $name
 	 * @return Filter object
 	 */
-	public function add($name)
+	public function add($name, $table = NULL)
 	{
-		$filter = new Filter($name, $this->table);
-
+		if (!$table)
+		{
+			$table = $this->table;
+		}
+		else
+		{
+			$name .= '/'.$table;
+		}
+		
+		$filter = new Filter($name, $table);
+		
 		$this->filters[$name] = $filter;
-
+		
 		return $filter;
 	}
 
@@ -578,6 +623,11 @@ class Filter_form
 				continue;
 			}
 			
+			if (!array_key_exists($type, $this->filters))
+			{
+				throw new InvalidArgumentException('Invalid option: ' . $type);
+			}
+			
 			$filter = $this->filters[$type];
 			
 			$sub_queries = array();
@@ -623,8 +673,9 @@ class Filter_form
 				}
 
 				$table_pom = mb_strlen($filter->table) ? $filter->table . '.' : '';
+				$name_pom = (strpos($filter->name, '/') == FALSE ? $filter->name : substr($filter->name, 0, strpos($filter->name, '/')));
 				
-				$column = Database::instance()->escape_column(Database::instance()->escape_str($table_pom . $filter->name));
+				$column = Database::instance()->escape_column(Database::instance()->escape_str($table_pom . $name_pom));
 
 				if (isset($this->opers[$this->operations[$i]]['function']))
 					$query = $this->opers[$this->operations[$i]]['function']. "($column)";	
@@ -678,6 +729,47 @@ class Filter_form
 		}
 
 		return $data;
+	}
+	
+	/**
+	 * Indicates whether the filter form configuration was loaded from database.
+	 * 
+	 * @return boolean
+	 */
+	public function is_loaded_from_saved_query()
+	{
+		return $this->loaded_from_saved_query;
+	}
+	
+	/**
+	 * Indicates whether the filter form configuration that was loaded from 
+	 * database is default.
+	 * 
+	 * @return boolean
+	 */
+	public function is_loaded_from_default_saved_query()
+	{
+		return $this->loaded_from_default_saved_query;
+	}
+	
+	/**
+	 * Indicates whether it is first load
+	 * 
+	 * @return boolean
+	 */
+	public function is_first_load()
+	{
+		return $this->first_load;
+	}
+	
+	/**
+	 * Returns base URL of the filter form.
+	 * 
+	 * @return string URL
+	 */
+	public function get_base_url()
+	{
+		return $this->base_url;
 	}
 
 	/**

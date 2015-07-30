@@ -11,12 +11,6 @@
  * 
  */
 
-require_once APPPATH . 'libraries/importers/Fio/FioConnection.php';
-require_once APPPATH . 'libraries/importers/Fio/FioConfig.php';
-require_once APPPATH . 'libraries/importers/Fio/FioImport.php';
-require_once APPPATH . 'libraries/importers/Fio/FioSaver.php';
-
-
 /**
  * Controller performs specified actions at specified time.
  * This part of system has to be added to CRON. 
@@ -24,24 +18,66 @@ require_once APPPATH . 'libraries/importers/Fio/FioSaver.php';
  * @package Controller
  */
 class Scheduler_Controller extends Controller
-{	
+{
+	// Constants that represents count of minutes in which an action is
+	// performed. These constants are not directly written in code because
+	// of avoiding of overlaping of action in order to performance issues
+	// (action should not be started in the same time).
+	
+	/** Activation Minute for member fees (long action but triggered only monthly) */
+	const AM_MEMBER_FEES			= '03';
+	/** Activation Minute for entrance fees (take some time but triggered only monthly) */
+	const AM_ENTRANCE_FEES		= '05';
+	/** Activation Minute for device fees (not oftenly used) */
+	const AM_DEVICE_FEES			= '06';
+	/** Activation Minute for bank statements downloading (long action) */
+	const AM_BANK_STATEMENTS		= '07';
+	/** Activation Minute for connection test (daily action) */
+	const AM_CONNECTION_TEST	= '09';
+	/** Activation Minute for former member message */
+	const AM_FORMER_MEMBER		= '09';
+	/** Activation Minute for interrupted member message */
+	const AM_INTERRUPTED_MEMBER	= '09';
+	/** Activation Minute for notification (long action) */
+	const AM_NOTIFICATION		= '10';
+    /** Activation Minute for Vtiger synchronization - each hour (long action) */
+    const AM_VTIGER_SYNC        = '30';
+	
 	/**
 	 * Log scheduler error
 	 *
 	 * @param string $method
 	 * @param Exception $e 
+	 * @param boolean $log_queue Also log to log queue (database)?
 	 */
-	private static function log_error($method, Exception $e)
+	private static function log_error($method, Exception $e, $log_queue = TRUE)
 	{
 		// get humanize method
 		$method = str_replace('|', ' ' . __('or') . ' ', $method);
-		
-		// logg
-		Log::add('error', Kohana::lang(
-				'core.scheduler_exception', get_class($e),
-				$e->getMessage(), $method,
-				$e->getLine()
-		));
+		$text = Kohana::lang(
+			'core.scheduler_exception', get_class($e),
+			$e->getMessage(), $method,
+			$e->getLine()
+		);
+		// log to database
+		if ($log_queue)
+		{
+			Log_queue_Model::error($text, $e->getTraceAsString());
+		}
+		// log to file
+		Log::add('error', $text);
+	}
+	
+	/** Time at calling of the controller */
+	private $t;
+	
+	/**
+	 * Set up time
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		$this->t = time();
 	}
 	
 	/**
@@ -67,26 +103,44 @@ class Scheduler_Controller extends Controller
 			echo 'access denied';
 			die();
 		}
+		
+		// CRON failure detection (#754)
+		$last_active = intval(Settings::get('cron_last_active'));
+		
+		if ($last_active > 0) // not for the first time
+		{
+			if (($this->t - $last_active) > 110) // diff higher than 110 seconds => log failure
+			{
+				$data = array
+				(
+					'from'	=> date('Y-m-d H:i:s', $last_active),
+					'to'	=> date('Y-m-d H:i:s', $this->t)
+				);
+
+				$desc = __(
+					'CRON (scheduler) was offline from %s to %s (%s) some ' .
+					'system operation may not be performed', array
+					(
+						$data['from'], $data['to'],
+						($this->t - $last_active) . ' ' . __('seconds')
+					)
+				);
+				
+				Log_queue_Model::ferror(__('CRON failure'), $desc);
+			}
+		}
+		
+		Settings::set('cron_last_active', $this->t);
 
 		// daily actions
 		
-		if ((date('H:i') == '00:00'))
+		if (date('H:i', $this->t) == '00:00')
 		{
-			
-			try
-			{
-				ORM::factory('member')->update_lock_status();
-			}
-			catch (Exception $e)
-			{
-				self::log_error('update_lock_status', $e);
-			}
-
 			try
 			{
 				if (Settings::get('ulogd_enabled') == '1')
 				{
-					self::members_traffic_partitions_daily();
+					$this->members_traffic_partitions_daily();
 				}
 			}
 			catch (Exception $e)
@@ -97,21 +151,21 @@ class Scheduler_Controller extends Controller
 			try
 			{
 				// first day in month (per month)
-				if (date('m') == '01' && Settings::get('ulogd_enabled') == '1')
+				if (date('d', $this->t) == '01' && Settings::get('ulogd_enabled') == '1')
 				{
-					self::members_traffic_partitions_montly();
+					$this->members_traffic_partitions_montly();
 				}
 			}
 			catch (Exception $e)
 			{
-				self::log_error('members_traffic_partitions_daily', $e);
+				self::log_error('members_traffic_partitions_monthly', $e);
 			}
 
 			try
 			{
 				if (Settings::get('action_logs_active') == '1')
 				{
-					self::logs_partitions_daily();
+					$this->logs_partitions_daily();
 				}
 			}
 			catch (Exception $e)
@@ -119,26 +173,26 @@ class Scheduler_Controller extends Controller
 				self::log_error('action_logs_active', $e);
 			}
 		}
-
-		/*
-		if (date('H:i') == "01:00")
+		
+		/* Each day at 5:xx */
+		if (date('H:i', $this->t) == '05:' . self::AM_CONNECTION_TEST)
 		{
-			if (Settings::get('fio_import_daily') == '1')
+			try
 			{
-				self::fio_import_daily();
+				$this->update_applicant_connection_test();
 			}
 			catch (Exception $e)
 			{
-				self::log_error('fio_import_daily', $e);
+				self::log_error('update_applicant_connection_test', $e);
 			}
 		}
-		*/
 		
 		// send emails
 
 		try
 		{
-			self::send_quened_emails();
+			if (Settings::get('email_enabled'))
+				$this->send_quened_emails();
 		}
 		catch (Exception $e)
 		{
@@ -149,10 +203,10 @@ class Scheduler_Controller extends Controller
 		
 		try
 		{
-			if (Sms::enabled())
+			if (Settings::get('sms_enabled') && Sms::enabled())
 			{
 				//send quened SMS
-				self::send_quened_sms();
+				$this->send_quened_sms();
 
 				//receive SMS
 				self::receive_sms();
@@ -169,7 +223,7 @@ class Scheduler_Controller extends Controller
 		{
 			if (Settings::get('allowed_subnets_enabled'))
 			{
-				self::update_allowed_subnets();
+				$this->update_allowed_subnets();
 			}
 		}
 		catch (Exception $e)
@@ -178,17 +232,20 @@ class Scheduler_Controller extends Controller
 		}
 		
 		// update local subnets
-		self::update_local_subnets();
+		$this->update_local_subnets();
 		
-		// send notification from monitoring
-		self::monitoring_notification();
+		if (Settings::get('monitoring_enabled'))
+		{
+			// send notification from monitoring
+			$this->monitoring_notification();
+		}
 
 		// update ulogd
 		try
 		{
 			if (Settings::get('ulogd_enabled'))
 			{
-				self::update_ulogd();
+				$this->update_ulogd();
 			}
 		}
 		catch (Exception $e)
@@ -196,75 +253,318 @@ class Scheduler_Controller extends Controller
 			self::log_error('update_ulogd', $e);
 		}
 		
+		// interuption message activation and notification on interuption
+		// start and end (each day after midnight)
+		$this->update_and_redirect_interrupted_members();
+		
+		// former members message activation (each day after midnight)
+		$this->update_and_redirect_former_members();
+		
+		// bank statements import
+		$this->bank_statements_import();
+		
+		// automatic notification messages activation
+		$this->notification_activation();
+		
+		// fee deduction (monthly)
+		if (Settings::get('finance_enabled'))
+		{
+			$this->fee_deduction();
+		}
+		
+		//synchronize with vtiger CRM
+		$this->vtiger_sync();
+		
 		// set state of module (last activation time)
 		Settings::set('cron_state', date('Y-m-d H:i:s'));
 	}
-
+	
 	/**
-	 * @author Jiri Svitak
+	 * Auto download of statements of bank accounts of association
+	 * 
+	 * @author Ondrej Fibich
 	 */
-//	public function fio_import_daily()
-//	{
-//		//try
-//		{
-//			//$db = new Transfer_Model();
-//			//$db->transaction_start();
-//
-//			$ba = ORM::factory('bank_account')->where("bank_nr", Settings::get("fio_bank_account"))->find();
-//			
-//			$bs_model = new Bank_statement_Model();
-//			$bs = $bs_model->get_last_statement($ba->id);
-//			
-//			if (count($bs) > 0)
-//			{
-//				$fromDate = $bs->current()->to;
-//			}
-//			else
-//			{
-//				$fromDate = "2000-01-01";
-//			}
-//
-//			$toDate = date::decrease_day(date('Y'), date('m'), date('d'));
-//
-//			// correct date format for FIO
-//			$fromDate = date('d.m.Y', strtotime($fromDate));
-//			$toDate = date('d.m.Y', strtotime($toDate));			
-//
-//			$downloadConfig = new FioConfig(Settings::get("fio_user"),
-//					Settings::get("fio_password"),
-//					Settings::get("fio_account_number"),
-//					Settings::get("fio_view_name"));
-//
-//			$connection = new FioConnection($downloadConfig);
-//
-//			$csvData = $connection->getCSV($fromDate, $toDate);
-//			$csvData = iconv('cp1250', 'UTF-8', $csvData);
-//
-//			echo '<br>';
-//			echo $csvData;die();
-//
-//			$data = FioParser::parseCSV($csvData);
-//			FioImport::correctData($data);
-//			$header = FioImport::getListingHeader();
-//			
-//			echo '<br>';
-//			echo $data;
-//
-//			FioSaver($data);
-//
-//			//$db->transaction_commit();
-//
-//		}
-//		/*
-//		catch(Exception $e)
-//		{
-//			$db->transaction_rollback();
-//			throw $e;
-//		}
-//		 *
-//		 */
-//	}
+	private function bank_statements_import()
+	{
+		$error_prefix = __('Error during automatic import of bank statements');
+		
+		try
+		{
+			// models and data
+			$bank_account_model = new Bank_account_Model();
+			$baad_model = new Bank_accounts_automatical_download_Model();
+			
+			// for each bank account of association
+			$accounts = $bank_account_model->get_assoc_bank_accounts();
+			
+			// try for each account
+			foreach ($accounts as $account)
+			{
+				// get settings
+				try
+				{
+					$settings = Bank_Account_Settings::factory($account->type);
+					$settings->load_column_data($account->settings);
+				}
+				catch (InvalidArgumentException $e) // no settings
+				{
+					continue;
+				}
+				
+				// check if enabled
+				if (!$settings->can_download_statements_automatically())
+				{
+					continue;
+				}
+				
+				// bank account
+				$bank_account_model->find($account->id);
+				$rules = $baad_model->get_bank_account_settings($account->id);
+				
+				// activate flags
+				$activate = $a_email = $a_sms = FALSE;
+				// get all rules that match
+				$filtered_rules = Time_Activity_Rule::filter_rules(
+						$rules, self::AM_BANK_STATEMENTS, $this->t
+				);				
+				// check all rules if redir/email/sms should be activated now
+				foreach ($filtered_rules as $rule)
+				{
+					$activate = TRUE;
+					$a_email = $a_email || $rule->email_enabled;
+					$a_sms = $a_sms || $rule->sms_enabled;
+				}
+				// global options
+				$a_email = $a_email && Settings::get('email_enabled');
+				$a_sms = $a_sms && Settings::get('sms_enabled');
+				// any rule?
+				if (!$activate)
+				{
+					continue;
+				}
+				// import 
+				try
+				{
+					// download&import
+					$bs = Bank_Statement_File_Importer::download(
+							$bank_account_model, $settings, $a_email, $a_sms
+					);
+					
+					// inform
+					if ($bs)
+					{
+						$tc = $bs->bank_transfers->count();
+						$aurl = '/bank_transfers/show_by_bank_statement/' . $bs->id;
+						
+						$args = array
+						(
+							($tc > 0) ? html::anchor($aurl, $bs->id) : __('empty', array(), 1),
+							$tc, 
+							$bank_account_model->name . ' - ' .
+							$bank_account_model->account_nr . '/' .
+							$bank_account_model->bank_nr
+						);
+						
+						$m = __('Bank statement (%s) with %d transfers for bank account '
+								. '"%s" has been automatically downloaded and imported',
+								$args);
+						
+						Log_queue_Model::info($m);
+						
+						// if empty => delete
+						if (!$tc)
+						{
+							$bs->delete();
+						}
+					}
+				}
+				catch (Exception $e)
+				{
+					$m = $error_prefix . ': ' . $bank_account_model->account_nr
+						. '/' . $bank_account_model->bank_nr
+						. ' ' . __('caused by') . ': ' . $e->getMessage();
+					self::log_error($m, $e, FALSE);
+					Log_queue_Model::error($m, $e);
+				}
+			}
+		}
+		catch (Exception $e)
+		{
+			self::log_error($error_prefix, $e, FALSE);
+			Log_queue_Model::error($error_prefix, $e);
+		}
+	}
+			
+	/**
+	 * Auto activation of notification messages
+	 * 
+	 * @author Ondrej Fibich
+	 */
+	private function notification_activation()
+	{
+		if (module::e('notification'))
+		{		
+			$error_prefix = __('Error during automatic activation of notification messages');
 
+			try
+			{
+				// models and data
+				$member_model = new Member_Model();
+				$messages_aa = new Messages_automatical_activation_Model();
+				$messages = ORM::factory('message')->find_all();
+
+				// for each message
+				foreach ($messages as $message)
+				{
+					// auto activation possible?
+					if (!Message_Model::can_be_activate_automatically($message->type))
+					{
+						continue; // No!
+					}
+					// find rules
+					$rules = $messages_aa->get_message_settings($message->id);
+					// activate flags
+					$a_redir = $a_email = $a_sms = FALSE;
+					// get all rules that match
+					$filtered_rules = Time_Activity_Rule::filter_rules(
+							$rules, self::AM_NOTIFICATION, $this->t
+					);				
+					// check all rules if redir/email/sms should be activated now
+					foreach ($filtered_rules as $rule)
+					{
+						$a_redir = $a_redir || $rule->redirection_enabled;
+						$a_email = $a_email || $rule->email_enabled;
+						$a_sms = $a_sms || $rule->sms_enabled;
+					}
+					// global options
+					$a_redir = $a_redir && Settings::get('redirection_enabled');
+					$a_email = $a_email && Settings::get('email_enabled');
+					$a_sms = $a_sms && Settings::get('sms_enabled');
+					// do not do next if nothing should be made
+					if (!$a_redir && !$a_email && !$a_sms)
+					{
+						continue;
+					}
+					// get all members for messages
+					$members = $member_model->get_members_to_messages($message->type);
+					// activate notification
+					try
+					{
+						// notify
+						$stats = Notifications_Controller::notify(
+								$message, $members, NULL, NULL, $a_redir,
+								$a_email, $a_sms, $a_redir
+						);
+						// info messages
+						$info_messages = notification::build_stats_string(
+								$stats, $a_redir, $a_email, $a_sms, $a_redir
+						);
+						// log action
+						if (count($info_messages))
+						{
+							$m = __('Notification message "%s" has been automatically activated',
+									array(__($message->name)));
+							Log_queue_Model::info($m, implode("\n", $info_messages));
+						}
+					}
+					catch (Exception $e)
+					{
+						self::log_error($e->getMessage(), $e, FALSE);
+						Log_queue_Model::error($e->getMessage(), $e);
+					}
+				}
+			}
+			catch (Exception $e)
+			{
+				self::log_error($error_prefix, $e, FALSE);
+				Log_queue_Model::error($error_prefix, $e);
+			}
+		}
+	}
+	
+	/**
+	 * Deduct all fees automatically if enabled
+	 * 
+	 * @author Ondrej Fibich
+	 */
+	private function fee_deduction()
+	{
+		$day_of_deduct = date::get_deduct_day_to(date('m', $this->t), date('Y', $this->t));
+		
+		if (Settings::get('deduct_fees_automatically_enabled') &&
+			intval(date('j', $this->t)) == intval($day_of_deduct))
+		{
+			// preparations
+			$association = new Member_Model(Member_Model::ASSOCIATION);
+			$user_id = $association->get_main_user();
+			
+			// members fees (at deduct date 3 minutes after midnight)
+			if (date('H:i', $this->t) == '00:' . self::AM_MEMBER_FEES)
+			{
+				try
+				{
+					// perform
+					$c = Transfers_Controller::worker_deduct_members_fees(
+							date('m', $this->t), date('Y', $this->t), $user_id
+					);
+					// info to logs
+					$m = __('Member fees deducted automatically (in sum %d)', $c);
+					Log_queue_Model::info($m);
+				}
+				catch (Exception $e)
+				{
+					$m = __('Error during automatical deduction of members fees,' .
+							'please use manual deduction of fees');
+					self::log_error($m, $e, FALSE);
+					Log_queue_Model::error($m, $e);
+				}
+			}
+			
+			// entrance fees (at deduct date 5 minutes after midnight)
+			if (date('H:i', $this->t) == '00:' . self::AM_ENTRANCE_FEES)
+			{
+				try
+				{
+					// perform
+					$c = Transfers_Controller::worker_deduct_entrance_fees(
+							date('m', $this->t), date('Y', $this->t), $user_id
+					);
+					// info to logs
+					$m = __('Entrance fees deducted automatically (in sum %d)', $c);
+					Log_queue_Model::info($m);
+				}
+				catch (Exception $e)
+				{
+					$m = __('Error during automatical deduction of entrance fees,' .
+							'please use manual deduction of fees');
+					self::log_error($m, $e, FALSE);
+					Log_queue_Model::error($m, $e);
+				}
+			}
+			
+			// device deduct fees (at deduct date 7 minutes after midnight)
+			if (date('H:i', $this->t) == '00:' . self::AM_DEVICE_FEES)
+			{
+				try
+				{
+					// perform
+					$c = Transfers_Controller::worker_deduct_devices_fees(
+							date('m', $this->t), date('Y', $this->t), $user_id
+					);
+					// info to logs
+					$m = __('Device fees deducted automatically (in sum %d)', $c);
+					Log_queue_Model::info($m);
+				}
+				catch (Exception $e)
+				{
+					$m = __('Error during automatical deduction of device fees,' .
+							'please use manual deduction of fees');
+					self::log_error($m, $e, FALSE);
+					Log_queue_Model::error($m, $e);
+				}
+			}
+		}
+	}
 
 	/**
 	 * Manage partitions of log table.
@@ -273,7 +573,7 @@ class Scheduler_Controller extends Controller
 	 * @see Logs_Controller
 	 * @author Ondřej Fibich
 	 */
-	private static function logs_partitions_daily()
+	private function logs_partitions_daily()
 	{
 		$model_log = new Log_Model();
 		// remove log partition
@@ -288,7 +588,7 @@ class Scheduler_Controller extends Controller
 	 * 
 	 * @author Ondřej Fibich
 	 */
-	private static function members_traffic_partitions_daily()
+	private function members_traffic_partitions_daily()
 	{
 		$model_members_traffic_daily = new Members_traffic_Model();
 		// remove log partition
@@ -303,7 +603,7 @@ class Scheduler_Controller extends Controller
 	 * 
 	 * @author Ondřej Fibich
 	 */
-	private static function members_traffic_partitions_montly()
+	private function members_traffic_partitions_montly()
 	{
 		$model_members_traffic_montly = new Members_traffic_Model();
 		// remove log partition
@@ -439,7 +739,7 @@ class Scheduler_Controller extends Controller
 
 					// save message to database
 					$sms_model = new Sms_message_Model();
-					$sms_model->user_id = NULL;
+					$sms_model->user_id = 1;
 					$sms_model->stamp = $message->date;
 					$sms_model->send_date = $message->date;
 					$sms_model->text = htmlspecialchars($message->text);
@@ -459,7 +759,7 @@ class Scheduler_Controller extends Controller
 	 * 
 	 * @author Michal Kliment
 	 */
-	private static function update_ulogd()
+	private function update_ulogd()
 	{
 		// it's time to update
 		if ((
@@ -486,7 +786,7 @@ class Scheduler_Controller extends Controller
 			
 			// finding of avarage
 			$avg = $members_traffic_model->avg_daily_traffics(
-					date('Y-m-d'), Settings::get('ulogd_active_type')
+					date('Y-m-d', $this->t), Settings::get('ulogd_active_type')
 			);
 
 			if (($ulogd_active_min = Settings::get('ulogd_active_min')) != '')
@@ -520,7 +820,7 @@ class Scheduler_Controller extends Controller
 			$members_traffic_model->update_active_members(
 					$avg, $ulogd_active_count,
 					Settings::get('ulogd_active_type'),
-					date('Y-m-d')
+					date('Y-m-d', $this->t)
 			);
 		
 			// updates variable
@@ -538,12 +838,157 @@ class Scheduler_Controller extends Controller
 		// it's time to update
 		if (Settings::get('allowed_subnets_enabled') &&
 			(
-				Settings::get('allowed_subnets_update_last') +
-				Settings::get('allowed_subnets_update_interval')
+				strtotime(Settings::get('allowed_subnets_update_state')) +
+				intval(Settings::get('allowed_subnets_update_interval'))
 			) < time())
 		{
+			// activate
+			ORM::factory('message')->activate_unallowed_connecting_place_message(
+					User_Model::ASSOCIATION
+			);
+			// set last update info
+			Settings::set('allowed_subnets_update_state', date('Y-m-d H:i:s'));
+		}
+	}
+
+	/**
+	 * Update former members and redirect them or if enabled devices of todays
+	 * former members are deleted.
+	 *
+	 * @author Ondrej Fibich
+	 */
+	private function update_and_redirect_former_members()
+	{
+		if (date('H:i', $this->t) == '00:' . self::AM_FORMER_MEMBER)
+		{
+			$member_model = new Member_Model();
+			
+			try
+			{
+				// get message
+				$message = ORM::factory('message')->get_message_by_type(
+						Message_Model::FORMER_MEMBER_MESSAGE
+				);
+				// gets today former members
+				$today_former_members = $member_model->get_today_former_members();
+				// adds new former members
+				$member_model->add_today_former_members();
+				// gets all former members
+				$former_members = $member_model->get_all_former_members();
+				// remove devices of todays members if enabled
+				if (Settings::get('former_member_auto_device_remove'))
+				{
+					try
+					{
+						$mids = array();
+						// get member IDs
+						foreach ($today_former_members as $m)
+						{
+							$mids[] = $m->member_id;
+						}
+						// delete
+						$member_model->delete_members_devices($mids);
+					}
+					catch (Exception $e)
+					{
+						self::log_error('update_and_redirect_former_members: device delete', $e);
+					}
+				}
+				// only if notification enabled
+				if (module::e('notification'))
+				{
+					// redirect all former members
+					Notifications_Controller::notify(
+							$message, $former_members, NULL, NULL,
+							TRUE, FALSE, FALSE, TRUE
+					);
+					// inform new former members (email and sms)
+					Notifications_Controller::notify(
+							$message, $today_former_members, NULL, NULL,
+							FALSE, TRUE, TRUE, FALSE, FALSE, TRUE
+					);
+				}
+			}
+			catch (Exception $e)
+			{
+				self::log_error('update_and_redirect_former_members', $e);
+			}
+		}
+	}
+
+	/**
+	 * Notify new iterrupted members and redirect all of them.
+	 *
+	 * @author Ondrej Fibich
+	 */
+	private function update_and_redirect_interrupted_members()
+	{
+		if (date('H:i', $this->t) == '00:' . self::AM_INTERRUPTED_MEMBER &&
+			Settings::get('membership_interrupt_enabled') &&
+			module::e('notification'))
+		{
+			$m_model = new Member_Model();
+			
+			try
+			{
+				// get messages
+				$i_message = ORM::factory('message')->get_message_by_type(
+						Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE
+				);
+				$bi_message = ORM::factory('message')->get_message_by_type(
+						Message_Model::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE
+				);
+				$ei_message = ORM::factory('message')->get_message_by_type(
+						Message_Model::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE
+				);
+				// get members
+				$interr_members = $m_model->get_interrupted_members_on(
+						date('Y-m-d', $this->t)
+				);
+				$begin_interr_members = $m_model->get_interrupted_members_on(
+						date('Y-m-d', $this->t), 2
+				);
+				$end_interr_members = $m_model->get_interrupted_members_on(
+						date('Y-m-d', strtotime('-1 day', $this->t)), 3
+				);
+				// redirect all interrupt members
+				Notifications_Controller::notify(
+						$i_message, $interr_members, NULL, NULL,
+						TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE
+				);
+				// inform interrupted members which is interupted from today
+				Notifications_Controller::notify(
+						$bi_message, $begin_interr_members, NULL, NULL,
+						FALSE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE
+				);
+				// inform interrupted members which was interupted yesterday
+				Notifications_Controller::notify(
+						$ei_message, $end_interr_members, NULL, NULL,
+						FALSE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE
+				);
+			}
+			catch (Exception $e)
+			{
+				self::log_error('update_and_redirect_former_members', $e);
+			}
+		}
+	}
+
+	/**
+	 * If  self member registration is enabled then this rutine denies test
+	 * connections of applicants after count of days stored in settings property 
+	 * 'applicant_connection_test_duration'. Connections will not be denyed
+	 * if the applicant became member or submit member registration.
+	 *
+	 * @author Ondrej Fibich
+	 */
+	private function update_applicant_connection_test()
+	{
+		if (Settings::get('self_registration') &&
+			(Settings::get('applicant_connection_test_duration') > 0))
+		{
 			ORM::factory('message')
-					->activate_unallowed_connecting_place_message(User_Model::MAIN_USER);
+					->activate_test_connection_end_message(User_Model::ASSOCIATION);
 		}
 	}
 	
@@ -552,14 +997,14 @@ class Scheduler_Controller extends Controller
 	 * 
 	 * @author Michal Kliment
 	 */
-	private static function send_quened_emails()
+	private function send_quened_emails()
 	{
 		$email_queue_model = new Email_queue_Model();
 		
 		$email_queue = $email_queue_model->get_current_queue();
 		
 		if (!count($email_queue))
-			return; // do not connect to SMPT server for no reason (fixes #336)
+			return; // do not connect to SMTP server for no reason (fixes #336)
 		
 		$swift = email::connect();
 		
@@ -570,7 +1015,7 @@ class Scheduler_Controller extends Controller
 			$recipients->addTo($email->to);
 			
 			// Build the HTML message
-			$message = new Swift_Message($email->subject, $email->body, "text/html");
+			$message = new Swift_Message($email->subject, $email->body, 'text/html');
 			
 			// Send
 			if (Config::get('unit_tester') || 
@@ -579,7 +1024,9 @@ class Scheduler_Controller extends Controller
 				$email->state = Email_queue_Model::STATE_OK;
 			}
 			else
+			{
 				$email->state = Email_queue_Model::STATE_FAIL;
+			}
 				
 			$email_queue->access_time = date('Y-m-d H:i:s');
 			$email->save();
@@ -594,7 +1041,7 @@ class Scheduler_Controller extends Controller
 	 * @author Michal Kliment
 	 * @return type 
 	 */
-	private static function update_local_subnets()
+	private function update_local_subnets()
 	{
 		// it's time to update
 		if ((
@@ -673,138 +1120,86 @@ class Scheduler_Controller extends Controller
 	 * 
 	 * @author Michal Kliment
 	 */
-	private static function monitoring_notification()
+	private function monitoring_notification()
 	{
-		// prepare models
-		$email_queue_model = new Email_queue_Model();
-		$monitor_host_model = new Monitor_host_Model();
-		
-		try
+		if (module::e('monitoring') && (
+				Settings::get('monitoring_notification_update_last') +
+				Settings::get('monitoring_notification_interval')*60
+			) < time())
 		{
-			$monitor_host_model->transaction_start();
-			
-			// find maximal diff between down time and last attempt time
-			$max_down_diff = $monitor_host_model
-				->get_max_state_changed_diff(Monitor_host_Model::STATE_DOWN);
+			// prepare models
+			$monitor_host_model	= new Monitor_host_Model();
+			$message_model		= new Message_Model();
 
-			/**
-			 * following code generate sequence of diffs
-			 * for each diff and host will be sent notification once time
-			 */
-			$down_diffs = array();
-
-			$increase = 3;
-			$growth = 5;
-
-			$i = 0;
-
-			$max = 5;
-
-			while ($i <= $max_down_diff)
+			try
 			{
-				$down_diffs[] = $i;
+				$monitor_host_model->transaction_start();
 
-				$i += $increase;
+				// find message for host down
+				$monitoring_host_down_message = $message_model->
+						where('type', Message_Model::MONITORING_HOST_DOWN)->find();
 
-				if ($i >= $max)
-				{			
-					$increase = $max;
-
-					$max *= $growth;
-				}
-			}
-
-			for($i=0;$i<count($down_diffs)-1;$i++)
-			{	
-				/**
-				 * find all down hosts in interval between this diff and next diff
-				 * (exclude hosts about which has been already sent notification
-				 * in this interval)
-				 */
+				// find all down hosts
 				$down_hosts = $monitor_host_model->get_all_hosts_by_state(
-						Monitor_host_Model::STATE_DOWN, $down_diffs[$i], $down_diffs[$i+1]);
+						Monitor_host_Model::STATE_DOWN);
 
-				// for each send e-mail
 				foreach ($down_hosts as $down_host)
-				{	
-					$email_queue_model->push(
-						Settings::get('email_default_email'),
-						Settings::get('monitoring_email_to'),
-						__('Monitoring error').': '.__('Host').' '.$down_host->name.' '.__('is unreachable'),
-						__('Host').' '
-							.html::anchor(url_lang::base().'devices/show/'.$down_host->device_id, $down_host->name)
-							.' '.__('is unreachable since').' '.strftime("%c", strtotime($down_host->state_changed_date))
+				{
+					Message_Model::send_email(
+							$monitoring_host_down_message,
+							Settings::get('monitoring_email_to'),
+							$down_host
 					);
-
-					$monitor_host_model->update_host_notification_date($down_host->id);
 				}
+
+				// find message for host up
+				$monitoring_host_up_message = $message_model->
+						where('type', Message_Model::MONITORING_HOST_UP)->find();
+
+				// find all up hosts
+				$up_hosts = $monitor_host_model->get_all_hosts_by_state(
+						Monitor_host_Model::STATE_UP);
+
+				foreach ($up_hosts as $up_host)
+				{
+					Message_Model::send_email(
+							$monitoring_host_up_message,
+							Settings::get('monitoring_email_to'),
+							$up_host
+					);
+				}
+
+				$monitor_host_model->transaction_start();
 			}
-			
-			// maximal value from sequence of diff for which will sent notification
-			// about hosts which returned from down state
-			$max_returned_diff = 30;
-			
-			/**
-			 * following code generate sequence of diffs
-			 * for each diff and host will be sent notification once time
-			 */
-			$returned_diffs = array();
-
-			$increase = 3;
-			$growth = 5;
-
-			$i = 0;
-
-			$max = 5;
-
-			while ($i <= $max_returned_diff)
+			catch (Exception $e)
 			{
-				$returned_diffs[] = $i;
-
-				$i += $increase;
-
-				if ($i >= $max)
-				{			
-					$increase = $max;
-
-					$max *= $growth;
-				}
+				$monitor_host_model->transaction_rollback();
+				self::log_error('monitoring_notification', $e);
 			}
-			
-			for($i=0;$i<count($returned_diffs)-1;$i++)
-			{	
-				/**
-				* find all hosts which returned from down state in interval
-				* between this diff and next diff (exclude hosts about which
-				* has been already sent notification in this interval)
-				*/
-				$returned_hosts = $monitor_host_model->get_all_hosts_by_state(
-						Monitor_host_Model::STATE_UP, $returned_diffs[$i], $returned_diffs[$i+1]);
 
-				// for each send e-mail
-				foreach ($returned_hosts as $returned_host)
-				{	
-					$email_queue_model->push(
-						Settings::get('email_default_email'),
-						Settings::get('monitoring_email_to'),
-						__('Monitoring notice').': '.__('Host').' '.$returned_host->name.' '.__('is again reachable'),
-						__('Host').' '
-							.html::anchor(url_lang::base().'devices/show/'.$returned_host->device_id, $returned_host->name)
-							.' '.__('is again reachable since').' '.strftime("%c", strtotime($returned_host->state_changed_date))
-					);
-
-					$monitor_host_model->update_host_notification_date($returned_host->id);
-				}
-			}
-			
-			$monitor_host_model->transaction_commit();
+			Settings::set('monitoring_notification_update_last', time());
 		}
-		catch (Exception $e)
-		{
-			$monitor_host_model->transaction_rollback();
-			Log::add_exception($e);
-		}
-		
 	}
 
+	/**
+	 * Synchronize members and users to vtiger CRM.
+	 * Runs every 30 minutes if Vtiger integration is enabled in settings.
+	 * 
+	 * @author Jan Dubina
+	 */
+	private function vtiger_sync()
+	{
+		if (Settings::get('vtiger_integration') &&
+            date('i', $this->t) == self::AM_VTIGER_SYNC)
+		{
+			try 
+			{
+				Members_Controller::vtiger_sync();
+			} 
+			catch (Exception $e) 
+			{
+				self::log_error('vtiger_synchronization', $e);
+			}
+		}
+	}
 }

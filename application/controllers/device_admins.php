@@ -20,6 +20,18 @@
 class Device_admins_Controller extends Controller
 {	
 	/**
+	 * Constructor, only test if networks is enabled
+	 */
+	public function __construct()
+	{
+		parent::__construct();
+		
+		// access control
+		if (!Settings::get('networks_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Edits devices of which is user admin
 	 * 
 	 * @author Michal Kliment
@@ -98,7 +110,7 @@ class Device_admins_Controller extends Controller
 			{
 				$device_admin_model->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cannot update device admin.');
+				status::error('Error - cannot update device admin.', $e);
 			}
 			
 			url::redirect('devices/show/'.$device->id);
@@ -214,7 +226,7 @@ class Device_admins_Controller extends Controller
 			{
 				$device_admin_model->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - cannot update device admin.');
+				status::error('Error - cannot update device admin.', $e);
 			}
 			url::redirect(url_lang::base().'users/show/'.$user->id);
 		}

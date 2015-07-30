@@ -19,6 +19,17 @@
 class Variable_Symbols_Controller extends Controller
 {	
 	/**
+	 * Constructor, only test if finance is enabled
+	 */
+	public function __construct()
+	{		
+		parent::__construct();
+		
+		if (!Settings::get('finance_enabled'))
+			Controller::error (ACCESS);
+	}
+	
+	/**
 	 * Shows variable symbols of account
 	 * 
 	 * @author David Raška
@@ -144,9 +155,18 @@ class Variable_Symbols_Controller extends Controller
 		$form = new Forge();
 
 		$form->input('variable_symbol')
-				->label(__('Variable symbol') . ':')
-				->rules('required|length[1,10]')
+				->rules('length[1,10]')
 				->callback(array($this,'valid_var_sym'));
+		
+		if (Variable_Key_Generator::get_active_driver())
+		{
+			$form->checkbox('variable_symbol_generate')
+					->label('Generate automatically');
+		}
+		else
+		{
+			$form->variable_symbol->rules('required|length[1,10]');
+		}
 
 		$form->submit('Add');
 		
@@ -154,22 +174,38 @@ class Variable_Symbols_Controller extends Controller
 		{
 			$form_data = $form->as_array();
 			$variable_symbol_model = new Variable_Symbol_Model();
-			if ($variable_symbol_model->get_variable_symbol_id($form_data['variable_symbol']))
+			
+			if (isset($form_data['variable_symbol_generate']) &&
+				$form_data['variable_symbol_generate'])
+			{
+				$var_sym = Variable_Key_Generator::factory()->generate($account->member_id);
+			}
+			else
+			{
+				$var_sym = $form_data['variable_symbol'];
+			}
+			
+			if (empty($var_sym))
+			{
+				status::warning('Empty variable symbol.');
+			}
+			else if ($variable_symbol_model->get_variable_symbol_id($var_sym))
 			{
 			    status::warning('Variable symbol already exists in database.');
 			}
 			else
 			{
-			    $variable_symbol_model->variable_symbol = $form_data['variable_symbol'];
+			    $variable_symbol_model->variable_symbol = $var_sym;
 			    $variable_symbol_model->account_id = $account_id;
 			    $issaved = $variable_symbol_model->save();
+				
 			    if ($issaved)
 			    {
-				status::success('Variable symbol has been successfully added');
+					status::success('Variable symbol has been successfully added');
 			    }
 			    else
 			    {
-				status::error('Error - cant update variable symbols');
+					status::error('Error - cant update variable symbols');
 			    }
 			}
 
@@ -284,7 +320,7 @@ class Variable_Symbols_Controller extends Controller
 				{
 				    $variable_symbol_model->transaction_rollback();
 					Log::add_exception($e);
-				    status::error('Error - cant update variable symbols');
+				    status::error('Error - cant update variable symbols', $e);
 				}
 				
 			}
@@ -378,12 +414,12 @@ class Variable_Symbols_Controller extends Controller
 		
 	} // end of delete function
 	
-		/**
+	/**
 	 * Check validity of variable symbol
 	 *
 	 * @param object $input 
 	 */
-	public function valid_var_sym($input = NULL)
+	public static function valid_var_sym($input = NULL)
 	{
 		// validators cannot be accessed
 		if (empty($input) || !is_object($input))
@@ -393,19 +429,22 @@ class Variable_Symbols_Controller extends Controller
 		
 		$value = trim($input->value);
 		
-		$variable_symbol_model = new Variable_Symbol_Model();
-		
-		$total = $variable_symbol_model->get_variable_symbol_id($value);
+		if (!empty($value))
+		{
+			$variable_symbol_model = new Variable_Symbol_Model();
 
-		if (!preg_match("/^[0-9]{1,10}$/", $value))
-		{
-			$input->add_error('required', __('Bad variable symbol format.'));
-		}
-		else if ($total)
-		{
-			$input->add_error('required', __(
-					'Variable symbol already exists in database.'
-			));
+			$total = $variable_symbol_model->get_variable_symbol_id($value);
+
+			if (!preg_match("/^[0-9]{1,10}$/", $value))
+			{
+				$input->add_error('required', __('Bad variable symbol format.'));
+			}
+			else if ($total)
+			{
+				$input->add_error('required', __(
+						'Variable symbol already exists in database.'
+				));
+			}
 		}
 	}
 }

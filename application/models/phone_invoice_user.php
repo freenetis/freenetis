@@ -43,37 +43,6 @@ class Phone_invoice_user_Model extends ORM
 		'phone_connections', 'phone_calls', 'phone_fixed_calls', 'phone_pays',
 		'phone_roaming_sms_messages', 'phone_sms_messages', 'phone_vpn_calls'
 	);
-	
-	/**
-	 * Check if given user has any phone invoice
-	 *
-	 * @param integer $user_id	User
-	 * @return bool				Has?
-	 */
-	public function has_phone_invoices($user_id)
-	{
-		return $this->db->query("
-			SELECT COUNT(id) AS count
-			FROM phone_invoice_users
-			WHERE user_id = ?
-		", $user_id)->current()->count > 0;
-	}
-	
-	/**
-	 * Gets count of unfilled users phone invoices
-	 *
-	 * @param integer $user_id	User
-	 * @return integer
-	 */
-	public function count_unfilled_phone_invoices($user_id)
-	{
-		return $this->db->query("
-			SELECT COUNT(pi.id) AS count
-			FROM phone_invoice_users pi
-			LEFT JOIN phone_invoices p ON pi.phone_invoice_id = p.id
-			WHERE pi.user_id = ? AND pi.locked = 0 AND p.locked = 0
-		", $user_id)->current()->count;
-	}
 
 	/**
 	 * Get sum of all users phone invoices separated to cells price_company and price_private

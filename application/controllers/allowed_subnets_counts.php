@@ -41,7 +41,7 @@ class Allowed_subnets_counts_Controller extends Controller
 			Controller::error(RECORD);
 		
 		// access control
-		if (!$this->acl_check_edit('Devices_Controller', 'allowed_subnet', $member_id))
+		if (!$this->acl_check_edit('Allowed_subnets_Controller', 'allowed_subnet', $member_id))
 			Controller::error(ACCESS);
 
 		$form = new Forge(url::base(TRUE) . url::current(TRUE));
@@ -97,7 +97,7 @@ class Allowed_subnets_counts_Controller extends Controller
 			{
 				$member->transaction_rollback();
 				Log::add_exception($e);
-				status::error('Error - Cannot update count of allowed subnets');
+				status::error('Error - Cannot update count of allowed subnets', $e);
 			}
 			
 			$this->redirect('allowed_subnets/show_by_member/' . $member_id);

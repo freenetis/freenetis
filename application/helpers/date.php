@@ -282,6 +282,24 @@ class date
 		
 		return $days;
 	}
+	
+	/**
+	 * Returns array of months
+	 * 
+	 * @param bool $translate	Translate months names
+	 * @return array
+	 */
+	public static function months_array($translate = TRUE)
+	{
+		if ($translate)
+		{
+			return array_map('__', self::$months);
+		}
+		else
+		{
+			return self::$months;
+		}
+	}
 
 	/**
 	 * Number of months in a year
@@ -474,30 +492,58 @@ class date
     }
 
     /**
-     * Function returns date of 15th day in the month.
-     * If given day is before and including 15th day, then 15th day of current month is returned.
-     * If given day is after 15th day, then 15th day of next month is returned.
-     * @author Jiri Svitak
-     * @param date
-     * @return unknown_type
+     * Function returns date of new deduct from the given date.
+	 * 
+     * If given day is before and including deduct day, then deduct day of
+	 * current month is returned.
+     * If given day is after deduct day, then deduct day of next month is returned.
+	 * 
+     * @author Ondrej Fibich
+     * @param string $date
+     * @return string
      */
-    public static function get_middle_of_month($date = '0000-00-00')
-    {
+	public static function get_closses_deduct_date_to($date)
+	{
         // parsed date
         $parsed_date = date_parse($date);
         $day = $parsed_date['day'];
         $month = $parsed_date['month'];
         $year = $parsed_date['year'];
-        if ($day >= 15)
-        	$month++;
+		// deduct day
+		$deduct_day = date::get_deduct_day_to($month, $year);
+		
+        if ($day >= $deduct_day)
+        {
+			$month++;
+		}
+		
         if ($month == 13)
         {
         	$month = 1;
         	$year++;
         }
+		
+		$deduct_day2 = date::get_deduct_day_to($month, $year);
+		
         // returns boundary date of month
-		return date('Y-m-d', mktime(0, 0, 0, $month, 15, $year));
-    }
+		return date('Y-m-d', mktime(0, 0, 0, $month, $deduct_day2, $year));
+	}
+	
+	/**
+	 * Calculate deduct day of given month. 
+	 * 
+	 * @author Ondrej Fibich
+	 * @param integer $month
+	 * @param integer $year
+	 * @return string
+	 */
+	public static function get_deduct_day_to($month, $year)
+	{
+		return max(1, min(
+				Settings::get('deduct_day'),
+				date::days_of_month($month, $year)
+		));
+	}
 
     /**
      * Function to finding difference between 2 dates
@@ -531,19 +577,20 @@ class date
         $date .= num::null_fill($month,2).'-';
         $date .= num::null_fill($day,2);
 
-	if ($datetime)
-	{
-		$date .= ' '.num::null_fill($hour,2).':';
-		$date .= num::null_fill($minute,2).':';
-		$date .= num::null_fill($second,2);
-	}
+		if ($datetime)
+		{
+			$date .= ' '.num::null_fill($hour,2).':';
+			$date .= num::null_fill($minute,2).':';
+			$date .= num::null_fill($second,2);
+		}
 
         return $date;
     }
 
 	/**
-	 * @author Michal Kliment
 	 * Function to return date in pretty format from datetime
+	 * 
+	 * @author Michal Kliment
 	 * @param string $datetime
 	 * @return string
 	 */
@@ -571,19 +618,6 @@ class date
         $month = ($pd['month'] < 10) ? '0' . $pd['month'] : $pd['month'];
         return $month.'/'.$pd['year'];
     }
-
-    /*
-    public static function interval($datetime = '0000-00-00 00:00:00', $unit = 'hours')
-    {
-	   $pd = date_parse($datetime);
-
-	   $years = $pd['year'];
-	   $months = $years * 12 + $pd['month'];
-	   $days = $months * 30 + $pd['day'];
-	   $hours = $days * 24 + $pd['hour'];
-
-	   return $$unit;
-    }*/
 
     public static function from_interval($interval = 0, $unit = 'hours')
     {
@@ -634,8 +668,9 @@ class date
     }
 
 	/**
-	 * @author Michal Kliment
 	 * Function to get time for mail (Google style)
+	 * 
+	 * @author Michal Kliment
 	 * @param string $datetime
 	 * @return string
 	 */
@@ -661,8 +696,9 @@ class date
         }
 
 	/**
-	 * @author Michal Kliment
 	 * Returns diff between 2 datetimes
+	 * 
+	 * @author Michal Kliment
 	 * @param string $date1
 	 * @param string $date2
 	 * @return number
@@ -686,8 +722,9 @@ class date
 	}
 
 	/**
-	 * @author Michal Kliment
 	 * Returns interval (in array) between 2 datetimes
+	 * 
+	 * @author Michal Kliment
 	 * @param string $date1
 	 * @param string $date2
 	 * @return array
@@ -834,64 +871,6 @@ class date
 
 		return num::null_fill($hours,2).':'.num::null_fill($minutes,2).':'.num::null_fill($seconds,2);
 	}
-
-	/**
-	 * Rounds date up
-	 *
-	 * @author Michal Kliment
-	 * @param int $day
-	 * @param int $month
-	 * @param int $year
-	 * @return bool
-	 */
-	public function round_up (&$day, &$month, &$year)
-	{
-		if ($day >= 15)
-		{
-			$month++;
-
-			if ($month == 13)
-			{
-				$month = 1;
-				$year++;
-			}
-
-			$day = 1;
-
-			return true;
-		}
-		else
-			return false;
-	}
-
-	/**
-	 * Rounds date down
-	 *
-	 * @author Michal Kliment
-	 * @param int $day
-	 * @param int $month
-	 * @param int $year
-	 * @return boolean
-	 */
-	public function round_down (&$day, &$month, &$year)
-	{
-		if ($day < 15)
-		{
-			$month--;
-
-			if ($month == 0)
-			{
-				$month = 12;
-				$year--;
-			}
-
-			$day = date::days_of_month($month);
-
-			return true;
-		}
-		else
-			return false;
-	}
 	
 	/**
 	 * Finds start of week and return it in given format
@@ -1005,7 +984,7 @@ class date
 		
 		$$unit += $number;
 		
-		$middle = 15;
+		$middle = date::get_deduct_day_to($month, $year);
 		
 		$year += floor($month/12);
 		$month = ($month %12 + 12) % 12;

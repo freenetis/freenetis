@@ -11,8 +11,6 @@
  * 
  */
 
-require_once "FioException.php";
-
 /**
  * Auxiliary class for parsing CSV bank account listings from czech bank "FIO banka".
  * The CSV listings are downloaded from the ebanking web application.
@@ -36,10 +34,7 @@ require_once "FioException.php";
  * @link http://www.praha12.net
  */
 class FioParser
-{
-	const DATE_INDEX = 0;
-	const AMOUNT_INDEX = 7;
-	
+{	
 	/**
 	 * Account number
 	 *
@@ -158,7 +153,7 @@ class FioParser
 	 * @param string $csv string containing the original csv file.
 	 * @return array[array]	Integer-indexed array of associative arrays.
 	 *						Each associative array represents one line of the CSV
-	 * @throws FioException
+	 * @throws Exception
 	 */
 	public static function parseCSV($csv)
 	{
@@ -178,12 +173,12 @@ class FioParser
 				$line_arr = explode('"', $line);
 				if (count($line_arr) < 2)
 				{
-					throw new FioException("Nemohu najít číslo účtu na prvním řádku.");
+					throw new Exception("Nemohu najít číslo účtu na prvním řádku.");
 				}
 				$acc_arr = explode("/", $line_arr[1]);
 				if (count($acc_arr) < 2)
 				{
-					throw new FioException("Nemohu rozlišit číslo účtu a kód banky na prvním řádku.");
+					throw new Exception("Nemohu rozlišit číslo účtu a kód banky na prvním řádku.");
 				}
 				self::$account_nr = $acc_arr[0];
 				self::$bank_nr = $acc_arr[1];
@@ -194,24 +189,24 @@ class FioParser
 				$line_arr = explode(":", $line);
 				if (count($line_arr) < 2)
 				{
-					throw new FioException("Nemohu najít datum od a do na čtvrtém řádku.");
+					throw new Exception("Nemohu najít datum od a do na čtvrtém řádku.");
 				}
 				$dates = explode("-", $line_arr[1]);
 				if (count($dates) < 2)
 				{
-					throw new FioException("Nemohu najít oddělovač dat od a do na čtvrtém řádku.");
+					throw new Exception("Nemohu najít oddělovač dat od a do na čtvrtém řádku.");
 				}
 				$from_arr = explode(".", $dates[0]);
 				if (count($from_arr) < 3)
 				{
-					throw new FioException("Chybný formát datumu od na čtvrtém řádku.");
+					throw new Exception("Chybný formát datumu od na čtvrtém řádku.");
 				}
 				$from_timestamp = mktime(0, 0, 0, intval($from_arr[1]), intval($from_arr[0]), intval($from_arr[2]));
 				self::$from = date("Y-m-d", $from_timestamp);
 				$to_arr = explode(".", $dates[1]);
 				if (count($to_arr) < 3)
 				{
-					throw new FioException("Chybný formát datumu do na čtvrtém řádku.");
+					throw new Exception("Chybný formát datumu do na čtvrtém řádku.");
 				}
 				$to_timestamp = mktime(0, 0, 0, intval($to_arr[1]), intval($to_arr[0]), intval($to_arr[2]));
 				self::$to = date("Y-m-d", $to_timestamp);
@@ -222,7 +217,7 @@ class FioParser
 				$line_arr = explode(":", $line);
 				if (count($line_arr) < 2)
 				{
-					throw new FioException("Nemohu najít počáteční zůstatek.");
+					throw new Exception("Nemohu najít počáteční zůstatek.");
 				}
 				self::$opening_balance = self::normalizeAmount(str_replace("CZK", "", $line_arr[1])) / 100;
 			}
@@ -232,7 +227,7 @@ class FioParser
 				$line_arr = explode(":", $line);
 				if (count($line_arr) < 2)
 				{
-					throw new FioException("Nemohu najít konečný zůstatek.");
+					throw new Exception("Nemohu najít konečný zůstatek.");
 				}
 				self::$closing_balance = self::normalizeAmount(str_replace("CZK", "", $line_arr[1])) / 100;
 			}
@@ -261,20 +256,20 @@ class FioParser
 			$number++;
 		}
 
-		throw new FioException('CSV soubor není kompletní.');
+		throw new Exception('CSV soubor není kompletní.');
 	}
 
 	/**
 	 * Checks headers
 	 *
 	 * @param integer $line 
-	 * @throws FioException
+	 * @throws Exception
 	 */
 	private static function checkHeaders($line)
 	{
 		$expected = implode(';', self::$fields) . ';';
 		if ($line != $expected)
-			throw new FioException(__("Nelze parsovat hlavičku Fio výpisu. Ujistěte se, že jste zvolili všech 18 sloupců k importu v internetovém bankovnictví."));
+			throw new Exception(__("Nelze parsovat hlavičku Fio výpisu. Ujistěte se, že jste zvolili všech 18 sloupců k importu v internetovém bankovnictví."));
 	}
 
 	/**
@@ -282,7 +277,7 @@ class FioParser
 	 *
 	 * @param string $amount
 	 * @return double
-	 * @throws FioException
+	 * @throws Exception
 	 */
 	private static function normalizeAmount($amount)
 	{
@@ -290,7 +285,7 @@ class FioParser
 		$amount = str_replace(",", "", $amount);
 
 		if (!is_numeric($amount))
-			throw new FioException('Chybný formát částky převodu.');
+			throw new Exception('Chybný formát částky převodu.');
 
 		return doubleval($amount);
 	}
@@ -301,14 +296,14 @@ class FioParser
 	 * @param string $line
 	 * @param array $keys
 	 * @return array
-	 * @throws FioException
+	 * @throws Exception
 	 */
 	private static function parseLine($line, $keys)
 	{
 		$cols = explode(';', $line);
 		
 		if (count($cols) != count(self::$fields) + 1)
-			throw new FioException('Chybný počet políček v položce.');
+			throw new Exception('Chybný počet políček v položce.');
 		
 		array_pop($cols);
 
@@ -317,6 +312,9 @@ class FioParser
 
 		// Amount has to be converted
 		$cols['castka'] = self::normalizeAmount($cols['castka']);
+		
+		// Trim leading zeros from VS
+		$cols['vs'] = ltrim($cols['vs'], '0');
 
 		return $cols;
 	}
@@ -326,14 +324,14 @@ class FioParser
 	 *
 	 * @param array $cols
 	 * @param integer $sum 
-	 * @throws FioException
+	 * @throws Exception
 	 */
 	private static function checkLastLine($cols, $sum)
 	{
 		$amount = $cols['castka'];
 		
 		if ($sum != $amount)
-			throw new FioException("Chybný kontrolní součet částky ('$sum' != '$amount').");
+			throw new Exception("Chybný kontrolní součet částky ('$sum' != '$amount').");
 	}
 
 }

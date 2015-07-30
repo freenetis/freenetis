@@ -234,5 +234,22 @@ class Log_Model extends ORM
 		", $table_name, $object_id)->current()->count;
 	}
 
-
+	/**
+	 * Gets last modification time of object
+	 * 
+	 * @param string $table_name
+	 * @param int $object_id
+	 * @return string
+	 */
+	public function get_object_last_modification($table_name, $object_id)
+	{
+		$result = $this->db->query("
+			SELECT time FROM logs WHERE table_name = ? AND object_id = ? ORDER BY time DESC
+			", $table_name, $object_id);
+		
+		if ($result && $result->current())
+		{
+			return $result->current()->time;
+		}
+	}
 }

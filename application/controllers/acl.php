@@ -18,8 +18,7 @@
  * @author Michal Kliment
  */
 class Acl_Controller extends Controller
-{
-	
+{	
 	/**
 	 * Index function, only redirect to list of all access control rules
 	 * 
@@ -46,12 +45,12 @@ class Acl_Controller extends Controller
 			$page_word = 'page', $page = 1)
 	{
 		// check access
-		if (!$this->acl_check_view('Settings_Controller', 'access_rights'))
+		if (!$this->acl_check_view('Acl_Controller', 'acl'))
 			Controller::Error(ACCESS);
 		
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 		
 		// parameters control
 		$allowed_order_type = array
@@ -67,16 +66,41 @@ class Acl_Controller extends Controller
 		if (strtolower($order_by_direction) != 'desc')
 			$order_by_direction = 'asc';
 		
+		$filter_form = new Filter_form('a');
+		
+		$filter_form->add('note');
+		
+		$filter_form->add('aco_value')
+				->label('ACO')
+				->type('select')
+				->values(Aco_Model::get_actions());
+		
+		$filter_form->add('aro_group_id')
+				->label('ARO group')
+				->type('select')
+				->values(Aro_group_Model::get_groups());
+		
+		$filter_form->add('axo_section_value')
+				->label('AXO section')
+				->type('select')
+				->values(Axo_Model::get_section_values());
+		
+		$filter_form->add('axo_value')
+				->label('AXO value')
+				->type('select')
+				->values(Axo_Model::get_values());
+		
 		$acl_model = new Acl_Model();
 		
-		$total_rules = $acl_model->count_all_rules();
+		$total_rules = $acl_model->count_all_rules($filter_form->as_sql());
 		
 		// limit check
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_rules)
 			$sql_offset = 0;
 		
 		$rules = $acl_model->get_all_rules(
-				$sql_offset, (int)$limit_results, $order_by, $order_by_direction
+				$sql_offset, (int)$limit_results, $order_by, $order_by_direction,
+				$filter_form->as_sql()
 		);
 		
 		$headline = __('List of all rules for access control');
@@ -101,15 +125,18 @@ class Acl_Controller extends Controller
 			'order_by'					=> $order_by,
 			'order_by_direction'		=> $order_by_direction,
 			'limit_results'				=> $limit_results,
-			//'filter'					=> $filter_form
+			'filter'					=> $filter_form
 		));
 		
-		$grid->add_new_button('acl/add', __('Add new rule'));
+		if ($this->acl_check_new('Acl_Controller', 'acl'))
+		{
+			$grid->add_new_button('acl/add', __('Add new rule'));
+		}
 		
 		$grid->order_field('id')
 				->label(__('ID'));
 		
-		$grid->order_callback_field('description')
+		$grid->order_callback_field('note')
 				->callback('callback::limited_text');
 		
 		$grid->order_callback_field('aco_count')
@@ -133,26 +160,40 @@ class Acl_Controller extends Controller
 				->icon_action('show')
 				->url('acl/show');
 		
-		$actions->add_action('id')
-				->icon_action('edit')
-				->url('acl/edit');
+		if ($this->acl_check_edit('Acl_Controller', 'acl'))
+		{
+			$actions->add_action('id')
+					->icon_action('edit')
+					->url('acl/edit');
+		}
 		
-		$actions->add_action('id')
-				->icon_action('delete')
-				->url('acl/delete')
-				->class('delete_link');
+		if ($this->acl_check_delete('Acl_Controller', 'acl'))
+		{
+			$actions->add_action('id')
+					->icon_action('delete')
+					->url('acl/delete')
+					->class('delete_link');
+		}
 		
 		$grid->datasource($rules);
 		
-		$submenu = array();
-		$submenu[] = __('Access control rules');
-		$submenu[] = html::anchor('aro_groups/show_all', __('Access control groups of users'));
+		if ($this->acl_check_view('Aro_groups_Controller', 'aro_group'))
+		{
+			$submenu = array();
+			$submenu[] = html::anchor('acl/show_all', __('Access control rules'));
+			$submenu[] = html::anchor('aro_groups/show_all', __('Access control groups of users'));
+		}
+		else
+		{
+			$submenu = NULL;
+		}
 		
 		$view = new View('main');
 		$view->breadcrumbs = __('Access control rules');
 		$view->title = $headline;
 		$view->content = new View('show_all');
-		$view->content->submenu = implode(' | ',$submenu);
+		$this->sections = $submenu;
+		$view->content->current = 'acl/show_all';
 		$view->content->headline = $headline;
 		$view->content->table = $grid;
 		$view->render(TRUE);
@@ -167,7 +208,7 @@ class Acl_Controller extends Controller
 	public function show ($acl_id = NULL)
 	{
 		// check access
-		if (!$this->acl_check_view('Settings_Controller', 'access_rights'))
+		if (!$this->acl_check_view('Acl_Controller', 'acl'))
 			Controller::Error(ACCESS);
 		
 		// bad parameter
@@ -235,13 +276,21 @@ class Acl_Controller extends Controller
 		
 		$axo_grid->field('name');
 		
+		if ($this->acl_check_new('Acl_Controller', 'acl') ||
+			$this->acl_check_edit('Acl_Controller', 'acl'))
+		{
+			$axo_grid->callback_field('name')
+					->callback('callback::axodoc')
+					->label('Actions');
+		}
+		
 		$axo_grid->datasource($axos);
 		
 		$headline = __('Show access control rule');
 		
 		$breadcrumbs = breadcrumbs::add()
 				->link('acl/show_all', 'Access control rules',
-					$this->acl_check_view('Settings_Controller', 'access_rights'))
+					$this->acl_check_view('Acl_Controller', 'acl'))
 				->text('ID '.$acl->id);
 		
 		$view = new View('main');
@@ -263,7 +312,7 @@ class Acl_Controller extends Controller
 	public function add ()
 	{
 		// check access
-		if (!$this->acl_check_edit('Settings_Controller', 'access_rights'))
+		if (!$this->acl_check_new('Acl_Controller', 'acl'))
 			Controller::Error(ACCESS);
 		
 		$form = new Forge(url::base(TRUE).url::current(TRUE));
@@ -273,35 +322,30 @@ class Acl_Controller extends Controller
 				->style('width:600px');
 		
 		$form->dropdown('aco[]')
-				->label(__('ACO').': '.help::hint('aco'))
+				->label('ACO')
+				->help(help::hint('aco'))
 				->rules('required')
 				->options(Aco_Model::get_actions())
 				->multiple('multiple')
-				->size(20);
+				->size(10);
 		
 		$aro_group_model = new Aro_group_Model();
-		$aro_groups = $aro_group_model->find_all();
-		
-		$arr_aro_groups = array();
-		foreach ($aro_groups as $aro_group)
-			$arr_aro_groups[$aro_group->id] = $aro_group->name;
+		$arr_aro_groups = $aro_group_model->select_list('id', 'name', 'name');
 		
 		$form->dropdown('aro_group[]')
-				->label(__('ARO groups').': '.help::hint('aro_groups'))
+				->label('ARO groups')
+				->help(help::hint('aro_groups'))
 				->rules('required')
 				->options($arr_aro_groups)
 				->multiple('multiple')
 				->size(20);
 		
 		$axo_model = new Axo_Model();
-		$axos = $axo_model->find_all();
-		
-		$arr_axos = array();
-		foreach ($axos as $axo)
-			$arr_axos[$axo->id] = $axo->name.' ('.$axo->section_value.')';
+		$arr_axos = $axo_model->select_list('id', 'CONCAT(section_value, \' - \', name)');
 		
 		$form->dropdown('axo[]')
-				->label(__('AXO').': '.help::hint('axo'))
+				->label('AXO')
+				->help(help::hint('axo'))
 				->rules('required')
 				->options($arr_axos)
 				->multiple('multiple')
@@ -338,7 +382,7 @@ class Acl_Controller extends Controller
 		
 		$breadcrumbs = breadcrumbs::add()
 				->link('acl/show_all', 'Access control rules',
-					$this->acl_check_view('Settings_Controller', 'access_rights'))
+					$this->acl_check_view('Acl_Controller', 'acl'))
 				->text('Add new rule');
 		
 		$view = new View('main');
@@ -359,7 +403,7 @@ class Acl_Controller extends Controller
 	public function edit ($acl_id = NULL)
 	{
 		// check access
-		if (!$this->acl_check_edit('Settings_Controller', 'access_rights'))
+		if (!$this->acl_check_edit('Acl_Controller', 'acl'))
 			Controller::Error(ACCESS);
 		
 		// bad parameter
@@ -384,26 +428,24 @@ class Acl_Controller extends Controller
 			$sel_acos[] = $aco->value;
 		
 		$form->dropdown('aco[]')
-				->label(__('ACO').': '.help::hint('aco'))
+				->label('ACO')
+				->help(help::hint('aco'))
 				->rules('required')
 				->options(Aco_Model::get_actions())
 				->selected($sel_acos)
 				->multiple('multiple')
-				->size(20);
+				->size(10);
 		
 		$aro_group_model = new Aro_group_Model();
-		$aro_groups = $aro_group_model->find_all();
-		
-		$arr_aro_groups = array();
-		foreach ($aro_groups as $aro_group)
-			$arr_aro_groups[$aro_group->id] = $aro_group->name;
+		$arr_aro_groups = $aro_group_model->select_list('id', 'name', 'name');
 		
 		$sel_aro_groups = array();
 		foreach ($acl->get_aro_groups() as $aro_group)
 			$sel_aro_groups[] = $aro_group->id;
 		
 		$form->dropdown('aro_group[]')
-				->label(__('ARO groups').': '.help::hint('aro_groups'))
+				->label('ARO groups')
+				->help(help::hint('aro_groups'))
 				->rules('required')
 				->options($arr_aro_groups)
 				->selected($sel_aro_groups)
@@ -411,18 +453,15 @@ class Acl_Controller extends Controller
 				->size(20);
 		
 		$axo_model = new Axo_Model();
-		$axos = $axo_model->find_all();
-		
-		$arr_axos = array();
-		foreach ($axos as $axo)
-			$arr_axos[$axo->id] = $axo->name.' ('.$axo->section_value.')';
+		$arr_axos = $axo_model->select_list('id', 'CONCAT(section_value, \' - \', name)');
 		
 		$sel_axos = array();
 		foreach ($acl->get_axos() as $axo)
 			$sel_axos[] = $axo->id;
 		
 		$form->dropdown('axo[]')
-				->label(__('AXO').': '.help::hint('axo'))
+				->label('AXO')
+				->help(help::hint('axo'))
 				->rules('required')
 				->options($arr_axos)
 				->selected($sel_axos)
@@ -461,9 +500,9 @@ class Acl_Controller extends Controller
 		
 		$breadcrumbs = breadcrumbs::add()
 				->link('acl/show_all', 'Access control rules',
-					$this->acl_check_view('Settings_Controller', 'access_rights'))
+					$this->acl_check_view('Acl_Controller', 'acl'))
 				->link('acl/show/'.$acl->id, 'ID '.$acl->id,
-					$this->acl_check_view('Settings_Controller', 'access_rights'))
+					$this->acl_check_view('Acl_Controller', 'acl'))
 				->text('Edit');
 		
 		$view = new View('main');
@@ -484,7 +523,7 @@ class Acl_Controller extends Controller
 	public function delete ($acl_id = NULL)
 	{
 		// check access
-		if (!$this->acl_check_edit('Settings_Controller', 'access_rights'))
+		if (!$this->acl_check_delete('Acl_Controller', 'acl'))
 			Controller::Error(ACCESS);
 		
 		// bad parameter
@@ -509,5 +548,3 @@ class Acl_Controller extends Controller
 		url::redirect('acl/show_all');
 	}
 }
-
-?>

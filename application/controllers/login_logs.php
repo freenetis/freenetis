@@ -32,53 +32,70 @@ class Login_logs_Controller extends Controller
 	 * 
 	 * @author Michal Kliment
 	 */
-	public function show_all($limit_results = 50, $page_word = null, $page = 1)
+	public function show_all($limit_results = 50, $order_by = 'last_time',
+			$order_by_direction = 'DESC', $page_word = null, $page = 1)
 	{
 		// access
-		if (!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Login_logs_Controller', 'logs'))
 			Controller::error(ACCESS);
 		
+		// filter
+		$filter_form = new Filter_form();
+		
+		$filter_form->add('name')
+				->callback('json/user_name');
+		
+		$filter_form->add('id')
+				->label('ID')
+				->type('number');
+		
+		$filter_form->add('last_time')
+				->label('Time of login')
+				->type('date');
+		
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$login_log_model = new Login_log_Model();
 
-		$total_login_logs = $login_log_model->count_all_login_logs();
+		$total_login_logs = $login_log_model->count_all_login_logs($filter_form->as_sql());
 
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_login_logs)
 			$sql_offset = 0;
 
 		$login_logs = $login_log_model->get_all_login_logs(
-				$sql_offset, (int) $limit_results
+				$sql_offset, (int) $limit_results, $order_by,
+				$order_by_direction, $filter_form->as_sql()
 		);
 
 		// create grid
 		$grid = new Grid('login_logs/show_all', __('Login logs'), array
 		(
-				'use_paginator'				=> true,
-				'use_selector'				=> true,
-				'current'					=> $limit_results,
-				'selector_increace'			=> 50,
-				'selector_min'				=> 50,
-				'selector_max_multiplier'	=> 10,
-				'uri_segment'				=> 'page',
-				'base_url'					=> Config::get('lang') . '/login_logs/show_all/'
-											. $limit_results,
-				'total_items'				=> $total_login_logs,
-				'items_per_page'			=> $limit_results,
-				'style'						=> 'classic',
-				'order_by'					=> 'last_time',
-				'order_by_direction'		=> 'desc',
-				'limit_results'				=> $limit_results
+			'use_paginator'				=> true,
+			'use_selector'				=> true,
+			'current'					=> $limit_results,
+			'selector_increace'			=> 50,
+			'selector_min'				=> 50,
+			'selector_max_multiplier'	=> 10,
+			'uri_segment'				=> 'page',
+			'base_url'					=> Config::get('lang') . '/login_logs/show_all/'
+										. $limit_results.'/'.$order_by.'/'.$order_by_direction,
+			'total_items'				=> $total_login_logs,
+			'items_per_page'			=> $limit_results,
+			'style'						=> 'classic',
+			'order_by'					=> $order_by,
+			'order_by_direction'		=> $order_by_direction,
+			'limit_results'				=> $limit_results,
+			'filter'					=> $filter_form->html()
 		));
 
-		$grid->field('id');
+		$grid->order_field('id');
 		
-		$grid->field('name');
+		$grid->order_field('name');
 		
-		$grid->field('last_time')
-				->label(__('Last time login'));
+		$grid->order_field('last_time')
+				->label('Last time login');
 		
 		$actions = $grid->grouped_action_field();
 		
@@ -125,26 +142,36 @@ class Login_logs_Controller extends Controller
 			Controller::error(RECORD);
 		
 		// access
-		if (!$this->acl_check_view(get_class($this), 'users', $user->member_id) &&
-			!$this->acl_check_view('Settings_Controller', 'system'))
+		if (!$this->acl_check_view('Login_logs_Controller', 'logs', $user->member_id))
 		{
 			Controller::error(ACCESS);
 		}
+		
+		// filter
+		$filter_form = new Filter_form();
+		
+		$filter_form->add('time')
+				->label('Time of login')
+				->type('date');
+		
+		$filter_form->add('ip_address');
 
 		// gets new selector
-		if (is_numeric($this->input->get('record_per_page')))
-			$limit_results = (int) $this->input->get('record_per_page');
+		if (is_numeric($this->input->post('record_per_page')))
+			$limit_results = (int) $this->input->post('record_per_page');
 
 		$login_log_model = new Login_log_Model();
 
-		$total_login_logs = $login_log_model->count_all_login_logs_by_user($user->id);
+		$total_login_logs = $login_log_model->count_all_login_logs_by_user(
+				$user->id, $filter_form->as_sql()
+		);
 
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_login_logs)
 			$sql_offset = 0;
 
 		$login_logs = $login_log_model->get_all_login_logs_by_user(
 				$user->id, $sql_offset, (int) $limit_results,
-				$order_by, $order_by_direction
+				$order_by, $order_by_direction, $filter_form->as_sql()
 		);
 
 		$headline = __('Login logs of user') . ' ' . $user->get_full_name();
@@ -152,30 +179,32 @@ class Login_logs_Controller extends Controller
 		// create grid
 		$grid = new Grid('login_logs/show_by_user', null, array
 		(
-				'current'					=> $limit_results,
-				'selector_increace'			=> 200,
-				'selector_min'				=> 200,
-				'selector_max_multiplier'	=> 10,
-				'uri_segment'				=> 'page',
-				'base_url'					=> Config::get('lang') . '/login_logs/show_by_user/'
-											. $user->id . '/' . $limit_results . '/'
-											. $order_by . '/' . $order_by_direction,
-				'total_items'				=> $total_login_logs,
-				'items_per_page'			=> $limit_results,
-				'style'						=> 'classic',
-				'order_by'					=> $order_by,
-				'order_by_direction'		=> $order_by_direction,
-				'limit_results'				=> $limit_results,
-				'variables'					=> $user->id . '/',
-				'url_array_ofset'			=> 1
+			'current'					=> $limit_results,
+			'selector_increace'			=> 200,
+			'selector_min'				=> 200,
+			'selector_max_multiplier'	=> 10,
+			'uri_segment'				=> 'page',
+			'base_url'					=> Config::get('lang') . '/login_logs/show_by_user/'
+										. $user->id . '/' . $limit_results . '/'
+										. $order_by . '/' . $order_by_direction,
+			'total_items'				=> $total_login_logs,
+			'items_per_page'			=> $limit_results,
+			'style'						=> 'classic',
+			'order_by'					=> $order_by,
+			'order_by_direction'		=> $order_by_direction,
+			'limit_results'				=> $limit_results,
+			'variables'					=> $user->id . '/',
+			'url_array_ofset'			=> 1,
+			'filter'					=> $filter_form->html()
 		));
 
-		$grid->order_field('id');
+		$grid->order_field('id')
+				->label('ID');
 		
 		$grid->order_field('time');
 		
 		$grid->order_field('ip_address')
-				->label(__('IP address'));
+				->label('IP address');
 
 		$grid->datasource($login_logs);
 
@@ -186,10 +215,10 @@ class Login_logs_Controller extends Controller
 						'ID ' . $user->member->id . ' - ' . $user->member->name,
 						$this->acl_check_view('Members_Controller', 'members', $user->member->id))
 				->link('users/show_by_member/' . $user->member_id, 'Users',
-						$this->acl_check_view(get_class($this), 'users', $user->member_id))
+						$this->acl_check_view('Users_Controller', 'users', $user->member_id))
 				->link('users/show/' . $user->id,
 						$user->name . ' ' . $user->surname . ' (' . $user->login . ')',
-						$this->acl_check_view(get_class($this), 'users', $user->member_id))
+						$this->acl_check_view('Users_Controller', 'users', $user->member_id))
 				->text('Login logs');
 
 		$view = new View('main');

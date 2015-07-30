@@ -22,7 +22,7 @@ class Form_Date extends Form_Input {
 	protected $data = array
 	(
 		'name'  => '',
-		'class' => 'dropdown',
+		'class' => 'date',
 	);
 
 	protected $protect = array('type');
@@ -30,7 +30,7 @@ class Form_Date extends Form_Input {
 	// Precision for the parts, you can use @ to insert a literal @ symbol
 	protected $parts = array
 	(
-		'day'     => array(1),
+		'day'     => array(),
 		'month'   => array(),
 		'year'    => array(),
 	);
@@ -50,6 +50,11 @@ class Form_Date extends Form_Input {
 		{
 			// Set options for date generation
 			$this->parts[substr($method, 0, -1)] = $args;
+			
+			// Add rule
+			
+			$this->rules('time_interval');
+			
 			return $this;
 		}
 
@@ -61,61 +66,160 @@ class Form_Date extends Form_Input {
 		// Import base data
 		$data = $this->data;
 
-		// Get the options and default selection
-		$time = $this->time_array(arr::remove('value', $data));
-
-
 		// No labels or values
 		unset($data['label']);
 
-		$input = '';
+		// count date limit
+		$maxDate = '';
+		$minDate = '';
+		
 		foreach($this->parts as $type => $val)
 		{
-			if (is_int($type))
+			if (empty($val))
 			{
-				// Just add the separators
-				$input .= $val;
 				continue;
 			}
-
-			// Set this input name
-			$data['name'] = $this->data['name'].'['.$type.']';
-
-			// Set the selected option
-			$selected = $time[$type];
-
-			if ($type == 'am_pm')
+			
+			if ($type == 'year')
 			{
-				// Options are static
-				$options = array('AM' => 'AM', 'PM' => 'PM');
+				$minDate .= '-'.(intval(date('Y')) - intval($val[0])).'Y ';
+				
+				if (count($val) > 1)
+				{
+					$diff = intval($val[1]) - intval(date('Y'));
+					
+					$maxDate .= '+'.$diff.'Y ';
+				}
 			}
-			else
+			else if ($type == 'month')
 			{
-				// minute(s), hour(s), etc
-				$type .= 's';
-
-				// Use the date helper to generate the options
-				$options = empty($val) ? date::$type() : call_user_func_array(array('date', $type), $val);
+				$minDate .= '-'.(intval(date('m')) - intval($val[0])).'m ';
+				
+				if (count($val) > 1)
+				{
+					$diff = intval($val[1]) - intval(date('m'));
+					
+					$maxDate .= '+'.$diff.'m ';
+				}
 			}
-
-			$input .= form::dropdown($data, $options, $selected);
+			else if ($type == 'day')
+			{
+				$minDate .= '-'.(intval(date('d')) - intval($val[0])).'d ';
+				
+				if (count($val) > 1)
+				{
+					$diff = intval($val[1]) - intval(date('d'));
+					
+					$maxDate .= '+'.$diff.'d ';
+				}
+			}
 		}
+		
+		// convert timestamp to readable format
+		$converted_data = $data;
+		$converted_data['value'] = ($data['value'] ? date('Y-m-d', $data['value']) : '');
+		$converted_data['minDate'] = trim($minDate);
+		$converted_data['maxDate'] = trim($maxDate);
+		
+		$input = form::input($converted_data);
 
 		return $input;
 	}
-
-	protected function time_array($timestamp)
+	
+	public function rule_time_interval()
 	{
-		$time = array_combine
-		(
-			array('month', 'day', 'year', 'hour', 'minute', 'am_pm'), 
-			explode('--', date('n--j--Y--g--i--A', $timestamp))
-		);
-
-		// Minutes should always be in 5 minute increments
-		//$time['minute'] = num::round($time['minute'], current($this->parts['minute']));
-
-		return $time;
+		// timestamp
+		$ts = $this->data['value'];
+		
+		// get min date
+		// min year
+		if (empty($this->parts['year']))
+		{
+			$min_y = date('Y');
+		}
+		else
+		{
+			$min_y = $this->parts['year'][0];
+		}
+		
+		// min month
+		if (empty($this->parts['month']))
+		{
+			$min_m = date('m');
+		}
+		else
+		{
+			$min_m = $this->parts['month'][0];
+		}
+		
+		// min day
+		if (empty($this->parts['day']))
+		{
+			$min_d = date('d');
+		}
+		else
+		{
+			$min_d = $this->parts['day'][0];
+		}
+		
+		// get max date
+		// max year
+		if (count($this->parts['year']) == 2)
+		{
+			$max_y = $this->parts['year'][1];
+			$max_set = TRUE;
+		}
+		else
+		{
+			$max_y = date('Y');
+		}
+		
+		// max month
+		if (count($this->parts['month']) == 2)
+		{
+			$max_m = $this->parts['month'][1];
+			$max_set = TRUE;
+		}
+		else
+		{
+			$max_m = date('m');
+		}
+		
+		// max day
+		if (count($this->parts['day']) == 2)
+		{
+			$max_d = $this->parts['day'][1];
+			$max_set = TRUE;
+		}
+		else
+		{
+			$max_d = date('d');
+		}
+		
+		// get min, max timestamps
+		$min_ts = mktime(0, 0, 0, $min_m, $min_d, $min_y);
+				
+		// check if given date is in interval
+		if ($ts && $ts < $min_ts)
+		{
+			$this->errors['date_interval'] = TRUE;
+		}
+		
+		// max interval set
+		if (isset($max_set) && $max_set)
+		{
+			$max_ts = mktime(0, 0, 0, $max_m, $max_d, $max_y);
+			
+			if ($ts && $ts > $max_ts)
+			{
+				$this->errors['date_interval'] = TRUE;
+			}
+		}
+		
+		if (!$ts)
+		{
+			$this->data['value'] = 0;
+		}
 	}
 
 	protected function load_value()
@@ -125,23 +229,7 @@ class Form_Date extends Form_Input {
 
 		$time = $this->input_value($this->name);
 		
-		if (!is_array($time))
-		{
-			$time = array();
-		}
-
-		// Make sure all the required inputs keys are set
-		$time += $this->time_array(time());
-
-		$this->data['value'] = mktime
-		(
-			date::adjust($time['hour'], $time['am_pm']),
-			$time['minute'],
-			0,
-			$time['month'],
-			$time['day'],
-			$time['year']
-		);
+		$this->data['value'] = strtotime($time);
 	}
 
 } // End Form Dateselect

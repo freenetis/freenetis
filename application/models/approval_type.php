@@ -27,6 +27,7 @@
  * @property string $time
  * @property integer $default_vote
  * @property integer $min_suggested_amount
+ * @property bool $one_vote Only one vote (approve/reject) required to end voting.
  */
 class Approval_type_Model extends ORM
 {
@@ -36,6 +37,52 @@ class Approval_type_Model extends ORM
 	const SIMPLE = 1;
 	/** Absolute type of approval type */
 	const ABSOLUTE = 2;
+	
+	/**
+	 * Type names
+	 *
+	 * @var array
+	 */
+	private static $type_names = array
+	(
+		self::SIMPLE	=> 'Simple majority',
+		self::ABSOLUTE	=> 'Absolute majority',
+	);
+	
+	/**
+	 * Gets name of a type.
+	 * 
+	 * @param integer $type Type constant
+	 * @param bool $translate Translate name?
+	 * @return null|string
+	 */
+	public static function get_type_name($type, $translate = TRUE)
+	{
+		if (array_key_exists($type, self::$type_names))
+		{
+			if ($translate)
+			{
+				return __(self::$type_names[$type]);
+			}
+			return self::$type_names[$type];
+		}
+		return NULL;
+	}
+	
+	/**
+	 * Gets type names.
+	 * 
+	 * @param bool $translate Translate names?
+	 * @return array
+	 */
+	public static function get_type_names($translate = TRUE)
+	{
+		if ($translate)
+		{
+			return array_map('__', self::$type_names);
+		}
+		return self::$type_names;
+	}
 
 	/**
 	 * Function to return all aproval types
@@ -66,7 +113,7 @@ class Approval_type_Model extends ORM
 		return $this->db->query("
 				SELECT at.id, at.name, at.comment, at.type, at.majority_percent,
 					at.interval, at.default_vote, at.min_suggest_amount,
-					ag.id as group_id, ag.name as group_name
+					ag.id as group_id, ag.name as group_name, at.one_vote
 				FROM approval_types at
 				LEFT JOIN aro_groups ag ON at.aro_group_id = ag.id
 				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction

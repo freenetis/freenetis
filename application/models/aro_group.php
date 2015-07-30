@@ -30,9 +30,25 @@ class Aro_group_Model extends ORM
 	const ALL									= 21;
 	const REGULAR_MEMBERS						= 22;
 	const REGISTERED_APPLICANTS					= 23;
+	const ENGINEERS								= 26;
 	const ADMINS									= 32;
 	const TELEPHONISTS							= 44;
 	// <= ARO groups
+	
+	/**
+	 * Returns all ARO groups
+	 * 
+	 * @author Michal Kliment
+	 * @return type
+	 */
+	public static function get_groups()
+	{
+		$aro_group_model = new Aro_group_Model();
+		
+		$aro_groups = $aro_group_model->get_all_values();
+		
+		return arr::from_objects($aro_groups);
+	}
 	
 	/**
 	 * Is given ARO group deletable?
@@ -53,6 +69,7 @@ class Aro_group_Model extends ORM
 				$aro_group_id != self::ALL &&
 				$aro_group_id != self::REGULAR_MEMBERS &&
 				$aro_group_id != self::REGISTERED_APPLICANTS &&
+				$aro_group_id != self::ENGINEERS &&
 				$aro_group_id != self::ADMINS &&
 				$aro_group_id != self::TELEPHONISTS
 		);

@@ -128,7 +128,7 @@ class Stats_Controller extends Controller
 				->type('date')
 				->default(Filter_form::OPER_GREATER_OR_EQUAL, $association->entrance_date)
 				->default(Filter_form::OPER_SMALLER_OR_EQUAL, $last_entrance_date)
-				->class('without_days');
+				->add_class('without_days');
 		
 		$filter_form->add('increase')
 				->type('number');
@@ -185,11 +185,23 @@ class Stats_Controller extends Controller
 		$view->content = new View('stats/members_increase_decrease');
 		$view->content->js_data_array_str = '';
 
-		$year = min(array_keys($counts));
-		$month = min(array_keys($counts[$year]));
-
-		$max_year = max(array_keys($counts));
-		$max_month = max(array_keys($counts[$max_year]));
+		$year = $max_year = $month = $max_month = NULL;
+		$counts_year_keys = array_keys($counts);
+		
+		if (!empty($counts_year_keys))
+		{
+			$year = min($counts_year_keys);
+			$max_year = max($counts_year_keys);
+			
+			$counts_month_keys = array_keys($counts[$year]);
+			
+			if (!empty($counts_month_keys)) 
+			{
+				$month = min(array_keys($counts[$year]));
+				$max_month = max(array_keys($counts[$max_year]));
+			}
+		}
+		
 		$max_date = date('Y-m-d', mktime(
 				0, 0, 0, $max_month, count(date::days($max_month)), $max_year
 		));

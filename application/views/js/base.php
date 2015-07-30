@@ -425,7 +425,7 @@ $(document).ready(function()
 					if (data.length)
 					{
 						// detecting returned data's type by first character
-						switch (data[0])
+						switch (data.charAt(0))
 						{
 							// result is html
 							case '<':

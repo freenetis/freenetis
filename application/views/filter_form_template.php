@@ -29,73 +29,80 @@ $(document).ready(function(){
 	 * @author Michal Kliment
 	 */
 	$(".t").die("change").live("change", function (){
-        // css classes
-        var classes = [];
+		// filter items
+		var $op = $(this).parent().find("select.o");
+		var $val = $(this).parent().find(":input.v");console.log($val.length);
+		// value
+		var val = $(this).val();
+		var name = $val.attr("name");
         
 		// remove all items from operation's select
-		$(this).next().html("");
+		$op.html("");
 		
 		// adds only operations of current type
 		var b = [];
-		for (var i in types[$(this).val()]['operations'])
+		for (var i in types[val]['operations'])
 		{
-			b.push("<option value='"+i+"'>"+types[$(this).val()]['operations'][i]+"</option>");
+			b.push("<option value='"+i+"'>"+types[val]['operations'][i]+"</option>");
 		}
-		$(this).next().append(b.join(''));
+		$op.append(b.join(''));
 		
-		$(this).next().next().autocomplete("destroy");
+		// destroy old objects
+		$val.autocomplete("destroy");
+		$val.datepicker("destroy");
 		
-		$(this).next().next().datepicker("destroy");
-		
-		// repair classes of value input
-		$(this).next().next().removeClass().addClass("v");
-		for (var i in types[$(this).val()]['classes'])
-		{
-			$(this).next().next().addClass(types[$(this).val()]['classes'][i]);
-		}
-		
-		// add CSS classes
-		for (var i in types[$(this).val()]['css_classes'])
-		{
-			$(this).next().next().addClass(types[$(this).val()]['css_classes'][i]);
-            classes.push(types[$(this).val()]['css_classes'][i]);
-		}
+		// remove old CSS classes
+		$val.removeClass();
 		
 		// type returns key (not value), change value input to select
-		if (types[$(this).val()]['returns'] == 'key')
+		if (types[val]['returns'] == 'key')
 		{
-			if (!$(this).next().next().is("select"))
+			if (!$val.is("select"))
 			{
 				// adds button to switch to multiple select
-				$(this).next().next().after("<img src='<?php echo url::base() ?>media/images/icons/ico_add.gif' class='expand-button' title='<?php echo __("Multiple choice") ?>'>");
+				$val.after($("<img>", {
+					src: "<?php echo url::base() ?>media/images/icons/ico_add.gif",
+					title: "<?php echo __("Multiple choice") ?>"
+				}).addClass("expand-button"));
 			}
-			
-            classes.push('v');
-			$(this).next().next().replaceWith("<select class='" + classes.join(' ') + "' name='"+$(this).next().next().attr("name")+"'></select>");
-			
-			b = [];
-			for (var i in types[$(this).val()]['values'])
+			// build select
+			b = ["<select name='" + name + "' class='v'>"];
+			for (var i in types[val]['values'])
 			{
-				b.push("<option value='"+i+"'>"+types[$(this).val()]['values'][i]+"</option>");
+				b.push("<option value='"+i+"'>"+types[val]['values'][i]+"</option>");
 			}
-			$(this).next().next().append(b.join(''));
+			b.push("</select>");
+			// replace old input with select
+			$val.replaceWith(b.join(""));
+			// replace pointer to value
+			$val = $(this).parent().find(":input.v");
 		}
 		// type returns value (not key), change value select to input
 		else
 		{	
-			if (!$(this).next().next().is("input"))
+			if (!$val.is("input"))
 			{
-                classes.push('v');
-				$(this).next().next().replaceWith("<input class='" + classes.join(' ') + "' name='"+$(this).next().next().attr("name")+"'>");
-				$(this).next().next().next().remove();
+				$val.next().remove(); // expand button remove
+				$val.replaceWith($("<input>", {name: name}).addClass('v'));
+				// replace pointer to value
+				$val = $(this).parent().find(":input.v");
+			}
+			else
+			{
+				$val.val("");
 			}
 		}
 		
+		// set CSS classes
+		$val.addClass('v')
+			.addClass(types[val]['classes'].join(' '))
+			.addClass(types[val]['css_classes'].join(' '));
+		
 		// type has callback
-		if (types[$(this).val()]['callback'] != null)
+		if (types[val]['callback'] != null)
 		{
-			$(this).next().next().autocomplete({
-				source: "<?php echo url_lang::base() ?>"+types[$(this).val()]['callback']
+			$val.autocomplete({
+				source: "<?php echo url_lang::base() ?>"+types[val]['callback']
 			});
 		}
 	});

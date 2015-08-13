@@ -142,7 +142,7 @@ abstract class Bank_Statement_File_Importer
         // make download
         $file_data = $this->do_download($bank_account, $settings, $url);
 
-        if ($file_data == FALSE)
+        if ($file_data === FALSE)
         {
             throw new Exception(__('Import download has failed caused by: %s',
                     implode('<br>', $driver->get_errors())));
@@ -566,7 +566,7 @@ abstract class Bank_Statement_File_Importer
 	 * @param Bank_account_Model $bank_account
 	 * @param Bank_Account_Settings $settings
      * @param string $url Prepare download URL
-     * @return string Content of downloaded file
+     * @return string Content of downloaded file or FALSE on error
      */
     protected function do_download(Bank_account_Model $bank_account,
             Bank_Account_Settings $settings, $url)
@@ -578,7 +578,8 @@ abstract class Bank_Statement_File_Importer
 			$e = error_get_last();
 			$m = __('Cannot download statement from ') . ' "' . $url . '": '
 					. (isset($e['message']) ? $e['message'] : '');
-			throw new InvalidArgumentException($m);
+			$this->add_error($m);
+            return FALSE;
 		}
         
         return $fd;

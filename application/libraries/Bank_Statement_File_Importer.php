@@ -138,16 +138,26 @@ abstract class Bank_Statement_File_Importer
 		{
 			throw new Exception(__('Cannot prepare for statement download'));
 		}
+
+        // make download
+        $file_data = $this->do_download($bank_account, $settings, $url);
+
+        if ($file_data == FALSE)
+        {
+            throw new Exception(__('Import download has failed caused by: %s',
+                    implode('<br>', $driver->get_errors())));
+        }
 		
 		// import
-		return self::import($bank_account, $url, $type, $send_emails, $send_sms);
+		return self::import_loaded($bank_account, $file_data, $type,
+                $send_emails, $send_sms);
 	}
-	
+
 	/**
 	 * Imports a bank statement placed in a file that is given by the filename
 	 * to bank account that is given by its database model. Throws error
 	 * exceptions with translated error description if any error occures.
-	 * 
+	 *
 	 * @param Bank_account_Model $bank_account Bank account ot which the statement
 	 *										   is imported
 	 * @param string $filename Full path to imported file
@@ -160,6 +170,39 @@ abstract class Bank_Statement_File_Importer
 	 */
 	public static function import(Bank_account_Model $bank_account,
 			$filename, $ext, $send_emails = TRUE, $send_sms = FALSE)
+    {
+        $fd = @file_get_contents($filename);
+
+		if ($fd == FALSE)
+		{
+			$e = error_get_last();
+			$m = __('Cannot read from input file') . ' "' . $filename . '": '
+					. (isset($e['message']) ? $e['message'] : '');
+			throw new InvalidArgumentException($m);
+		}
+
+        return self::import_loaded($bank_account, $fd, $filename, $ext,
+                $send_emails, $send_sms);
+    }
+	
+	/**
+	 * Imports a bank statement from given loaded file data to bank account
+     * that is given by its database model. Throws error exceptions with
+     * translated error description if any error occures.
+	 * 
+	 * @param Bank_account_Model $bank_account Bank account ot which the statement
+	 *										   is imported
+	 * @param string $file_data Content to import
+	 * @param string $filename Full path to imported file (for error messages)
+	 * @param string $ext File extension
+	 * @param boolean $send_emails Send notification of affected members by e-mail
+	 * @param boolean $send_sms Send notification of affected members by sms
+	 * @return Bank_statement_Model Stored statement
+	 * @throws InvalidArgumentException On invalid file or bank account entity
+	 * @throws Exception On any error during parsing or storing of statement
+	 */
+	private static function import_loaded(Bank_account_Model $bank_account,
+			$file_data, $filename, $ext, $send_emails = TRUE, $send_sms = FALSE)
 	{
 		/* obtain driver */
 		$driver = self::factory($bank_account, $ext);
@@ -176,17 +219,12 @@ abstract class Bank_Statement_File_Importer
 		$driver->inform_affected_member_by_sms = $send_sms;
 		
 		/* set file data */
-		$fd = @file_get_contents($filename);
+        if (empty($file_data))
+        {
+            throw new Exception(__('Invalid file data'));
+        }
 		
-		if ($fd == FALSE)
-		{
-			$e = error_get_last();
-			$m = __('Cannot read from input file') . ' "' . $filename . '": '
-					. (isset($e['message']) ? $e['message'] : '');
-			throw new InvalidArgumentException($m);
-		}
-		
-		$driver->set_file_data($fd);
+		$driver->set_file_data($file_data);
 		
 		/* check format */
 		if (!$driver->check_file_data_format())
@@ -519,6 +557,32 @@ abstract class Bank_Statement_File_Importer
 	{
 		return TRUE;
 	}
+
+    /**
+     * This method enables to download a bank statement. By default it simply
+     * download file from the specified URL. If other type of download is needed
+     * that this method should be overriden.
+     *
+	 * @param Bank_account_Model $bank_account
+	 * @param Bank_Account_Settings $settings
+     * @param string $url Prepare download URL
+     * @return string Content of downloaded file
+     */
+    protected function do_download(Bank_account_Model $bank_account,
+            Bank_Account_Settings $settings, $url)
+    {
+        $fd = @file_get_contents($filename);
+
+		if ($fd == FALSE)
+		{
+			$e = error_get_last();
+			$m = __('Cannot download statement from ') . ' "' . $url . '": '
+					. (isset($e['message']) ? $e['message'] : '');
+			throw new InvalidArgumentException($m);
+		}
+        
+        return $fd;
+    }
 	
 	/**
 	 * Checks whether the file content that is stored into a fileData property
@@ -627,7 +691,7 @@ abstract class Bank_Statement_File_Importer
 			return FALSE;
 		}
 	}
-	
+
 }
 
 /**

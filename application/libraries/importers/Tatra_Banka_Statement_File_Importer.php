@@ -19,7 +19,11 @@
  */
 abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_Importer
 {
-	protected $data;
+	const LAST_DOWNLOAD_SETTINGS_KEY = 'tatrabanka_email_last_download';
+
+	protected $data = array();
+
+	protected $last_download_datetime;
 
 	protected function store(&$stats = array())
 	{
@@ -38,9 +42,13 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 			$statement->bank_account_id = $ba->id;
 			$statement->user_id = $this->get_user_id();
 			$statement->type = $this->get_importer_name();
-			$statement->from = $header->from;
-			$statement->to = $header->to;
-			$statement->closing_balance = $header->closingBalance;
+
+			if ($header != NULL)
+			{
+				$statement->from = $header->from;
+				$statement->to = $header->to;
+				$statement->closing_balance = $header->closingBalance;
+			}
 			$statement->save_throwable();
 
 			/* transactions */
@@ -173,6 +181,8 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 				$dm = __('Duplicate transactions') . ': ' . implode('; ', $duplicities);
 				throw new Duplicity_Exception($dm);
 			}
+
+			Settings::set(self::LAST_DOWNLOAD_SETTINGS_KEY, $this->last_download_datetime);
 
 			// done
 			$statement->transaction_commit();

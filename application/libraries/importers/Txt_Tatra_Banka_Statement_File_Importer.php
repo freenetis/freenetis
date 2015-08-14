@@ -46,12 +46,24 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 			$accounts[] = $e;
 		}
 
-		return ($match_data == $match_symbols) && ($match_symbols == $match_counter) && count(array_unique($accounts)) == 1;
+		if (count(array_unique($accounts)) > 1)
+		{
+			$this->add_error(__('E-mails contains more than one destination account: %s', implode(', ', array_unique($accounts))), FALSE);
+		}
+
+		return ($match_data == $match_symbols) && ($match_symbols == $match_counter) && count(array_unique($accounts)) <= 1;
 	}
 
 	protected function get_header_data()
 	{
 		$emails = $this->get_file_data();
+
+		unset ($emails[self::LAST_DOWNLOAD_SETTINGS_KEY]);
+
+		if (count($emails) == 0)
+		{
+			return NULL;
+		}
 
 		// Newest e-mail
 		preg_match("@(\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}).+(\w{2}\d{2}(\d{4})(\d{16})).* (\d+,\d{2}) (.+)\.@",
@@ -83,6 +95,8 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 	protected function parse_file_data()
 	{
 		$emails = $this->get_file_data();
+
+		$this->last_download_datetime = $emails[self::LAST_DOWNLOAD_SETTINGS_KEY];
 
 		foreach ($emails as $email)
 		{
@@ -124,6 +138,13 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 	protected function do_download(Bank_account_Model $bank_account,
 					Bank_Account_Settings $settings, $url)
 	{
+		$last_download = Settings::get(self::LAST_DOWNLOAD_SETTINGS_KEY);
+
+		if (empty($last_download))
+		{
+			$last_download = 0;
+		}
+
 		$hostname = $settings->get_download_statement_url();
 		$inbox = @imap_open($hostname, $settings->imap_name, $settings->imap_password, OP_READONLY);
 
@@ -137,13 +158,30 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 
 		$emails = imap_search($inbox, 'ALL');
 
+		$first = TRUE;
+
+		$all_mails[self::LAST_DOWNLOAD_SETTINGS_KEY] = 0;
+
 		if ($emails)
 		{
+			// Sort from newest mail
 			rsort($emails);
 
 			foreach ($emails as $email_number)
 			{
 				$struct = imap_fetchstructure($inbox, $email_number);
+				$header = imap_headerinfo($inbox, $email_number);
+
+				if ($first)
+				{
+					$all_mails[self::LAST_DOWNLOAD_SETTINGS_KEY] = $header->udate;
+					$first = FALSE;
+				}
+
+				if ($header->udate <= $last_download)
+				{
+					continue;
+				}
 
 				$body = imap_fetchbody($inbox,$email_number, 1);
 

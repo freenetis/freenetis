@@ -918,6 +918,7 @@ $lang = array
 	'during sending an error appear' => 'Při odesílání zprávy se vyskytla chyba',
 	'due date' => 'Datum splatnosti',
 	'duplex' => 'Duplexní',
+	'duplicate transactions' => 'Duplikující se transakce',
 	'duplicate transaction codes' => 'Duplikující se transakční kódy',
 	'e' => 'U',
 	'economy' => 'Ekonomika',

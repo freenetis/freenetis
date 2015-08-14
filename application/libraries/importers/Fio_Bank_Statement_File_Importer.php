@@ -387,6 +387,8 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 		}
 		catch (Duplicity_Exception $e)
 		{
+			$statement->transaction_rollback();
+
 			throw $e;
 		}
 		catch (Exception $e)

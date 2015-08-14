@@ -507,7 +507,9 @@ class Bank_accounts_Controller extends Controller
 					case Bank_Account_Settings::FIELD_TYPE_BOOL:
 						$input = $form->checkbox($column)->checked($ba_driver->$column);
 						break;
-					
+					case Bank_Account_Settings::FIELD_TYPE_DROPDOWN:
+						$input = $form->dropdown($column)->selected($ba_driver->$column)->options(array());
+						break;
 					default:
 						$input = $form->input($column)->value($ba_driver->$column);
 						break;
@@ -521,6 +523,9 @@ class Bank_accounts_Controller extends Controller
 				
 				if (isset($info['rules']) && !empty($info['rules']))
 					$input->rules($info['rules']);
+
+				if (isset($info['options']) && !empty($info['options']))
+					$input->options($info['options']);
 			}
 		}
 		

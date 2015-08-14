@@ -484,6 +484,42 @@ class Bank_transfer_Model extends ORM
 		
 		return $duplicate_transaction_codes;
 	}
+
+	/**
+	 * Returns duplicities in table for given bank account
+	 * Used in Tatra banka importer
+	 *
+	 * @author David Raska
+	 * @param $bank_account_id
+	 * @return array
+	 */
+	public function get_transactions_duplicities($bank_account_id)
+	{
+		$duplicities = $this->db->query("
+				SELECT t.datetime, t.amount, oba.name, CONCAT(oba.account_nr, '/', oba.bank_nr) AS bank_account, COUNT(bt.id) AS count
+				FROM `bank_transfers` bt
+				LEFT JOIN `transfers` t ON t.id = bt.transfer_id
+				LEFT JOIN bank_statements bs ON bs.id = bt.bank_statement_id
+				LEFT JOIN bank_accounts ba ON ba.id = bs.bank_account_id
+				LEFT JOIN bank_accounts oba ON oba.id = bt.origin_id
+				WHERE ba.id = ?
+				GROUP BY t.datetime, t.amount, bt.origin_id
+				HAVING count > 1
+		", $bank_account_id);
+
+		$dupl_array = array();
+
+		foreach ($duplicities as $duplicity)
+		{
+			$dupl_array[] =
+				$duplicity->datetime . ", " .
+				$duplicity->amount. " " . Settings::get('currency') . ", " .
+				__('Origin bank account: ') .
+				$duplicity->bank_account;
+		}
+
+		return $dupl_array;
+	}
 	
 	/**
 	 * Gets last transaction code of the given bank account.

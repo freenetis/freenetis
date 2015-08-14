@@ -75,6 +75,14 @@ abstract class Bank_Statement_File_Importer
 			'class'			=> 'Csv_Fio_Bank_Statement_File_Importer',
 			'bank_type'		=> Bank_account_Model::TYPE_FIO,
 			'extensions'	=> array('csv')
+		),
+		/* Tatrabanka - TXT - Obtained from TB B-mail */
+		array
+		(
+			'name'          => 'Tatra bank E-mail importer',
+			'class'         => 'Txt_Tatra_Banka_Statement_File_Importer',
+			'bank_type'     => Bank_account_Model::TYPE_TATRABANKA,
+			'extensions'    => array('txt')
 		)
 	);
 	
@@ -109,7 +117,7 @@ abstract class Bank_Statement_File_Importer
 	{		
 		// get type
 		$type = $settings->get_download_statement_type();
-		
+
 		if (empty($type))
 		{
 			throw new InvalidArgumentException(__('Unset download statement type'));
@@ -126,7 +134,7 @@ abstract class Bank_Statement_File_Importer
 		// obtain driver
 		$driver = self::factory($bank_account, $type);
 		$acc = $bank_account->account_nr . '/' . $bank_account->bank_nr;
-		
+
 		if (!$driver)
 		{
 			$m = __('File importer for bank %s is not available', $acc);
@@ -140,7 +148,7 @@ abstract class Bank_Statement_File_Importer
 		}
 
 		// make download
-		$file_data = $this->do_download($bank_account, $settings, $url);
+		$file_data = $driver->do_download($bank_account, $settings, $url);
 
 		if ($file_data === FALSE)
 		{
@@ -149,7 +157,7 @@ abstract class Bank_Statement_File_Importer
 		}
 		
 		// import
-		return self::import_loaded($bank_account, $file_data, $type,
+		return self::import_loaded($bank_account, $file_data, $url, $type,
 				$send_emails, $send_sms);
 	}
 
@@ -206,7 +214,7 @@ abstract class Bank_Statement_File_Importer
 	{
 		/* obtain driver */
 		$driver = self::factory($bank_account, $ext);
-		
+
 		$acc = $bank_account->account_nr . '/' . $bank_account->bank_nr;
 		
 		if (!$driver)
@@ -571,7 +579,7 @@ abstract class Bank_Statement_File_Importer
 	protected function do_download(Bank_account_Model $bank_account,
 			Bank_Account_Settings $settings, $url)
 	{
-		$fd = @file_get_contents($filename);
+		$fd = @file_get_contents($url);
 
 		if ($fd == FALSE)
 		{

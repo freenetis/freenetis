@@ -20,22 +20,32 @@ require dirname(__FILE__) . '/Tatra_Banka_Statement_File_Importer.php';
  */
 class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File_Importer
 {
+	// Date, accout, amount
+	const REGEX_DATA = "@(\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}).+(\w{2}\d{2}(\d{4})(\d{16})).* (\d+,\d{2}) (.+)\.@";
+	// Counter account
+	const REGEX_CA = "@ (\d{4})/([\d-]+)@";
+	// Variable, specific, constant symbol
+	const REGEX_SYMBOLS = "@/VS(\d*)/SS(\d*)/KS(\d*)@";
+	// Current balance
+	const REGEX_BALANCE = "@aktualny zostatok: (\d+,\d{2}) (.+)@";
+
+
 	protected function check_file_data_format()
 	{
 		$emails = implode('', $this->get_file_data());
 
 		// Date, account, amount
-		$match_data = preg_match_all("@(\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}).+(\w{2}\d{2}(\d{4})(\d{16})).* (\d+,\d{2}) (.+)\.@",
+		$match_data = preg_match_all(self::REGEX_DATA,
 			$emails,
 			$m1);
 
 		// Counter account
-		$match_counter = preg_match_all("@ (\d{4})/([\d-]+)@",
+		$match_counter = preg_match_all(self::REGEX_CA,
 			$emails,
 			$m2);
 
 		// Variable, specific, constant symbol
-		$match_symbols = preg_match_all("@/VS(\d*)/SS(\d*)/KS(\d*)@",
+		$match_symbols = preg_match_all(self::REGEX_SYMBOLS,
 			$emails,
 			$m3);
 
@@ -66,17 +76,17 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 		}
 
 		// Newest e-mail
-		preg_match("@(\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}).+(\w{2}\d{2}(\d{4})(\d{16})).* (\d+,\d{2}) (.+)\.@",
+		preg_match(self::REGEX_DATA,
 			$emails[0],
 			$mN);
 
 		// Current balance
-		preg_match("@aktualny zostatok: (\d+,\d{2}) (.+)@",
+		preg_match(self::REGEX_BALANCE,
 			$emails[0],
 			$mC);
 
 		// Oldest e-mail
-		preg_match("@(\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}).+(\w{2}\d{2}(\d{4})(\d{16})).* (\d+,\d{2}) (.+)\.@",
+		preg_match(self::REGEX_DATA,
 			$emails[count($emails) - 1],
 			$mO);
 
@@ -100,15 +110,15 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 
 		foreach ($emails as $email)
 		{
-			$match_data = preg_match("@(\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}).+(\w{2}\d{2}(\d{4})(\d{16})).* (\d+,\d{2}) (.+)\.@",
+			$match_data = preg_match(self::REGEX_DATA,
 				$email,
 				$m1);
 
-			$match_counter = preg_match("@ (\d{4})/([\d-]+)@",
+			$match_counter = preg_match(self::REGEX_CA,
 				$email,
 				$m2);
 
-			$match_symbols = preg_match("@/VS(\d*)/SS(\d*)/KS(\d*)@",
+			$match_symbols = preg_match(self::REGEX_SYMBOLS,
 				$email,
 				$m3);
 
@@ -192,15 +202,15 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 					continue;
 				}
 
-				preg_match("@(\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}).+(\w{2}\d{2}(\d{4})(\d{16})).* (\d+,\d{2}) (.+)\.@",
+				preg_match(self::REGEX_DATA,
 					$body,
 					$m1);
 
-				preg_match("@ (\d{4})/([\d-]+)@",
+				preg_match(self::REGEX_CA,
 					$body,
 					$m2);
 
-				preg_match("@/VS(\d*)/SS(\d*)/KS(\d*)@",
+				preg_match(self::REGEX_SYMBOLS,
 					$body,
 					$m3);
 

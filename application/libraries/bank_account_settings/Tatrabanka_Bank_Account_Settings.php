@@ -129,19 +129,19 @@ class Tatrabanka_Bank_Account_Settings extends Bank_Account_Settings
 			),
 			'imap_mailbox' => array
 			(
-				'name'		=> __('Mailbox name'),
+				'name'		=> __('E-mail folder'),
 				'type'		=> self::FIELD_TYPE_STRING,
 				'help'		=> 'imap_mailbox'
 			),
 			// IMAP credentials
 			'imap_name'	=> array
 			(
-				'name'		=> __('IMAP username'),
+				'name'		=> __('Username'),
 				'type'		=> self::FIELD_TYPE_STRING,
 			),
 			'imap_password'	=> array
 			(
-				'name'		=> __('IMAP password'),
+				'name'		=> __('Password'),
 				'type'		=> self::FIELD_TYPE_STRING,
 			)
 		);

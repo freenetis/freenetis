@@ -296,7 +296,7 @@ class Contacts_Controller extends Controller
 				{
 					try
 					{
-						$this->send_verify_message($contact_model->id);
+						self::send_verify_message($contact_model->id);
 						status::success('Verification message have been successfully sent.');
 					}
 					catch (Exception $ex)
@@ -471,7 +471,7 @@ class Contacts_Controller extends Controller
 				{
 					try
 					{
-						$this->send_verify_message($contact_id);
+						self::send_verify_message($contact_id);
 						status::success('Verification message have been successfully sent.');
 					}
 					catch (Exception $ex)
@@ -786,7 +786,7 @@ class Contacts_Controller extends Controller
 				{
 					try
 					{
-						$this->send_verify_message($contact_id);
+						self::send_verify_message($contact_id);
 						status::success('Verification message have been successfully sent.');
 					}
 					catch (Exception $ex)
@@ -855,7 +855,7 @@ class Contacts_Controller extends Controller
 	 * @param mixed $user_id 
 	 * @param mixed $contact_id 
 	 */
-	public function send_verify_message($contact_id)
+	public static function send_verify_message($contact_id)
 	{
 		$contact_model = new Contact_Model($contact_id);
 		$message_model = new Message_Model();

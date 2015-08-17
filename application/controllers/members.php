@@ -2890,8 +2890,7 @@ class Members_Controller extends Controller
 						{
 							try
 							{
-								$cc = new Contacts_Controller();
-								$cc->send_verify_message($contact_model->id);
+								Contacts_Controller::send_verify_message($contact_model->id);
 								status::success('Verification message have been successfully sent.');
 							}
 							catch (Exception $ex)

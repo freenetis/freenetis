@@ -433,7 +433,7 @@ class Members_Controller extends Controller
 
 		if ($this->acl_check_new(get_class($this), 'applicants'))
 		{
-			$grid->add_new_button('registration', 'Register applicant', array
+			$grid->add_new_button('registration', 'Register new applicant', array
 			(
 				'title' => __('Registration form'),
 			));

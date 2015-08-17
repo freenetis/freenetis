@@ -430,7 +430,15 @@ class Members_Controller extends Controller
 			'filter'					=> $filter_form,
 			'method'					=> 'get'
 		));
-		
+
+		if ($this->acl_check_new(get_class($this), 'applicants'))
+		{
+			$grid->add_new_button('registration', 'Register applicant', array
+			(
+				'title' => __('Registration form'),
+			));
+		}
+
 		// approve applicant checkbox
 		$grid->order_form_field('toapprove')
 				->callback('callback::member_approve_avaiable')

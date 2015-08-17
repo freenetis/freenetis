@@ -746,7 +746,11 @@ class Contacts_Controller extends Controller
 			$contact_model->save_throwable();
 			// ok
 			$contact_model->transaction_commit();
-			status::success('Contact have been successfully verified');
+			status::success(
+				'Your contact %s have been successfully verified, thank you for your participation in the verification process.',
+				TRUE,
+				array($contact_model->value)
+			);
 
 			$this->redirect('contacts/show_by_user/'.$user_id);
 		}

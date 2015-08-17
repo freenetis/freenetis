@@ -421,11 +421,11 @@ class Registration_Controller extends Controller
 				}
 			}
 		}
-
-		$headline = __('Registration form');
 		
 		if ($this->user_id)
 		{
+			$headline = __('Register applicant');
+
 			// breadcrumbs navigation			
 			$breadcrumbs = breadcrumbs::add()
 					->link('members/show_all', 'Members',
@@ -443,6 +443,8 @@ class Registration_Controller extends Controller
 		}
 		else
 		{
+			$headline = __('Registration form');
+
 			$view = new View('registration/index');
 			$view->title = $headline;
 			$view->form = $form->html();

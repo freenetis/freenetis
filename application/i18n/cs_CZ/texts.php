@@ -2237,6 +2237,7 @@ $lang = array
 	'reg' => 'Přih.',
 	'register' => 'Registrovat',
 	'register applicant' => 'Registrovat zájemce',
+	'register new applicant' => 'Registrovat nového zájemce',
 	'register this connection' => 'zaregistrovat tuto přípojku',
 	'register to %s' => 'Registrovat na %s',
 	'registered' => 'Registrovaný',

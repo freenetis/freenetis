@@ -678,6 +678,16 @@ class Settings_Controller extends Controller
 					$upload_max_filesize_changed = FALSE;
 					$post_max_size_changed = FALSE;
 
+					$max_filesize = $form_data['upload_max_filesize'];
+
+					if (network::str2bytes($max_filesize) < 1024*1024)	// If less than 1M, set to 1M
+					{
+						$max_filesize = network::speed(1024*1024);
+					}
+
+					// do not save to DB, it's useless
+					unset($form_data['upload_max_filesize']);
+
 					foreach ($htaccessFile as $line_num => $line)
 					{
 						// find line with RewriteBase
@@ -693,7 +703,7 @@ class Settings_Controller extends Controller
 						{
 							$htaccessFile[$line_num] = preg_replace(
 									"/^(php_value upload_max_filesize )(.+)/", 
-									'${1}'.$form_data['upload_max_filesize'], $line
+									'${1}'.$max_filesize, $line
 							);
 							$upload_max_filesize_changed = TRUE;
 						}
@@ -701,7 +711,7 @@ class Settings_Controller extends Controller
 						{
 							$htaccessFile[$line_num] = preg_replace(
 									"/^(php_value post_max_size )(.+)/", 
-									'${1}'.$form_data['upload_max_filesize'], $line
+									'${1}'.$max_filesize, $line
 							);
 							$post_max_size_changed = TRUE;
 						}
@@ -709,12 +719,12 @@ class Settings_Controller extends Controller
 
 					if (!$upload_max_filesize_changed)
 					{
-						$htaccessFile[] = "\nphp_value upload_max_filesize ".$form_data['upload_max_filesize']."\n";
+						$htaccessFile[] = "\nphp_value upload_max_filesize ".$max_filesize."\n";
 					}
 					
 					if (!$post_max_size_changed)
 					{
-						$htaccessFile[] = "\nphp_value post_max_size ".$form_data['upload_max_filesize']."\n";
+						$htaccessFile[] = "\nphp_value post_max_size ".$max_filesize."\n";
 					}
 					
 					$handle = @fopen('.htaccess', 'w');

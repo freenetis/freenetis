@@ -917,10 +917,22 @@ $(document).ready(function()
 				dropdown.append('<option>'+first_option_text+'</option>');
 				
 				data = jQuery.parseJSON(data);
-				
+
 				for (key in data)
 				{
-					dropdown.append('<option value="'+data[key].id+'">'+data[key].name+'</option>');
+					if ($.isArray(data[key]))	// is grouped?
+					{
+						dropdown.append('<optgroup label="'+key+'">');
+						for (subkey in data[key])
+						{
+							dropdown.append('<option value="'+data[key][subkey].id+'">'+data[key][subkey].name+'</option>');
+						}
+						dropdown.append('</optgroup>');
+					}
+					else	// no group
+					{
+						dropdown.append('<option value="'+data[key].id+'">'+data[key].name+'</option>');
+					}
 				}
 			}
 		});

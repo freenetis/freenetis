@@ -780,5 +780,30 @@ class Account_Model extends ORM
 		return $this->in('account_attribute_id', $aaids, TRUE)
 				->select_list('id', $concat, 'account_attribute_id');
     }
-	
+
+	/**
+	 * Returns grouped accounts for use in json response for account filter
+	 *
+	 * @param string $filter_sql
+	 * @return Database_Result
+	 */
+	public function get_accounts_to_dropdown($filter_sql = '')
+	{
+		$having = '';
+
+		// filter
+		if (!empty($filter_sql))
+		{
+			$having = "HAVING $filter_sql";
+		}
+
+		// query
+		return $this->db->query("
+			SELECT a.id, a.member_id, a.name as aname, m.name as mname, a.account_attribute_id
+			FROM accounts a
+			LEFT JOIN members m ON m.id = a.member_id
+			$having
+			ORDER BY aname
+		");
+	}
 }

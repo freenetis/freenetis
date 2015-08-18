@@ -656,6 +656,10 @@ class Transfers_Controller extends Controller
 
 		// destination account, instead of origin one
 		$dst_accounts = $oa->get_some_doubleentry_account_names_grouped($origin_account_id);
+		$dst_accounts = arr::merge(array
+		(
+			NULL => '----- ' . __('Select account') . ' -----'
+		), $dst_accounts);
 		// default destination account
 		$operating = ORM::factory('account')->where(
 				'account_attribute_id', Account_attribute_Model::OPERATING
@@ -701,7 +705,8 @@ class Transfers_Controller extends Controller
 				->options($dst_accounts)
 				->rules('required')
 				->selected($operating->id)
-				->style('width:450px');
+				->style('width:450px')
+				->filter_button('transfers');
 		
 		// other information
 		$form->group('Transfer');
@@ -2146,4 +2151,104 @@ class Transfers_Controller extends Controller
 		}
 	}
 
+	/**
+	 * Method used for popup filtering
+	 *
+	 * @author David Raska
+	 */
+	public function filter()
+	{
+		// access rights
+		if (!$this->acl_check_view('Accounts_Controller', 'transfers'))
+		{
+			self::error(ACCESS);
+		}
+
+		// account attributes for types of accounts
+		$aa_model = new Account_attribute_Model();
+		$account_attributes = $aa_model->get_account_attributes();
+
+		foreach ($account_attributes as $aattr)
+		{
+			$arr_attributes[$aattr->id] = $aattr->id . ' ' . $aattr->name;
+		}
+
+		// create filter form
+		$filter_form = new Filter_form();
+
+		$filter_form->add('member_id')
+			->label('Member ID')
+			->type('number');
+
+		$filter_form->add('mname')
+			->label('Member name')
+			->callback('json/member_name');
+
+		$filter_form->add('aname')
+			->label('Account name');
+
+		$filter_form->add('id')
+			->label('Account ID')
+			->type('number');
+
+		$filter_form->add('account_attribute_id')
+			->label('Account type')
+			->type('select')
+			->values($arr_attributes);
+
+		// filter form is submited => print only result in JSON format
+		if (!$filter_form->is_first_load())
+		{
+			$filter_sql = $filter_form->as_sql();
+
+			$account_model = new Account_Model();
+
+			$accounts = $account_model->get_accounts_to_dropdown($filter_sql);
+
+			// keys
+			$keys = array(__('Association'), __('Members'));
+
+			// result
+			$grouped_accounts = array
+			(
+				$keys[0]	=> array(),
+				$keys[1]	=> array()
+			);
+
+			// transform members from objects to array
+			$x = 0;
+			foreach ($accounts as $account)
+			{
+				if ($account->member_id == Member_Model::ASSOCIATION)
+				{
+					$i = 0;
+				}
+				else
+				{
+					$i = 1;
+				}
+
+				$grouped_accounts[$keys[$i]][$x++] = array
+				(
+					'id' => $account->id,
+					'name' => $account->aname.' ('.$account->id.', '.$account->account_attribute_id.', '.$account->member_id.')'
+				);
+			}
+
+			// print array with members in JSON
+			die(json_encode($grouped_accounts));
+		}
+		// filter form is not submited => print only form
+		else
+		{
+			$title = __('Filter accounts');
+
+			$view = new View('main');
+			$view->title = $title;
+			$view->content = new View('form');
+			$view->content->headline = $title;
+			$view->content->form = $filter_form;
+			$view->render(TRUE);
+		}
+	}
 }

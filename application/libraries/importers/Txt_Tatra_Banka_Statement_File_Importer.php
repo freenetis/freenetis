@@ -166,7 +166,15 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 			throw new Exception($m . ' (' . implode(" > ", imap_errors()) . ')');
 		}
 
-		$emails = imap_search($inbox, 'ALL');
+		if ($last_download > 0)
+		{
+			$last_download_prev = $last_download - (60 * 60 * 24);	// - 1 day
+			$emails = imap_search($inbox, 'SINCE "'.date('j F Y', $last_download_prev).'"');
+		}
+		else
+		{
+			$emails = imap_search($inbox, 'ALL');
+		}
 
 		$first = TRUE;
 
@@ -188,9 +196,9 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 					$first = FALSE;
 				}
 
-				if ($header->udate <= $last_download)
+				if (intval($header->udate) <= intval($last_download))
 				{
-					continue;
+					break;
 				}
 
 				$body = imap_fetchbody($inbox,$email_number, 1);
@@ -220,7 +228,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 					continue;
 				}
 
-				$all_mails[] = $body;
+				array_unshift($all_mails, $body);
 			}
 		}
 
@@ -250,7 +258,6 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 					$body = quoted_printable_decode($body);
 					break;
 				case ENCOTHER:
-					throw new Exception("Unsupported IMAP encoding: ENCOTHER");
 					break;
 			}
 

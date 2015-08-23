@@ -266,9 +266,10 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 			{
 				foreach ($struct->parameters as $p)
 				{
-					if ($p->attribute == "charset")
+					if ($p->attribute == "charset" &&
+						\strtolower($p->value) != "utf-8")
 					{
-						$body = iconv($p->value, "UTF-8", $body);
+						$body = iconv($p->value, "UTF-8//TRANSLIT", $body);
 						break;
 					}
 				}

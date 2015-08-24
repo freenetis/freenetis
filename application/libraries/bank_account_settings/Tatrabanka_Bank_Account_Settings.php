@@ -143,6 +143,12 @@ class Tatrabanka_Bank_Account_Settings extends Bank_Account_Settings
 			(
 				'name'		=> __('Password'),
 				'type'		=> self::FIELD_TYPE_STRING,
+			),
+			'last_download' => array
+			(
+				'name'		=> __('Check E-mails since'),
+				'type'		=> self::FIELD_TYPE_DATESELECT,
+				'help'		=> 'imap_last_download'
 			)
 		);
 	}

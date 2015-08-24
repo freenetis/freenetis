@@ -573,6 +573,7 @@ $lang = array
 	'channel width' => 'Šířka kanálu',
 	'chars' => 'Znaků',
 	'check again' => 'Znovu zkontrolovat',
+	'check e-mails since' => 'Kontrolovat e-maily od',
 	'check it' => 'zkontrolujte je',
 	'children interfaces' => 'Položky bridge',
 	'choose' => 'Vybrat',

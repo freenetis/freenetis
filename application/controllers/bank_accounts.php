@@ -510,6 +510,9 @@ class Bank_accounts_Controller extends Controller
 					case Bank_Account_Settings::FIELD_TYPE_DROPDOWN:
 						$input = $form->dropdown($column)->selected($ba_driver->$column)->options(array());
 						break;
+					case Bank_Account_Settings::FIELD_TYPE_DATESELECT:
+						$input = $form->dateselect($column)->value($ba_driver->$column)->rules('precise')->minutes(1);
+						break;
 					default:
 						$input = $form->input($column)->value($ba_driver->$column);
 						break;
@@ -536,7 +539,7 @@ class Bank_accounts_Controller extends Controller
 		if ($form->validate())
 		{
 			$form_data = $form->as_array();
-			
+
 			// real bank account
 			$bank_account->type = $form_data['type'];
 			$bank_account->IBAN = $form_data['IBAN'];

@@ -19,7 +19,7 @@
  */
 abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_Importer
 {
-	const LAST_DOWNLOAD_SETTINGS_KEY = 'tatrabanka_email_last_download';
+	const LAST_DOWNLOAD_SETTINGS_KEY = 'last_download';
 
 	protected $data = array();
 
@@ -182,7 +182,15 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 				throw new Duplicity_Exception($dm);
 			}
 
-			Settings::set(self::LAST_DOWNLOAD_SETTINGS_KEY, $this->last_download_datetime);
+			$settings = Bank_Account_Settings::factory($this->get_bank_account()->type);
+			$settings->load_column_data($this->get_bank_account()->settings);
+
+			$key = self::LAST_DOWNLOAD_SETTINGS_KEY;
+			$settings->$key = $this->last_download_datetime;
+
+			$ba->settings = $settings->get_column_data();
+
+			$ba->save();
 
 			// done
 			$statement->transaction_commit();

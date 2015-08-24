@@ -74,8 +74,17 @@ class Form_Dateselect extends Form_Input {
 		// No labels or values
 		unset($data['label']);
 
+		$parts = $this->parts;
+
+		if (in_array('precise', $this->rules()))
+		{
+			$parts = array_slice($parts, 0, 7, true) +
+				array(':', 'second' => array(1)) +
+				array_slice($parts, 7, count($parts) - 1, true);
+		}
+
 		$input = '';
-		foreach($this->parts as $type => $val)
+		foreach($parts as $type => $val)
 		{
 			if (is_int($type))
 			{
@@ -114,12 +123,15 @@ class Form_Dateselect extends Form_Input {
 	{
 		$time = array_combine
 		(
-			array('month', 'day', 'year', 'hour', 'minute', 'am_pm'), 
-			explode('--', date('n--j--Y--g--i--A', $timestamp))
+			array('month', 'day', 'year', 'hour', 'minute', 'second', 'am_pm'),
+			explode('--', date('n--j--Y--g--i--s--A', $timestamp))
 		);
 
-		// Minutes should always be in 5 minute increments
-		$time['minute'] = num::round($time['minute'], current($this->parts['minute']));
+		if (!in_array('precise', $this->rules))
+		{
+			// Minutes should always be in 5 minute increments
+			$time['minute'] = num::round($time['minute'], current($this->parts['minute']));
+		}
 
 		return $time;
 	}
@@ -138,11 +150,16 @@ class Form_Dateselect extends Form_Input {
 		(
 			date::adjust($time['hour'], $time['am_pm']),
 			$time['minute'],
-			0,
+			$time['second'],
 			$time['month'],
 			$time['day'],
 			$time['year']
 		);
+	}
+
+	public function rule_precise()
+	{
+
 	}
 
 } // End Form Dateselect

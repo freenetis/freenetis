@@ -37,6 +37,8 @@ abstract class Bank_Account_Settings
 	const FIELD_TYPE_STRING = 'string';
 	/** Dropdown type */
 	const FIELD_TYPE_DROPDOWN = 'dropdown';
+	/** Dateselect type */
+	const FIELD_TYPE_DATESELECT = 'dateselect';
 	
 	/** Data of settings */
 	private $data = array();
@@ -258,6 +260,9 @@ abstract class Bank_Account_Settings
 					break;
 
 				case self::FIELD_TYPE_DROPDOWN:
+					break;
+
+				case self::FIELD_TYPE_DATESELECT:
 					break;
 			}
 			

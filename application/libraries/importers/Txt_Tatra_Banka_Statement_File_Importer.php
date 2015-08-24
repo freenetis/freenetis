@@ -148,7 +148,9 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 	protected function do_download(Bank_account_Model $bank_account,
 					Bank_Account_Settings $settings, $url)
 	{
-		$last_download = Settings::get(self::LAST_DOWNLOAD_SETTINGS_KEY);
+		$key = self::LAST_DOWNLOAD_SETTINGS_KEY;
+
+		$last_download = $settings->$key;
 
 		if (empty($last_download))
 		{

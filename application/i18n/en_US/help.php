@@ -81,6 +81,7 @@ $lang = array
 	'gps_coordinates' => 'GPS can be in shape of real number, or: hours°minutes\'seconds&quot.',
 	'grid_hide_on_first_load' => 'It determines whether hide grid and its items on its first load. It is used as optimalization of memory usage.',
 	'ignore_whitelist' => 'Allows this report, when activated, to ignore the white list. Designed for very special cases, such as when connected to the municipality, which is on permanent white list not to be harassed and even though we want to redirect his computer for information about the outage.',
+	'imap_last_download' => 'Defines date from which will be next listings downloaded. This value is automatically increased after each download to prevent duplicities listings.<br/>WARNING! Value can change during editing of account settings due to dowloading listings by scheduler.',
 	'imap_mailbox' => 'Folder in IMAP server, from which e-mails will be downloaded. Default is INBOX.',
 	'imap_port' => 'Default port for None and STARTTLS encryption is 143. For SSL/TLS 993.',
 	'log_queues_info' => 'Errors has been reported (in system or in some network elements), please %s and perform the necessary actions to correct them.',

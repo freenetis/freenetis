@@ -1054,6 +1054,52 @@ class Users_Controller extends Controller
 	} // end of change password function
 
 	/**
+	 * Function generates onetime password of user.
+	 *
+	 * @param integer $user_id
+	 */
+	public function generate_password($user_id = null)
+	{
+		if (!isset($user_id))
+			Controller::warning(PARAMETER);
+
+		$user = new User_Model($user_id);
+
+		if (!$user->id)
+			Controller::error(RECORD);
+
+		// access control
+		if (!$this->acl_check_edit(get_class($this), 'password', $user->member_id) ||
+			($user->is_user_in_aro_group($user->id, Aro_group_Model::ADMINS) &&
+				$user->id != $this->user_id
+			))
+			Controller::error(ACCESS);
+
+		try
+		{
+			$user->transaction_start();
+
+			$raw_password = security::generate_password(6);
+
+			$user->password_is_onetime = 1;
+			$user->password = sha1($raw_password);
+
+			$user->save_throwable();
+
+			$user->transaction_commit();
+
+			status::success('Password has been successfully changed.'.'<br />'.__('Generated password of user is: %s', $raw_password), FALSE);
+		}
+		catch (Exception $e)
+		{
+			$user->transaction_rollback();
+			status::error('Error - cant change password.');
+		}
+
+		url::redirect(Path::instance()->previous());
+	} // end of generate password function
+
+	/**
 	 * Function changes application password of user.
 	 *
 	 * @param integer $user_id

@@ -1537,6 +1537,18 @@ $(document).ready(function()
 		
 		return confirm;
 	});
+
+	// asking before action
+	$('.confirm_link').live('click', function(e)
+	{
+		var action = $(this).attr('title');
+		var confirm = window.confirm('<?php echo __('Do you really want to') ?> '+action+'?');
+
+		if (!confirm)
+			e.stopImmediatePropagation();
+
+		return confirm;
+	});
 	
 	// validate all form and filters
 	$('.form, #filter_form').each(function() {

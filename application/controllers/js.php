@@ -340,6 +340,8 @@ class Js_Controller extends Controller
 		}
 		
 		$this->domicile_toogle();
+
+		$this->views['members_add'] = View::factory('js/members_add');
 	}
 	
 	private function _js_members_approve_applicant($applicant_id)

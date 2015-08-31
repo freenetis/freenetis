@@ -341,7 +341,7 @@ class Js_Controller extends Controller
 		
 		$this->domicile_toogle();
 
-		$this->views['members_add'] = View::factory('js/members_add');
+		$this->views['members_add'] = View::factory('js/__pieces/autogen_password');
 	}
 	
 	private function _js_members_approve_applicant($applicant_id)
@@ -563,7 +563,12 @@ class Js_Controller extends Controller
 		$this->application_password($user_id);
 		$this->views['users_show'] = View::factory('js/users_show')->render();
 	}
-	
+
+	private function _js_users_change_password($user_id = NULL)
+	{
+		$this->views['users_change_password'] = View::factory('js/__pieces/autogen_password');
+	}
+
 	private function _js_users_show_work_report($work_id = NULL)
 	{
 		$this->views['users_show_work_report'] = View::factory('js/work_reports_show')->render();

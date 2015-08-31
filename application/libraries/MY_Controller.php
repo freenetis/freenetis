@@ -62,6 +62,7 @@ class Controller extends Controller_Core
 	(
 		/* login, scheduler, instalation */
 		'login',
+		'login/change_password',
 		'forgotten_password',
 		'scheduler/run',
 		'installation',
@@ -225,18 +226,7 @@ class Controller extends Controller_Core
 				// for preprocessing some variable
 				try
 				{
-					$user_model = new User_Model($this->user_id);
-					if ($user_model->id &&
-						$user_model->password_is_onetime &&
-						url_lang::current(2) != 'login/change_password' &&
-						url_lang::current(2) != 'login/logout')
-					{
-						url::redirect('login/change_password');
-					}
-					else
-					{
-						$this->preprocessor();
-					}
+					$this->preprocessor();
 				}
 				catch(Exception $e)
 				{

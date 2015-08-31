@@ -22,7 +22,6 @@ if ($user_data->id <> Member_Model::ASSOCIATION && Settings::get('approval_enabl
 if ($this->acl_check_edit('Users_Controller','password',$user_data->member_id) &&	!($user_data->is_user_in_aro_group($user_data->id, Aro_group_Model::ADMINS) && $user_data->id != $this->user_id	))
 {
 	$links[] = html::anchor('users/change_password/'.$user_data->id,__('Change password'), array('class' => 'popup_link'));
-	$links[] = html::anchor('users/generate_password/'.$user_data->id,__('Generate onetime password'), array('title' => strtolower(__('Generate onetime password')), 'class' => 'confirm_link'));
 }
 if ($this->acl_check_edit('Users_Controller', 'application_password', $user_data->member_id))
 	$links[] = html::anchor('users/change_application_password/'.$user_data->id, __('Change application password'), array('class' => 'popup_link'));

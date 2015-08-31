@@ -990,114 +990,97 @@ class Users_Controller extends Controller
 		$form->password('confirm_password')
 				->label(__('Confirm new password') . ':')
 				->rules('required|length['.$pass_min_len.',50]')
+				->class('join1')
 				->matches($form->password);
+
+		$form->checkbox('autogen_pass')
+			->label('Generate onetime password')
+			->class('join2')
+			->style('width: initial; margin-left: 15px;');
 		
 		$form->submit('submit')
 				->value(__('Change'));
 		
 		special::required_forge_style($form, ' *', 'required');
 
-		if ($form->validate())
+		if ($_POST)
 		{
-			$form_data = $form->as_array(FALSE);
-			$user = new User_Model($user_id);
-			$user->set_logger(FALSE);
-			$user->password = sha1($form_data['password']);
-
-			if ($user->save())
+			if (@$_POST['autogen_pass'] == "1")
 			{
-				status::success('Password has been successfully changed.');
+				$form->inputs['password']->rules('-length[' . $pass_min_len . ',50]')->rules('-required');
+				$form->inputs['confirm_password']->rules('-length[' . $pass_min_len . ',50]')->rules('-required');
 			}
-			else
-			{
-				status::error('Error - cant change password.');
-			}
-			
-			$this->redirect('users/change_password/' . $user->id);
-		}
-		else
-		{
-			// breadcrumbs navigation
-			$breadcrumbs = breadcrumbs::add()
-					->link('members/show_all', 'Members',
-							$this->acl_check_view('Members_Controller','members'))
-					->disable_translation()
-					->link('members/show/' . $user->member->id, 
-							"ID ".$user->member->id." - ".$user->member->name,
-							$this->acl_check_view(
-									'Members_Controller','members',
-									$user->member->id
-							)
-					)->enable_translation()
-					->link('users/show_by_member/' . $user->member_id, 'Users',
-							$this->acl_check_view(
-									get_class($this), 'users', $user->member_id
-							)
-					)->disable_translation()
-					->link('users/show/'.$user->id,
-							"$user->name $user->surname ($user->login)",
-							$this->acl_check_view(
-									get_class($this),'users', $user->member_id
-							)
-					)->enable_translation()
-					->text('Change password');
 
-			$view = new View('main');
-			$view->title = __('Change password');
-			$view->breadcrumbs = $breadcrumbs->html();
-			$view->content = new View('form');
-			$view->content->headline = __('Change password');
-			$view->content->link_back = '';
-			$view->content->form = $form->html();
-			$view->render(TRUE);
+			if ($form->validate())
+			{
+				$form_data = $form->as_array(FALSE);
+
+				$user = new User_Model($user_id);
+
+				if ($form_data['autogen_pass'] == "1")
+				{
+					// generate random password
+					$raw_password = security::generate_password(6);
+					$user->password_is_onetime = 1;
+				}
+				else
+				{
+					$raw_password = $form_data['password'];
+					$user->password_is_onetime = 0;
+				}
+
+				$user->set_logger(FALSE);
+				$user->password = sha1($raw_password);
+
+				if ($user->save())
+				{
+					$m = ($form_data['autogen_pass'] == "1" ? '<br />'.__('Generated password of user is: %s', $raw_password) : '');
+
+					status::success(__('Password has been successfully changed.').$m, FALSE);
+				}
+				else
+				{
+					status::error('Error - cant change password.');
+				}
+
+				$this->redirect('users/change_password/' . $user->id);
+			}
 		}
+
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view('Members_Controller','members'))
+				->disable_translation()
+				->link('members/show/' . $user->member->id,
+						"ID ".$user->member->id." - ".$user->member->name,
+						$this->acl_check_view(
+								'Members_Controller','members',
+								$user->member->id
+						)
+				)->enable_translation()
+				->link('users/show_by_member/' . $user->member_id, 'Users',
+						$this->acl_check_view(
+								get_class($this), 'users', $user->member_id
+						)
+				)->disable_translation()
+				->link('users/show/'.$user->id,
+						"$user->name $user->surname ($user->login)",
+						$this->acl_check_view(
+								get_class($this),'users', $user->member_id
+						)
+				)->enable_translation()
+				->text('Change password');
+
+		$view = new View('main');
+		$view->title = __('Change password');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->content = new View('form');
+		$view->content->headline = __('Change password');
+		$view->content->link_back = '';
+		$view->content->form = $form->html();
+		$view->render(TRUE);
 	} // end of change password function
-
-	/**
-	 * Function generates onetime password of user.
-	 *
-	 * @param integer $user_id
-	 */
-	public function generate_password($user_id = null)
-	{
-		if (!isset($user_id))
-			Controller::warning(PARAMETER);
-
-		$user = new User_Model($user_id);
-
-		if (!$user->id)
-			Controller::error(RECORD);
-
-		// access control
-		if (!$this->acl_check_edit(get_class($this), 'password', $user->member_id) ||
-			($user->is_user_in_aro_group($user->id, Aro_group_Model::ADMINS) &&
-				$user->id != $this->user_id
-			))
-			Controller::error(ACCESS);
-
-		try
-		{
-			$user->transaction_start();
-
-			$raw_password = security::generate_password(6);
-
-			$user->password_is_onetime = 1;
-			$user->password = sha1($raw_password);
-
-			$user->save_throwable();
-
-			$user->transaction_commit();
-
-			status::success('Password has been successfully changed.'.'<br />'.__('Generated password of user is: %s', $raw_password), FALSE);
-		}
-		catch (Exception $e)
-		{
-			$user->transaction_rollback();
-			status::error('Error - cant change password.');
-		}
-
-		url::redirect(Path::instance()->previous());
-	} // end of generate password function
 
 	/**
 	 * Function changes application password of user.

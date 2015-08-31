@@ -69,6 +69,13 @@ class Login_Controller extends Controller
 						$error = __('Your accout has been locked.').' '
 								.__('Please contact administrator.');
 					}
+					elseif ($user->password_is_onetime)
+					{
+						$this->session->set('onetime_username', $this->input->post('username'));
+						$this->session->set('onetime_logintime', time());
+
+						url::redirect('login/change_password');
+					}
 					else
 					{
 						$this->session->set('username', $this->input->post('username'));
@@ -189,7 +196,18 @@ class Login_Controller extends Controller
 	{
 		$error = '';
 
-		$user_model = new User_Model($this->user_id);
+		if (@$_SESSION['onetime_username'] == NULL ||
+			@$_SESSION['onetime_logintime'] == NULL ||
+			@$_SESSION['onetime_logintime'] < time() - 60*60)
+		{
+			$this->session->set('err_message', __('Error - cant change password').' <br/> '.url_lang::lang('states.Access denied'));
+			url::redirect('login');
+		}
+
+		$user_model = ORM::factory('user')->where(array
+		(
+			'login' => $_SESSION['onetime_username']
+		))->find();
 
 		if ($user_model->password_is_onetime != 1)
 		{
@@ -211,8 +229,14 @@ class Login_Controller extends Controller
 
 					$user_model->transaction_commit();
 
-					status::success('Password has been successfully changed');
-					url::redirect('login');
+					// Clean up $_SESSION data
+					$this->session->del(array('onetime_username', 'onetime_logintime'));
+
+					// Clean up $_POST data
+					$_POST = array();
+
+					$this->index(FALSE, __('Password has been successfully changed'));
+					die;
 				}
 				catch (Exception $e)
 				{

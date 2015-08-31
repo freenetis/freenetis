@@ -2020,15 +2020,6 @@ class Members_Controller extends Controller
 							'class' => 'popup_link'
 						)
 				);
-
-				$user_links[] = html::anchor(
-						'users/generate_password/'.$user->id, __('Generate onetime password'),
-						array
-						(
-							'title' => strtolower(__('Generate onetime password')),
-							'class' => 'confirm_link'
-						)
-				);
 			}
 
 			// change application password link

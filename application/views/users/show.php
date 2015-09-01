@@ -61,7 +61,7 @@ echo implode (' | ', $links);
 	</tr>
 	<tr>
 		<th><?php echo  __('Birthday') ?></th>
-		<td><?php echo  $user_data->birthday ?></td>
+		<td><?php echo  (Settings::get('users_birthday_empty_enabled') == 1  && Settings::get('members_age_min_limit') !== '' ? "> ".Settings::get('members_age_min_limit').' '.__('years') : $user_data->birthday) ?></td>
 	</tr>
 	<?php if ($this->acl_check_view('Users_Controller', 'application_password', $user_data->member->id)) { ?>
 	<tr>

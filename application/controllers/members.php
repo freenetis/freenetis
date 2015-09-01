@@ -2597,11 +2597,33 @@ class Members_Controller extends Controller
 				->selected($default_speed_class ? $default_speed_class->id : NULL)
 				->add_button('speed_classes')
 				->style('width:200px');
-		
-		$form->date('birthday')
+
+		$empty_birthday = Settings::get('users_birthday_empty_enabled');
+		$min_age = Settings::get('members_age_min_limit');
+
+		if ($empty_birthday == 0)
+		{
+			$form->date('birthday')
 				->label('Birthday')
-				->years(date('Y')-100, date('Y'))
+				->years(date('Y') - 100, date('Y'))
 				->rules('required');
+		}
+		else
+		{
+			if (empty($min_age))
+			{
+				$form->date('birthday')
+					->label('Birthday')
+					->years(date('Y') - 100, date('Y'))
+					->value('');
+			}
+			else
+			{
+				$form->checkbox('older_than')
+					->label(__("I'm older than %d years", array($min_age)))
+					->rules('required');
+			}
+		}
 		
 		$form->date('entrance_date')
 				->label('Entrance date')
@@ -2778,7 +2800,7 @@ class Members_Controller extends Controller
 					$user->surname = $form_data['surname'];
 					$user->pre_title = $form_data['title1'];
 					$user->post_title = $form_data['title2'];
-					$user->birthday	= date("Y-m-d",$form_data['birthday']);
+					$user->birthday	= (empty($form_data['birthday']) ? NULL : date("Y-m-d",$form_data['birthday']));
 					$user->password	= sha1($form_data['password']);
 					$user->type = User_Model::MAIN_USER;
 					$user->application_password = security::generate_password();

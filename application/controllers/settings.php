@@ -849,6 +849,15 @@ class Settings_Controller extends Controller
         $this->form->checkbox('user_email_duplicities_enabled')
                 ->label('Enable multiple users to have assigned same e-mail contact')
 				->checked(Settings::get('user_email_duplicities_enabled'));
+
+		$this->form->checkbox('users_birthday_empty_enabled')
+			->label('Users birthday can be empty')
+			->checked(Settings::get('users_birthday_empty_enabled'));
+
+		$this->form->input('members_age_min_limit')
+			->label('Minimum age of user')
+			->rules('valid_numeric')
+			->value(Settings::get('members_age_min_limit'));
 		
 		$this->form->group('Security');
 		

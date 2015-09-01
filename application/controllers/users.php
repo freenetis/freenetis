@@ -484,12 +484,35 @@ class Users_Controller extends Controller
 		
 		$form->group('Additional information');
 		
-		$form->date('birthday')
+		$empty_birthday = Settings::get('users_birthday_empty_enabled');
+		$min_age = Settings::get('members_age_min_limit');
+
+		if ($empty_birthday == 0)
+		{
+			$form->date('birthday')
 				->label('Birthday')
-				->years(date('Y')-100, date('Y'))
+				->years(date('Y') - 100, date('Y'))
 				->rules('required')
 				->value(strtotime($user->birthday));
-		
+		}
+		else
+		{
+			if (empty($min_age))
+			{
+				$form->date('birthday')
+					->label('Birthday')
+					->years(date('Y') - 100, date('Y'))
+					->value($user->birthday === NULL ? '' : strtotime($user->birthday));
+			}
+			else
+			{
+				$form->checkbox('older_than')
+					->label(__("I'm older than %d years", array($min_age)))
+					->rules('required')
+					->checked(TRUE);
+			}
+		}
+
 		if ($this->acl_check_edit(get_class($this), 'comment', $user->member_id))
 		{
 			$form->textarea('comment')
@@ -512,7 +535,7 @@ class Users_Controller extends Controller
 			{
 				$user_data->login = $form_data['username'];
 			}
-			$user_data->birthday = date("Y-m-d",$form_data['birthday']);
+			$user_data->birthday = (empty($form_data['birthday']) ? NULL : date("Y-m-d",$form_data['birthday']));
 			$user_data->pre_title = $form_data['pre_title'];
 			$user_data->name = $form_data['name'];
 			$user_data->middle_name = $form_data['middle_name'];
@@ -817,10 +840,32 @@ class Users_Controller extends Controller
 
 		$form->group('Additional information');
 
-		$form->date('birthday')
+		$empty_birthday = Settings::get('users_birthday_empty_enabled');
+		$min_age = Settings::get('members_age_min_limit');
+
+		if ($empty_birthday == 0)
+		{
+			$form->date('birthday')
 				->label('Birthday')
-				->years(date('Y')-100, date('Y'))
+				->years(date('Y') - 100, date('Y'))
 				->rules('required');
+		}
+		else
+		{
+			if (empty($min_age))
+			{
+				$form->date('birthday')
+					->label('Birthday')
+					->years(date('Y') - 100, date('Y'))
+					->value('');
+			}
+			else
+			{
+				$form->checkbox('older_than')
+					->label(__("I'm older than %d years", array($min_age)))
+					->rules('required');
+			}
+		}
 
 		if ($this->acl_check_new(get_class($this),'comment',$member_id))
 		{
@@ -838,7 +883,7 @@ class Users_Controller extends Controller
 			$form_data = $form->as_array();
 
 			$user_data = new User_Model;
-			$user_data->birthday = date("Y-m-d",$form_data['birthday']);
+			$user_data->birthday = (empty($form_data['birthday']) ? NULL : date("Y-m-d",$form_data['birthday']));
 			$user_data->login = $form_data['username'];
 			$user_data->password = sha1($form_data['password']);
 			$user_data->pre_title = $form_data['pre_title'];

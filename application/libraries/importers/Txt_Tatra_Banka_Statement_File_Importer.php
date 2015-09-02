@@ -25,9 +25,11 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 	// Counter account
 	const REGEX_CA = "@ (\d{4})/([\d-]+)@";
 	// Variable, specific, constant symbol
-	const REGEX_SYMBOLS = "@/VS(\d*)/SS(\d*)/KS(\d*)@";
+	const REGEX_VS = "@VS ?(\d*)@";
+	const REGEX_SS = "@SS ?(\d*)@";
+	const REGEX_CS = "@KS ?(\d*)@";
 	// Current balance
-	const REGEX_BALANCE = "@aktualny zostatok: (\d+,\d{2}) (.+)@";
+	const REGEX_BALANCE = "@aktualny zostatok:[^0-9]*(\d+,\d{2}) (.+)@";
 
 
 	protected function check_file_data_format()
@@ -35,23 +37,16 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 		$emails = implode('', $this->get_file_data());
 
 		// Date, account, amount
-		$match_data = preg_match_all(self::REGEX_DATA,
-			$emails,
-			$m1);
-
-		// Counter account
-		$match_counter = preg_match_all(self::REGEX_CA,
-			$emails,
-			$m2);
+		$match_data = preg_match_all(self::REGEX_DATA, $emails, $data);
 
 		// Variable, specific, constant symbol
-		$match_symbols = preg_match_all(self::REGEX_SYMBOLS,
-			$emails,
-			$m3);
+		$match_vs = preg_match_all(self::REGEX_VS, $emails, $vs);
+		$match_ss = preg_match_all(self::REGEX_SS, $emails, $ss);
+		$match_cs = preg_match_all(self::REGEX_CS, $emails, $cs);
 
 		$accounts = array();
 
-		foreach ($m1[2] as $e)
+		foreach ($data[2] as $e)
 		{
 			$accounts[] = $e;
 		}
@@ -61,7 +56,10 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 			$this->add_error(__('E-mails contains more than one destination account: %s', implode(', ', array_unique($accounts))), FALSE);
 		}
 
-		return ($match_data == $match_symbols) && ($match_symbols == $match_counter) && count(array_unique($accounts)) <= 1;
+		return $match_data == $match_vs &&
+				$match_vs == $match_ss &&
+				$match_ss == $match_cs &&
+				count(array_unique($accounts)) <= 1;
 	}
 
 	protected function get_header_data()
@@ -112,33 +110,41 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 		{
 			$match_data = preg_match(self::REGEX_DATA,
 				$email,
-				$m1);
+				$data);
 
-			$match_counter = preg_match(self::REGEX_CA,
+			preg_match(self::REGEX_CA,
 				$email,
-				$m2);
+				$ca);
 
-			$match_symbols = preg_match(self::REGEX_SYMBOLS,
+			$match_vs = preg_match(self::REGEX_VS,
 				$email,
-				$m3);
+				$vs);
 
-			if (!$match_data || !$match_symbols || !$match_counter)
+			$match_ss = preg_match(self::REGEX_SS,
+				$email,
+				$ss);
+
+			$match_cs = preg_match(self::REGEX_CS,
+				$email,
+				$cs);
+
+			if (!$match_data || !$match_vs || !$match_ss || !$match_cs)
 			{
 				continue;
 			}
 
 			$this->data[] = array(
-				'datetime' 	=>	DateTime::createFromFormat('j.n.Y G:i', $m1[1])->format('Y-m-d H:i:s'),
-				'iban'		=>	$m1[2],
-				'bank'		=>	$m1[3],
-				'account'	=>	$m1[4],
-				'amount'	=>	floatval(str_replace(',', '.', $m1[5])),
-				'counter_account'=>	$m2[2],
-				'counter_bank'	=>	$m2[1],
-				'currency'	=>	$m1[6],
-				'vs'		=>	$m3[1],
-				'ss'		=>	$m3[2],
-				'ks'		=>	$m3[3]
+				'datetime' 	=>	DateTime::createFromFormat('j.n.Y G:i', $data[1])->format('Y-m-d H:i:s'),
+				'iban'		=>	$data[2],
+				'bank'		=>	$data[3],
+				'account'	=>	$data[4],
+				'amount'	=>	floatval(str_replace(',', '.', $data[5])),
+				'counter_account'=>	@$ca[2],
+				'counter_bank'	=>	@$ca[1],
+				'currency'	=>	$data[6],
+				'vs'		=>	$vs[1],
+				'ss'		=>	$ss[1],
+				'ks'		=>	$cs[1]
 			);
 		}
 
@@ -214,18 +220,21 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 
 				preg_match(self::REGEX_DATA,
 					$body,
-					$m1);
+					$data);
 
-				preg_match(self::REGEX_CA,
+				preg_match(self::REGEX_VS,
 					$body,
-					$m2);
+					$vs);
 
-				preg_match(self::REGEX_SYMBOLS,
+				preg_match(self::REGEX_SS,
 					$body,
-					$m3);
+					$ss);
 
+				preg_match(self::REGEX_CS,
+					$body,
+					$cs);
 
-				if (!$m1 || !$m2 || !$m3)
+				if (!$data || !$vs || !$ss || !$cs)
 				{
 					continue;
 				}

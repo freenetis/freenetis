@@ -92,8 +92,8 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 				{
 					$counter_ba->clear();
 					$counter_ba->set_logger(FALSE);
-					$counter_ba->name = $item['counter_account'].'/'.$item['counter_bank'];
-					$counter_ba->account_nr = $item['counter_account'];
+					$counter_ba->name = self::remove_zeros($item['counter_account']).'/'.$item['counter_bank'];
+					$counter_ba->account_nr = self::remove_zeros($item['counter_account']);
 					$counter_ba->bank_nr = $item['counter_bank'];
 					$counter_ba->member_id = NULL;
 					$counter_ba->save_throwable();
@@ -123,9 +123,9 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 				$bt->bank_statement_id = $statement->id;
 				$bt->transaction_code = NULL;
 				$bt->number = $number;
-				$bt->constant_symbol = $item['ks'];
-				$bt->variable_symbol = $item['vs'];
-				$bt->specific_symbol = $item['ss'];
+				$bt->constant_symbol = self::remove_zeros($item['ks']);
+				$bt->variable_symbol = self::remove_zeros($item['vs']);
+				$bt->specific_symbol = self::remove_zeros($item['ss']);
 				$bt->save();
 
 				// assign transfer? (0 - invalid id, 1 - assoc id, other are ordinary members)
@@ -212,5 +212,18 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 
 			return NULL;
 		}
+	}
+
+	/**
+	 * Removes zeros on beginning of string (symbols or account)
+	 *
+	 * @param $value
+	 * @return string
+	 */
+	protected static function remove_zeros($value)
+	{
+		$count = preg_match('@[0-]*(\d+-?\d+)@', $value, $result);
+
+		return ($count == 1 ? $result[1] : $value);
 	}
 }

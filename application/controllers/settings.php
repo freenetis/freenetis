@@ -855,7 +855,7 @@ class Settings_Controller extends Controller
 			->checked(Settings::get('users_birthday_empty_enabled'));
 
 		$this->form->input('members_age_min_limit')
-			->label('Minimum age of user')
+			->label('Minimum age of main user')
 			->rules('valid_numeric')
 			->value(Settings::get('members_age_min_limit'));
 		

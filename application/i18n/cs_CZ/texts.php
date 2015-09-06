@@ -1786,6 +1786,7 @@ $lang = array
 	'members' => 'Členové',
 	'members account' => 'Účet člena',
 	'members count' => 'Počet členů',
+	'members - date of born' => 'Členové - datum narození',
 	'members on this address' => 'Členové na této adrese',
 	'membership can be ended only to former member' => 'Členství může být ukončeno jen bývalému členovi.',
 	'membership interrupt' => 'Přerušení členství',

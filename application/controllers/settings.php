@@ -850,6 +850,8 @@ class Settings_Controller extends Controller
                 ->label('Enable multiple users to have assigned same e-mail contact')
 				->checked(Settings::get('user_email_duplicities_enabled'));
 
+		$this->form->group('Members - date of born');
+
 		$this->form->checkbox('users_birthday_empty_enabled')
 			->label('Users birthday can be empty')
 			->checked(Settings::get('users_birthday_empty_enabled'));

@@ -856,14 +856,14 @@ class Settings_Controller extends Controller
 
 		$this->form->input('members_age_min_limit')
 			->label('Minimum age of main user')
-			->rules('valid_numeric')
+			->rules('valid_digit')
 			->value(Settings::get('members_age_min_limit'));
 		
 		$this->form->group('Security');
 		
 		$this->form->input('security_password_length')
 				->label('Minimal password length')
-				->rules('required|valid_numeric')
+				->rules('required|valid_digit')
 				->class('increase_decrease_buttons')
 				->style('width:30px')
 				->value(Settings::get('security_password_length'));
@@ -889,12 +889,12 @@ class Settings_Controller extends Controller
 
 			$this->form->input('membership_interrupt_minimum')
 					->label('Minimum membership interrupt period (months)')
-					->rules('valid_numeric')
+					->rules('valid_digit')
 					->value(Settings::get('membership_interrupt_minimum'));
 
 			$this->form->input('membership_interrupt_maximum')
 					->label('Maximum membership interrupt period (months)')
-					->rules('valid_numeric')
+					->rules('valid_digit')
 					->value(Settings::get('membership_interrupt_maximum'));
 		}
 		

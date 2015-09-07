@@ -92,8 +92,8 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 				{
 					$counter_ba->clear();
 					$counter_ba->set_logger(FALSE);
-					$counter_ba->name = self::remove_zeros($item['counter_account']).'/'.$item['counter_bank'];
-					$counter_ba->account_nr = self::remove_zeros($item['counter_account']);
+					$counter_ba->name = ($item['counter_bank'] == '' ? $item['counter_account'] : self::remove_zeros($item['counter_account']).'/'.$item['counter_bank']);
+					$counter_ba->account_nr = ($item['counter_bank'] == '' ? $item['counter_account'] : self::remove_zeros($item['counter_account']));
 					$counter_ba->bank_nr = $item['counter_bank'];
 					$counter_ba->member_id = NULL;
 					$counter_ba->save_throwable();
@@ -222,8 +222,8 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 	 */
 	protected static function remove_zeros($value)
 	{
-		$count = preg_match('@[0-]*(\d+-?\d+)@', $value, $result);
+		$count = preg_match_all('/[0-]*(\d+-?\d+)/', $value, $result);
 
-		return ($count == 1 ? $result[1] : $value);
+		return ($count == 1 ? $result[1][0] : $value);
 	}
 }

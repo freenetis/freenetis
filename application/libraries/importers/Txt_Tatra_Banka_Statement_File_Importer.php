@@ -24,6 +24,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 	const REGEX_DATA = "@(\d{1,2}\.\d{1,2}\.\d{4} \d{1,2}:\d{2}).+(\w{2}\d{2}(\d{4})(\d{16})).* (\d+,\d{2}) (.+)\.@";
 	// Counter account
 	const REGEX_CA = "@ (\d{4})/([\d-]+)@";
+	const REGEX_NO_CA = "@Popis transakcie: ()(.*)@";
 	// Variable, specific, constant symbol
 	const REGEX_VS = "@VS ?(\d*)@";
 	const REGEX_SS = "@SS ?(\d*)@";
@@ -112,9 +113,16 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 				$email,
 				$data);
 
-			preg_match(self::REGEX_CA,
+			$match_ca = preg_match(self::REGEX_CA,
 				$email,
 				$ca);
+
+			if ($match_ca == 0)
+			{
+				preg_match(self::REGEX_NO_CA,
+					$email,
+					$ca);
+			}
 
 			$match_vs = preg_match(self::REGEX_VS,
 				$email,

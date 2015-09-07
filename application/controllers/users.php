@@ -487,30 +487,15 @@ class Users_Controller extends Controller
 		$empty_birthday = Settings::get('users_birthday_empty_enabled');
 		$min_age = Settings::get('members_age_min_limit');
 
+		$form->date('birthday')
+			->label('Birthday')
+			->years(date('Y') - 100, date('Y'))
+			->value($user->birthday === NULL ? '' : strtotime($user->birthday));
+
 		if ($empty_birthday == 0)
 		{
-			$form->date('birthday')
-				->label('Birthday')
-				->years(date('Y') - 100, date('Y'))
-				->rules('required')
-				->value(strtotime($user->birthday));
-		}
-		else
-		{
-			if (!empty($min_age) && $user->type == User_Model::MAIN_USER)
-			{
-				$form->checkbox('older_than')
-					->label(__("I'm older than %d years", array($min_age)))
-					->rules('required')
-					->checked(TRUE);
-			}
-			else
-			{
-				$form->date('birthday')
-					->label('Birthday')
-					->years(date('Y') - 100, date('Y'))
-					->value($user->birthday === NULL ? '' : strtotime($user->birthday));
-			}
+			$form->inputs['birthday']
+				->rules('required');
 		}
 
 		if ($this->acl_check_edit(get_class($this), 'comment', $user->member_id))

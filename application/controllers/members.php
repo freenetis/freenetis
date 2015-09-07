@@ -2601,28 +2601,19 @@ class Members_Controller extends Controller
 		$empty_birthday = Settings::get('users_birthday_empty_enabled');
 		$min_age = Settings::get('members_age_min_limit');
 
+		$form->date('birthday')
+			->label('Birthday')
+			->years(date('Y') - 100, date('Y'));
+
 		if ($empty_birthday == 0)
 		{
-			$form->date('birthday')
-				->label('Birthday')
-				->years(date('Y') - 100, date('Y'))
+			$form->inputs['birthday']
 				->rules('required');
 		}
 		else
 		{
-			if (empty($min_age))
-			{
-				$form->date('birthday')
-					->label('Birthday')
-					->years(date('Y') - 100, date('Y'))
-					->value('');
-			}
-			else
-			{
-				$form->checkbox('older_than')
-					->label(__("I'm older than %d years", array($min_age)))
-					->rules('required');
-			}
+			$form->inputs['birthday']
+				->value('');
 		}
 		
 		$form->date('entrance_date')

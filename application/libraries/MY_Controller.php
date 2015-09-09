@@ -225,7 +225,18 @@ class Controller extends Controller_Core
 				// for preprocessing some variable
 				try
 				{
-					$this->preprocessor();
+					$user_model = new User_Model($this->user_id);
+					if ($user_model->id &&
+						$user_model->password_is_onetime &&
+						url_lang::current(2) != 'login/change_password' &&
+						url_lang::current(2) != 'login/logout')
+					{
+						url::redirect('login/change_password');
+					}
+					else
+					{
+						$this->preprocessor();
+					}
 				}
 				catch(Exception $e)
 				{

@@ -80,95 +80,189 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 			// saving each bank listing item
 			foreach ($this->data as $item)
 			{
-				// try to find counter bank account in database
-				$counter_ba = ORM::factory('bank_account')->where(array
-				(
-					'account_nr'	=>	$item['counter_account'],
-					'bank_nr'		=>	$item['counter_bank']
-				))->find();
-
-				// counter bank account does not exist? let's create new one
-				if (!$counter_ba->id)
-				{
-					$counter_ba->clear();
-					$counter_ba->set_logger(FALSE);
-					$counter_ba->name = ($item['counter_bank'] == '' ? $item['counter_account'] : self::remove_zeros($item['counter_account']).'/'.$item['counter_bank']);
-					$counter_ba->account_nr = ($item['counter_bank'] == '' ? $item['counter_account'] : self::remove_zeros($item['counter_account']));
-					$counter_ba->bank_nr = $item['counter_bank'];
-					$counter_ba->member_id = NULL;
-					$counter_ba->save_throwable();
-				}
-
 				// let's identify member
-				$member_id = $this->find_member_by_vs($item['vs']);
+				$member_id = $this->find_member_by_vs(self::remove_zeros($item['vs']));
 
-				if (!$member_id)
+				if ($item['counter_account'] == 'VKLAD V HOTOVOSTI')
 				{
-					$stats['unidentified_nr']++;
-				}
-
-				// double-entry incoming transfer
-				$transfer_id = Transfer_Model::insert_transfer(
-								$members_fees->id, $account->id, null, $member_id,
-								$user_id, null, $item['datetime'], $now, "",
-								abs($item['amount'])
-				);
-
-				// incoming bank transfer
-				$bt->clear();
-				$bt->set_logger(FALSE);
-				$bt->origin_id = $counter_ba->id;
-				$bt->destination_id = $ba->id;
-				$bt->transfer_id = $transfer_id;
-				$bt->bank_statement_id = $statement->id;
-				$bt->transaction_code = NULL;
-				$bt->number = $number;
-				$bt->constant_symbol = self::remove_zeros($item['ks']);
-				$bt->variable_symbol = self::remove_zeros($item['vs']);
-				$bt->specific_symbol = self::remove_zeros($item['ss']);
-				$bt->save();
-
-				// assign transfer? (0 - invalid id, 1 - assoc id, other are ordinary members)
-				if ($member_id && $member_id != Member_Model::ASSOCIATION)
-				{
-					$ca = ORM::factory('account')->where('member_id', $member_id)->find();
-
-					// has credit account?
-					if ($ca->id)
+					if (!$member_id)
 					{
-						// add affected member for notification
-						$this->add_affected_member($member_id);
-
-						// assign transfer
-						$a_transfer_id = Transfer_Model::insert_transfer(
-										$account->id, $ca->id, $transfer_id, $member_id,
-										$user_id, null, $item['datetime'], $now,
-										__('Assigning of transfer'), abs($item['amount'])
+						// undefined member fee - double-entry incoming transfer
+						$transfer_id = Transfer_Model::insert_transfer(
+							$members_fees->id, $account->id, null, null,
+							$user_id, null, $item['datetime'], $now, $item['message'],
+							abs($item['amount'])
 						);
 
-						// transaction fee
-						$fee = $fee_model->get_by_date_type($item['datetime'], 'transfer fee');
-						if ($fee && $fee->fee > 0)
-						{
-							$tf_transfer_id = Transfer_Model::insert_transfer(
-											$ca->id, $operating->id, $transfer_id,
-											$member_id, $user_id, null, $item['datetime'],
-											$now, __('Transfer fee'), $fee->fee
-							);
+						$bt->clear();
+						$bt->set_logger(false);
+						$bt->origin_id = null;
+						$bt->destination_id = $ba->id;
+						$bt->transfer_id = $transfer_id;
+						$bt->bank_statement_id = $statement->id;
+						$bt->transaction_code = NULL;
+						$bt->number = $number;
+						$bt->constant_symbol = self::remove_zeros($item['ks']);
+						$bt->variable_symbol = self::remove_zeros($item['vs']);
+						$bt->specific_symbol = self::remove_zeros($item['ss']);
+						$bt->comment = $item['message'];
+						$bt->save_throwable();
 
+						// member fee stats
+						$stats['member_fees'] += abs($item['amount']);
+						$stats['unidentified_nr']++;
+					}
+					else
+					{
+						// double-entry incoming transfer
+						$transfer_id = Transfer_Model::insert_transfer(
+								$members_fees->id, $account->id, null, $member_id, $user_id,
+								null, $item['datetime'], $now, "",
+								abs($item['amount'])
+						);
+
+						//incoming bank transfer
+						$bt->clear();
+						$bt->set_logger(false);
+						$bt->origin_id = null;
+						$bt->destination_id = $ba->id;
+						$bt->transfer_id = $transfer_id;
+						$bt->bank_statement_id = $statement->id;
+						$bt->transaction_code = null;
+						$bt->number = $number;
+						$bt->constant_symbol = self::remove_zeros($item['ks']);
+						$bt->variable_symbol = self::remove_zeros($item['vs']);
+						$bt->specific_symbol = self::remove_zeros($item['ss']);
+						$bt->comment = $item['message'];
+						$bt->save_throwable();
+
+						if ($member_id && $member_id != Member_Model::ASSOCIATION)
+						{
+							$ca = ORM::factory('account')
+									->where('member_id', $member_id)
+									->find();
+
+							if ($ca->id)
+							{
+								// add affected member for notification
+								$this->add_affected_member($member_id);
+
+								// assign transfer
+								$a_transfer_id = Transfer_Model::insert_transfer(
+									$account->id, $ca->id, $transfer_id, $member_id,
+									$user_id, null, $item['datetime'], $now,
+									__('Assigning of transfer'), abs($item['amount'])
+								);
+
+								// transaction fee
+								$fee = $fee_model->get_by_date_type($item['datetime'], 'transfer fee');
+								if ($fee && $fee->fee > 0)
+								{
+									$tf_transfer_id = Transfer_Model::insert_transfer(
+										$ca->id, $operating->id, $transfer_id,
+										$member_id, $user_id, null, $item['datetime'],
+										$now, __('Transfer fee'), $fee->fee
+									);
+
+								}
+							}
 						}
 
-						if (!$counter_ba->member_id)
-						{
-							$counter_ba->member_id = $member_id;
-							$counter_ba->save_throwable();
-						}
+						// member fee stats
+						$stats['member_fees'] += abs($item['amount']);
+						$stats['member_fees_nr']++;
 					}
 				}
+				else
+				{
+					// try to find counter bank account in database
+					$counter_ba = ORM::factory('bank_account')->where(array
+					(
+						'account_nr'	=>	$item['counter_account'],
+						'bank_nr'		=>	$item['counter_bank']
+					))->find();
 
-				// member fee stats
-				$stats['member_fees'] += abs($item['amount']);
-				$stats['member_fees_nr']++;
+					// counter bank account does not exist? let's create new one
+					if (!$counter_ba->id)
+					{
+						$counter_ba->clear();
+						$counter_ba->set_logger(FALSE);
+						$counter_ba->name = ($item['counter_bank'] == '' ? $item['counter_account'] : self::remove_zeros($item['counter_account']).'/'.$item['counter_bank']);
+						$counter_ba->account_nr = ($item['counter_bank'] == '' ? $item['counter_account'] : self::remove_zeros($item['counter_account']));
+						$counter_ba->bank_nr = $item['counter_bank'];
+						$counter_ba->member_id = NULL;
+						$counter_ba->save_throwable();
+					}
+
+					if (!$member_id)
+					{
+						$stats['unidentified_nr']++;
+					}
+
+					// double-entry incoming transfer
+					$transfer_id = Transfer_Model::insert_transfer(
+									$members_fees->id, $account->id, null, $member_id,
+									$user_id, null, $item['datetime'], $now, $item['message'],
+									abs($item['amount'])
+					);
+
+					// incoming bank transfer
+					$bt->clear();
+					$bt->set_logger(FALSE);
+					$bt->origin_id = $counter_ba->id;
+					$bt->destination_id = $ba->id;
+					$bt->transfer_id = $transfer_id;
+					$bt->bank_statement_id = $statement->id;
+					$bt->transaction_code = NULL;
+					$bt->number = $number;
+					$bt->constant_symbol = self::remove_zeros($item['ks']);
+					$bt->variable_symbol = self::remove_zeros($item['vs']);
+					$bt->specific_symbol = self::remove_zeros($item['ss']);
+					$bt->comment = $item['message'];
+					$bt->save_throwable();
+
+					// assign transfer? (0 - invalid id, 1 - assoc id, other are ordinary members)
+					if ($member_id && $member_id != Member_Model::ASSOCIATION)
+					{
+						$ca = ORM::factory('account')->where('member_id', $member_id)->find();
+
+						// has credit account?
+						if ($ca->id)
+						{
+							// add affected member for notification
+							$this->add_affected_member($member_id);
+
+							// assign transfer
+							$a_transfer_id = Transfer_Model::insert_transfer(
+											$account->id, $ca->id, $transfer_id, $member_id,
+											$user_id, null, $item['datetime'], $now,
+											__('Assigning of transfer'), abs($item['amount'])
+							);
+
+							// transaction fee
+							$fee = $fee_model->get_by_date_type($item['datetime'], 'transfer fee');
+							if ($fee && $fee->fee > 0)
+							{
+								$tf_transfer_id = Transfer_Model::insert_transfer(
+												$ca->id, $operating->id, $transfer_id,
+												$member_id, $user_id, null, $item['datetime'],
+												$now, __('Transfer fee'), $fee->fee
+								);
+
+							}
+
+							if (!$counter_ba->member_id)
+							{
+								$counter_ba->member_id = $member_id;
+								$counter_ba->save_throwable();
+							}
+						}
+					}
+
+					// member fee stats
+					$stats['member_fees'] += abs($item['amount']);
+					$stats['member_fees_nr']++;
+				}
 
 				$number++;
 			}

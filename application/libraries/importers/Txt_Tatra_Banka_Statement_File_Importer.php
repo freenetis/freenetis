@@ -31,6 +31,8 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 	const REGEX_CS = "@KS ?(\d*)@";
 	// Current balance
 	const REGEX_BALANCE = "@aktualny zostatok:[^0-9]*(\d+,\d{2}) (.+)@";
+	// Message
+	const REGEX_MSG = "@Informacia pre prijemcu: (.*)@";
 
 
 	protected function check_file_data_format()
@@ -136,12 +138,17 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 				$email,
 				$cs);
 
+			preg_match(self::REGEX_MSG,
+				$email,
+				$msg);
+
 			if (!$match_data || !$match_vs || !$match_ss || !$match_cs)
 			{
 				continue;
 			}
 
-			$this->data[] = array(
+			$this->data[] = array
+			(
 				'datetime' 	=>	DateTime::createFromFormat('j.n.Y G:i', $data[1])->format('Y-m-d H:i:s'),
 				'iban'		=>	$data[2],
 				'bank'		=>	$data[3],
@@ -152,7 +159,8 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 				'currency'	=>	$data[6],
 				'vs'		=>	$vs[1],
 				'ss'		=>	$ss[1],
-				'ks'		=>	$cs[1]
+				'ks'		=>	$cs[1],
+				'message'	=>	trim(@$msg[1])
 			);
 		}
 

@@ -1415,26 +1415,8 @@ class ORM_Core {
 
 		if ( ! isset($this->db_applied['select']))
 		{
-			// there are at least 1 ignored column, select columns manually
-			if (count($this->ignored_columns) > 0)
-			{
-				// removes ignored columns from all columnns
-				$columns = array_diff(
-					array_keys($this->table_columns),
-					$this->ignored_columns
-				);
-				
-				// append table name to column name
-				foreach ($columns as $i => $column)
-					$columns[$i] = $this->table_name . '.' . $column;
-				
-				$this->db->select($columns);
-			}
-			else
-			{
-				// Select all columns by default
-				$this->db->select($this->table_name.'.*');
-			}
+			// Select all columns by default
+			$this->db->select($this->table_name.'.*');
 		}
 
 		if ( ! empty($this->load_with))

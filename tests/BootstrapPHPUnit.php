@@ -1,7 +1,7 @@
 <?php defined('SYSPATH') or die('No direct script access.');
 /**
  * Kohana process control file, loaded by the front controller.
- *
+ * 
  * $Id: Bootstrap.php 1968 2008-02-06 21:41:29Z Shadowhand $
  *
  * @package    Core
@@ -36,16 +36,9 @@ defined('E_RECOVERABLE_ERROR') or define('E_RECOVERABLE_ERROR', 4096);
 // Load core files
 require SYSPATH.'core/utf8'.EXT;
 require SYSPATH.'core/Config'.EXT;
-
-require __DIR__.'/TestConfig'.EXT;
-TestConfig::init(); // set DB configuration
-
 require SYSPATH.'core/Log'.EXT;
 require SYSPATH.'core/Event'.EXT;
 require SYSPATH.'core/Kohana'.EXT;
-
-// test classes
-require __DIR__.'/AbstractItCase'.EXT;
 
 // End: kohana_loading
 Benchmark::stop(SYSTEM_BENCHMARK.'_kohana_loading');

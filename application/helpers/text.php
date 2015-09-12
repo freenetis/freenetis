@@ -401,19 +401,11 @@ class text {
 	 * @author Ondřej Fibich
 	 * @param string $str	String
 	 * @param string $start	Start
-	 * @param bool $icase	Ignore case? [optional]
 	 * @return bool			true if first string starts with second	
 	 */
-	public static function starts_with($str, $start, $icase = FALSE)
+	public static function starts_with($str, $start)
 	{
-		if ($icase === TRUE)
-		{
-			return strncasecmp($str, $start, mb_strlen($start)) == 0;
-		}
-		else
-		{
-			return strncmp($str, $start, mb_strlen($start)) == 0;
-		}
+		return strncmp($str, $start, mb_strlen($start)) == 0;
 	}
 	
 	/**

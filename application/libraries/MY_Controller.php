@@ -2,13 +2,13 @@
 /*
  * This file is part of open source system FreenetIS
  * and it is released under GPLv3 licence.
- *
+ * 
  * More info about licence can be found:
  * http://www.gnu.org/licenses/gpl-3.0.html
- *
+ * 
  * More info about project can be found:
  * http://www.freenetis.org/
- *
+ * 
  */
 
 // numbers of errors
@@ -48,11 +48,11 @@ class Controller extends Controller_Core
 
 	/**
 	 * Controller singleton
-	 *
+	 * 
 	 * @var Controller
 	 */
 	private static $instance;
-
+	
 	/**
 	 * Paths for which login is not required
 	 *
@@ -69,8 +69,6 @@ class Controller extends Controller_Core
 		'setup_config/htaccess',
 		'setup_config/setup',
 		'redirect/logo',
-		'email/displayed',
-		'email/preview',
 		/* registration */
 		'registration',
 		'registration/complete',
@@ -80,7 +78,7 @@ class Controller extends Controller_Core
 		'address_points/get_gps_by_address',
 		'address_points/get_gps_by_address_string',
 	);
-
+	
 	/** @var unknown_type */
 	public $arr;
 	/** @var Setting_Model Settings */
@@ -113,30 +111,25 @@ class Controller extends Controller_Core
 	protected $member_account_id = 1;
 	/** @var Session */
 	protected $session;
-    /** @var ServiceFactory */
-    protected $services;
 	/** @var $groups_aro_map Groups_aro_map_Model */
 	private $groups_aro_map;
-
+	
 	/**
 	 * Contruct of controller, creates singleton or return it
 	 */
 	public function __construct()
 	{
 		parent::__construct();
-
+		
 		// This part only needs to be run once
 		if (self::$instance === NULL)
 		{
 			// init sessions
 			$this->session = Session::instance();
-
-            // init services
-            $this->services = new ServiceFactory();
-
+			
 			// store user ID from session
 			$this->user_id = $this->session->get('user_id', 0);
-
+		
 			// store member ID from session
 			$this->member_id = $this->session->get('member_id', 0);
 
@@ -144,13 +137,12 @@ class Controller extends Controller_Core
 			// controllers like registration, redirect, installation, etc.
 			if (!in_array(url_lang::current(), self::$login_not_required) &&
 				url_lang::current(1) != 'web_interface' &&
-				url_lang::current(1) != 'api' &&
 				url_lang::current(2) != 'devices/export' &&
 				!$this->user_id)
 			{
 				// Not logged in - redirect to login page
 				$this->session->set_flash('err_message', __('Must be logged in'));
-
+				
 				// Do not logout after login
 				if (url_lang::current(1) != 'login' &&
 					url_lang::current(1) != 'js')
@@ -161,14 +153,14 @@ class Controller extends Controller_Core
 				{
 					$this->session->set('referer', '');
 				}
-
+				
 				// Redirect to login
 				url::redirect('login');
-
+				
 				// Die
 				die();
 			}
-
+			
 			// init settings
 			$this->settings = new Settings();
 
@@ -177,7 +169,7 @@ class Controller extends Controller_Core
 
 			// if true, freenetis will run in text mod for dialog
 			$this->dialog = (isset($_GET['dialog']) && $_GET['dialog']) ? 1 : 0;
-
+			
 			// if true, method redirect will not redirect
 			$this->noredirect = ($this->input->get('noredirect') || $this->input->post('noredirect'));
 
@@ -187,12 +179,12 @@ class Controller extends Controller_Core
 				// protection before loop
 				if (url_lang::current(1) == 'setup_config')
 					return;
-
+				
 				if (!file_exists('.htaccess'))
 				{
 					Settings::set('index_page', 1);
 				}
-
+				
 				url::redirect('setup_config');
 			}
 
@@ -202,41 +194,99 @@ class Controller extends Controller_Core
 				return;
 			}
 
-            // test database connection
-            if (!db::test())
-            {
-                self::error(DATABASE);
-            }
-
-            // db schema version is null or domain not filled => we must run install
-            if (!Version::get_db_version() || !Settings::get('domain'))
-            {
-                url::redirect('installation');
-            }
-            // db schema is not up to date => we must run upgrade
-            else if (!Version::is_db_up_to_date())
-            {
-                $this->upgrade_db();
-            }
-
+			// test database connection
+			if (!db::test())
+			{
+				Controller::error(DATABASE);
+			}
+			
+			// db schema version is null => we must run install
+			if (!Version::get_db_version())
+			{
+				url::redirect('installation');
+			}
+			// db schema is not up to date => we must run upgrade
+			else if (!Version::is_db_up_to_date())
+			{
+				// change database encoding if incorect
+				try
+				{
+					$db = Database::instance();
+					
+					/**
+					 * @todo in the future the collate should be used according  
+					 *		 to language system settings
+					 */
+					if ($db->get_variable_value('character_set_database') != 'utf8' || 
+						$db->get_variable_value('collation_database') != 'utf8_czech_ci')
+					{
+						$db->alter_db_character_set(
+							Config::get('db_name'), 'utf8', 'utf8_czech_ci'
+						);
+					}
+				}
+				catch (Exception $e)
+				{
+					Log::add_exception($e);
+					$m = __('Cannot set database character set to UTF8');
+					self::showbox($m, self::ICON_ERROR);
+				}
+				
+				// try to open mutex file
+				if (($f = @fopen(server::base_dir().'/upload/mutex', 'w')) === FALSE)
+				{
+					// directory is not writeable
+					self::error(WRITABLE, server::base_dir().'/upload/');
+				}
+				
+				// acquire an exclusive access to file
+				// wait while database is being updated
+				if (flock($f, LOCK_EX))
+				{
+					// first access - update db
+					// other access - skip
+					if (!Version::is_db_up_to_date())
+					{
+						try
+						{
+							Version::make_db_up_to_date();
+						}
+						catch (Not_Enabled_Upgrade_Exception $neu)
+						{
+							self::error(DATABASE_UPGRADE_NOT_ENABLED, $neu->getMessage());
+						}
+						catch (Old_Mechanism_Exception $ome)
+						{
+							self::error(DATABASE_OLD_MECHANISM);
+						}
+						catch (Database_Downgrate_Exception $dde)
+						{
+							self::error(DATABASE_DOWNGRATE);
+						}
+						catch (Exception $e)
+						{
+							throw new Exception(
+									__('Database upgrade failed') . ': ' .
+									$e->getMessage(), 0, $e
+							);
+						}
+					}
+					
+					// unlock mutex file
+					flock($f, LOCK_UN);
+				}
+				
+				// close mutex file
+				fclose($f);
+			}
+			
 			// load these variables only if preprocessor is enabled and user is logged
 			if ($this->is_preprocesor_enabled() && $this->user_id)
 			{
 				// for preprocessing some variable
 				try
 				{
-					$user_model = new User_Model($this->user_id);
-					if ($user_model->id &&
-						$user_model->password_is_onetime &&
-						url_lang::current(2) != 'login/change_password' &&
-						url_lang::current(2) != 'login/logout')
-					{
-						url::redirect('login/change_password');
-					}
-					else
-					{
-						$this->preprocessor();
-					}
+					$this->preprocessor();
 				}
 				catch(Exception $e)
 				{
@@ -248,10 +298,10 @@ class Controller extends Controller_Core
 			self::$instance = $this;
 		}
 	}
-
+	
 	/**
 	 * Singleton instance of Controller.
-	 *
+	 * 
 	 * @author Michal Kliment
 	 * @return Controller object
 	 */
@@ -265,7 +315,7 @@ class Controller extends Controller_Core
 
 	/**
 	 * Function shows error of given message number.
-	 *
+	 * 
 	 * @param integer $message_type
 	 * @param string $content
 	 */
@@ -273,7 +323,7 @@ class Controller extends Controller_Core
 	{
 		$response_code = NULL;
 		$fatal = FALSE;
-
+		
 		switch ($message_type)
 		{
 			case ACCESS:
@@ -281,7 +331,7 @@ class Controller extends Controller_Core
 				$response_code = 403; // Forbidden
 				break;
 			case EMAIL:
-				$message = url_lang::lang('states.Failed to send e-mail') .
+				$message = url_lang::lang('states.Failed to send e-mail') . 
 					'<br />' . url_lang::lang('states.Please check settings.');
 				$response_code = 500; // Internal server error
 				break;
@@ -330,20 +380,20 @@ class Controller extends Controller_Core
 				$response_code = 500; // Internal server error
 				break;
 		}
-
+		
 		self::showbox($message, self::ICON_ERROR, $content, $response_code, $fatal);
 	}
 
 	/**
 	 * Function shows warning of given message number.
-	 *
+	 * 
 	 * @param integer $message_type
 	 * @param string $content
 	 */
 	public static function warning($message_type, $content = NULL)
 	{
 		$response_code = NULL;
-
+		
 		switch ($message_type)
 		{
 			case PARAMETER:
@@ -355,20 +405,20 @@ class Controller extends Controller_Core
 				$response_code = 500; // Internal server error
 				break;
 		}
-
+		
 		self::showbox($message, self::ICON_WARNING, $content, $response_code);
 	}
 
 	/**
 	 * Function renders error and warning messages.
-	 *
+	 * 
 	 * @param string $message Message to display
 	 * @param integer $type Type of message (error, info, warning, etc.)
 	 * @param string $content Some message that describe message in more detail way
 	 * @param string $http_response_code Send some response code (xxx)
 	 * @param boolean $fatal_error Is this error a fatal error?
 	 */
-	private static function showbox($message, $type, $content = NULL,
+	private static function showbox($message, $type, $content = NULL, 
 		$http_response_code = NULL, $fatal_error = FALSE)
 	{
 		if ($fatal_error)
@@ -379,11 +429,11 @@ class Controller extends Controller_Core
 		{
 			$view = new View('main');
 		}
-
+		
 		$view->content = new View('statesbox');
 
 		$src = NULL;
-
+		
 		switch ($type)
 		{
 			case self::ICON_ERROR:
@@ -407,12 +457,12 @@ class Controller extends Controller_Core
 				$src = 'media/images/states/warning.png';
 				break;
 		}
-
+		
 		if ($http_response_code)
 		{
 			header("HTTP/1.1 $http_response_code");
 		}
-
+		
 		$view->content->icon = html::image(array
 		(
 			'src'		=> $src,
@@ -421,56 +471,65 @@ class Controller extends Controller_Core
 			'alt'		=> 'Image',
 			'class'		=> 'noborder'
 		));
-
+		
 		$view->content->message = $message;
-
+		
 		if (isset($content))
 		{
 			$view->content->content = $content;
 		}
-
+		
 		$view->loading_hide = TRUE;
 		$view->render(TRUE);
-
+		
 		// must be die() - else it will be render twice !
 		die();
 	}
-
-    /**
-     * Upgrade DB to current FreenetIS version.
-     */
-    private function upgrade_db()
-    {
-        try
-        {
-            $this->services->injectCoreDatabaseInit()
-                    ->make(server::base_dir() . '/upload/mutex');
-        }
-        catch (InvalidArgumentException $iaex)
-        {
-            self::error(WRITABLE, server::base_dir() . 'upload');
-        }
-        catch (NotEnabledDbUpgradeException $neu)
-        {
-            self::error(DATABASE_UPGRADE_NOT_ENABLED, $neu->getMessage());
-        }
-        catch (OldMechanismDbUpgradeException $ome)
-        {
-            self::error(DATABASE_OLD_MECHANISM);
-        }
-        catch (DowngrateDbUpgradeException $dde)
-        {
-            self::error(DATABASE_DOWNGRATE);
-        }
-        catch (Exception $e)
-        {
-            throw new Exception(
-                    __('Database upgrade failed') . ': ' .
-                    $e->getMessage(), 0, $e
-            );
-        }
-    }
-
+	
+	/**
+	 * Checks user's access to system
+	 * 
+	 * @author Ondřej Fibich
+	 *
+	 * @param type $axo_section_value	AXO section value - Controller name
+	 * @param type $axo_value			AXO value - part of Controller
+	 * @param type $aco_type			ACO type of action (view, new, edit, delete, confirm)
+	 * @param integer $member_id		Member to check access
+	 * @param boolean $force_own		Force to use own rules for not logged user
+	 *									Used at: Phone_invoices_Controller#user_field()
+	 * @return bool
+	 */
+	private function acl_check(
+			$axo_section, $axo_value, $aco_type, $member_id = NULL,
+			$force_own = FALSE)
+	{
+		// groups aro map loaded?
+		if (empty($this->groups_aro_map))
+		{
+			$this->groups_aro_map = new Groups_aro_map_Model();
+		}
+		
+		// check own?
+		if (($member_id == $_SESSION['member_id']) || $force_own)
+		{
+			// check own access
+			if ($this->groups_aro_map->has_access(
+					$_SESSION['user_id'], $aco_type . '_own',
+					$axo_section, $axo_value
+				))
+			{
+				// access valid
+				return true;
+			}
+		}
+		
+		// check all
+		return $this->groups_aro_map->has_access(
+				$_SESSION['user_id'], $aco_type . '_all',
+				$axo_section, $axo_value
+		);
+	}
+	
 	/**
 	 * Checks if user is in ARO group
 	 *
@@ -481,8 +540,7 @@ class Controller extends Controller_Core
 	 */
 	public function is_user_in_group($aro_group_id, $aro_id)
 	{
-        return $this->services->injectCoreAcl()
-                ->is_user_in_group($aro_group_id, $aro_id);
+		return $this->groups_aro_map->groups_aro_map_exists($aro_group_id, $aro_id);
 	}
 
 	/**
@@ -491,20 +549,21 @@ class Controller extends Controller_Core
 	 * may view own $axo_value object in $axo_section
 	 * (and in variable $member_id is his own id of member) or if currently logged user
 	 * may view all $axo_value object in $axo_section else return false
-	 *
+	 * 
 	 * @param $axo_section			Group of objects to view
 	 * @param $axo_value			Object to view
 	 * @param $member_id			Optional variable, id of other member
-	 *								who is being showed by logged member
+	 *								who is being showed by logged member 
 	 * @param boolean $force_own	Force to use own rules for not logged user
 	 *								Used at: Phone_invoices_Controller#user_field()
 	 * @return boolean				returns true if member has enough access rights
 	 */
-	public function acl_check_view($axo_section, $axo_value, $member_id = NULL,
-            $force_own = FALSE)
+	public function acl_check_view(
+			$axo_section, $axo_value, $member_id = NULL, $force_own = FALSE)
 	{
-		return $this->services->injectCoreAcl()
-                ->can_view($axo_section, $axo_value, $member_id, $force_own);
+		return $this->acl_check(
+				$axo_section, $axo_value, 'view', $member_id, $force_own
+		);
 	}
 
 	/**
@@ -525,8 +584,9 @@ class Controller extends Controller_Core
 	public function acl_check_edit(
 			$axo_section, $axo_value, $member_id = NULL, $force_own = FALSE)
 	{
-		return $this->services->injectCoreAcl()
-                ->can_edit($axo_section, $axo_value, $member_id, $force_own);
+		return $this->acl_check(
+				$axo_section, $axo_value, 'edit', $member_id, $force_own
+		);
 	}
 
 	/**
@@ -547,8 +607,9 @@ class Controller extends Controller_Core
 	public function acl_check_new(
 			$axo_section, $axo_value, $member_id = NULL, $force_own = FALSE)
 	{
-		return $this->services->injectCoreAcl()
-                ->can_create($axo_section, $axo_value, $member_id, $force_own);
+		return $this->acl_check(
+				$axo_section, $axo_value, 'new', $member_id, $force_own
+		);
 	}
 
 	/**
@@ -569,15 +630,16 @@ class Controller extends Controller_Core
 	public function acl_check_delete(
 			$axo_section, $axo_value, $member_id = NULL, $force_own = FALSE)
 	{
-		return $this->services->injectCoreAcl()
-                ->can_delete($axo_section, $axo_value, $member_id, $force_own);
+		return $this->acl_check(
+				$axo_section, $axo_value, 'delete', $member_id, $force_own
+		);
 	}
 
 	/**
 	 * This methods defines whether the preprocessor of MY_Controller is loaded
-	 * or not. By default preprocessor is loaded, for changing of this state
+	 * or not. By default preprocessor is loaded, for changing of this state 
 	 * this method should be overriden in child class. (#328)
-	 *
+	 * 
 	 * @author Ondřej Fibich
 	 * @return boolean Is preprocessor loaded?
 	 */
@@ -588,7 +650,7 @@ class Controller extends Controller_Core
 
 	/**
 	 * Function to preprocessing of some useful variables
-	 *
+	 * 
 	 * @author Michal Kliment
 	 */
 	private function preprocessor()
@@ -596,7 +658,7 @@ class Controller extends Controller_Core
 		// helper class
 		$pm = new Preprocessor_Model();
 		$ra_ip = server::remote_addr();
-
+	
 		// boolean variable if user has active voip number (for menu rendering)
 		$this->user_has_voip = (bool) $pm->has_voip_sips($this->user_id);
 
@@ -615,7 +677,7 @@ class Controller extends Controller_Core
 
 		// ip address span
 		$this->ip_address_span = $ra_ip;
-
+		
 		// DZOLO (2011-09-05)
 		// This function is wery slow, when internet connection is off.
 		/*if (($ptr_record = dns::get_ptr_record($this->ip_address_span)) != '')
@@ -633,13 +695,13 @@ class Controller extends Controller_Core
 			$as = $pm->get_allowed_subnet_by_member_and_ip_address(
 					$this->member_id, server::remote_addr()
 			);
-
+			
 			// it's possible to change allowed allowed subnets
 			if ($as && $as->id &&
 				$pm->count_all_disabled_allowed_subnets_by_member($this->member_id))
 			{
 				$uri = 'allowed_subnets/change/' .$as->id;
-
+				
 				if ($as->enabled)
 				{
 					$this->ip_address_span .= ' ' . html::anchor($uri, html::image(array
@@ -678,7 +740,7 @@ class Controller extends Controller_Core
 		// log queue (#462)
 		if ($this->acl_check_view('Log_queues_Controller', 'log_queue'))
 		{
-			$this->count_of_unclosed_logged_errors =
+			$this->count_of_unclosed_logged_errors = 
 					$pm->count_of_unclosed_logs();
 			// inform box
 			if ($this->count_of_unclosed_logged_errors &&
@@ -692,17 +754,17 @@ class Controller extends Controller_Core
 
 		// menu favourites
 		$this->user_favourites_pages = $pm->get_users_favourites($this->user_id);
-
+		
 		// access to AXO doc
 		$this->axo_doc_access = (
 			$this->acl_check_new('Acl_Controller', 'acl') ||
 			$this->acl_check_edit('Acl_Controller', 'acl')
 		);
 	}
-
+	
 	/**
 	 * Build menu
-	 *
+	 * 
 	 * @author Michal Kliment
 	 * @return Menu_builder
 	 * @throws Exception
@@ -710,20 +772,20 @@ class Controller extends Controller_Core
 	public function build_menu()
 	{
 		$menu = new Menu_builder();
-
+		
 		$pm = new Preprocessor_Model();
-
+		
 		/***********************    FAVOURITES     ***********************/
-
+		
 		if (!empty($this->user_favourites_pages) &&
 			$this->user_favourites_pages->count())
 		{
 			$menu->addGroup('favourites', __('Favourites'));
-
+			
 			foreach ($this->user_favourites_pages as $fav)
 			{
 				$default = array();
-
+				
 				if ($fav->default_page)
 				{
 					$default = array
@@ -731,17 +793,17 @@ class Controller extends Controller_Core
 						'default' => TRUE
 					);
 				}
-
+				
 				$menu->addItem($fav->page, $fav->title, 'favourites', $default);
 			}
-
+			
 			unset($this->user_favourites_pages);
 		}
-
+		
 		/***********************    MY PROFILE     ***********************/
-
+		
 		$menu->addGroup('account', __('My profile'));
-
+		
 		// my profile
 		if ($this->session->get('user_type') == User_Model::MAIN_USER &&
 		    $this->acl_check_view('Members_Controller', 'members', $this->member_id))
@@ -756,7 +818,7 @@ class Controller extends Controller_Core
 				'users/show/'.$this->user_id,
 				__('My profile'), 'account');
 		}
-
+		
 		// my transfers
 		if (Settings::get('finance_enabled') && $this->member_account_id &&
 		    ($this->acl_check_view('Accounts_Controller', 'transfers', $this->member_id) ||
@@ -766,7 +828,7 @@ class Controller extends Controller_Core
 				'transfers/show_by_account/'.$this->member_account_id,
 				__('My transfers'), 'account');
 		}
-
+		
 		// my devices
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Devices_Controller', 'devices',$this->member_id))
@@ -775,7 +837,7 @@ class Controller extends Controller_Core
 				'devices/show_by_user/'.$this->user_id,
 				__('My devices'), 'account');
 		}
-
+	
 		// my connection requests
 		if ($this->member_id != Member_Model::ASSOCIATION &&
 		    $this->acl_check_view('Connection_Requests_Controller', 'request', $this->member_id) &&
@@ -785,7 +847,7 @@ class Controller extends Controller_Core
 				'connection_requests/show_by_member/'.$this->member_id,
 				__('My connection requests'), 'account');
 		}
-
+		
 		// my works
 		if (Settings::get('works_enabled') &&
 		    $this->member_id != Member_Model::ASSOCIATION &&
@@ -795,27 +857,27 @@ class Controller extends Controller_Core
 				'works/show_by_user/'.$this->user_id,
 				__('My works'), 'account');
 		}
-
+		
 		// my work reports
 		if (Settings::get('works_enabled') &&
 		    $this->member_id != Member_Model::ASSOCIATION &&
 			$this->acl_check_view('Work_reports_Controller', 'work_report', $this->member_id))
 		{
-
+			
 			$menu->addItem('work_reports/show_by_user/'.$this->user_id,
 				__('My work reports'), 'account');
 		}
-
+		
 		// my requests
-		if (Settings::get('approval_enabled') &&
+		if (Settings::get('approval_enabled') && 
 			$this->member_id != Member_Model::ASSOCIATION &&
 			$this->acl_check_view('Requests_Controller', 'request', $this->member_id))
 		{
-
+			
 			$menu->addItem('requests/show_by_user/'.$this->user_id,
 				__('My requests'), 'account');
 		}
-
+		
 		// my phone invoices
 		if (Settings::get('phone_invoices_enabled') &&
 			$this->member_id != 1 &&
@@ -828,38 +890,38 @@ class Controller extends Controller_Core
 					'count' => $pm->count_unfilled_phone_invoices($this->user_id)
 				));
 		}
-
+		
 		// my VoIP calls
 		if (Settings::get('voip_enabled') && $this->user_has_voip)
 		{
 			$menu->addItem(
-				'voip_calls/show_by_user/'.$this->user_id,
+				'voip_calls/show_by_user/'.$this->user_id, 
 				__('My VoIP calls'), 'account');
 		}
-
+		
 		//  my mail
 		$menu->addItem('mail/inbox', __('My mail'), 'account', array
 		(
 			'count' => $this->unread_user_mails
 		));
-
+		
 		/***********************     USERS     *************************/
-
+		
 		$menu->addGroup('users', __('Users'));
-
+		
 		// list of members
 		if ($this->acl_check_view('Members_Controller', 'members'))
 		{
 			$menu->addItem(
 				'members/show_all', __('Members'), 'users');
 		}
-
+		
 		/**
 		 * @todo Add own AXO
 		 */
-
+		
 		// list of registered applicants
-		if ((Settings::get('self_registration') || $pm->count_of_registered_members() > 0) &&
+		if (Settings::get('self_registration') &&
 		    $this->acl_check_view('Members_Controller', 'members'))
 		{
 			$menu->addItem(
@@ -869,7 +931,7 @@ class Controller extends Controller_Core
 					'count' => $pm->count_of_registered_members()
 				));
 		}
-
+		
 		// list of membership interrupts
 		if (Settings::get('membership_interrupt_enabled') &&
 			$this->acl_check_view('Members_Controller', 'membership_interrupts'))
@@ -879,7 +941,7 @@ class Controller extends Controller_Core
 				__('Membership interrupts'),
 				'users');
 		}
-
+		
 		// list of membership interrupts
 		if ($this->acl_check_view('Membership_transfers_Controller', 'membership_transfer'))
 		{
@@ -888,7 +950,7 @@ class Controller extends Controller_Core
 				__('Membership transfers'),
 				'users');
 		}
-
+		
 		// list of users
 		if ($this->acl_check_view('Users_Controller', 'users'))
 		{
@@ -896,11 +958,11 @@ class Controller extends Controller_Core
 				'users/show_all', __('Users'),
 				'users');
 		}
-
+		
 		/**************************     FINANCES      *****************/
-
+		
 		$menu->addGroup('transfer', __('Finances'));
-
+		
 		// list of unidentified transfers
 		if (Settings::get('finance_enabled') &&
 			$this->acl_check_view('Accounts_Controller', 'unidentified_transfers'))
@@ -913,7 +975,7 @@ class Controller extends Controller_Core
 				    'count' => $pm->scount_unidentified_transfers()
 				));
 		}
-
+		
 		// list of bank accounts
 		if (Settings::get('finance_enabled') &&
 			$this->acl_check_view('Accounts_Controller', 'bank_accounts'))
@@ -922,7 +984,7 @@ class Controller extends Controller_Core
 				'bank_accounts/show_all', __('Bank accounts'),
 				'transfer');
 		}
-
+		
 		// list of accounts
 		if (Settings::get('finance_enabled') &&
 			$this->acl_check_view('Accounts_Controller', 'accounts'))
@@ -931,11 +993,11 @@ class Controller extends Controller_Core
 				'accounts/show_all', __('Double-entry accounts'),
 				'transfer');
 		}
-
+		
 		/**
 		 * @todo Add own AXO
 		 */
-
+		
 		// list of transfers
 		if (Settings::get('finance_enabled') &&
 			$this->acl_check_view('Accounts_Controller', 'transfers'))
@@ -943,7 +1005,7 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'transfers/show_all', __('Day book'),'transfer');
 		}
-
+		
 		/**
 		 * @todo Add own AXO
 		 */
@@ -953,11 +1015,11 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'invoices/show_all', __('Invoices'), 'transfer');
 		}
-
+		
 		/**********************     APPROVAL     ***********************/
-
+		
 		$menu->addGroup('approval', __('Approval'));
-
+		
 		// list of works
 		if (Settings::get('works_enabled') &&
 		    $this->acl_check_view('Works_Controller', 'work'))
@@ -969,7 +1031,7 @@ class Controller extends Controller_Core
 					'count' => $pm->get_count_of_unvoted_works_of_voter($this->user_id)
 				));
 		}
-
+		
 		// list of work reports
 		if (Settings::get('works_enabled') &&
 		    $this->acl_check_view('Work_reports_Controller', 'work_report'))
@@ -981,7 +1043,7 @@ class Controller extends Controller_Core
 					'count' => $pm->get_count_of_unvoted_work_reports_of_voter($this->user_id)
 				));
 		}
-
+		
 		// list of requests
 		if (Settings::get('approval_enabled') &&
 			$this->acl_check_view('Requests_Controller', 'request'))
@@ -993,11 +1055,11 @@ class Controller extends Controller_Core
 					'count' => $pm->get_count_of_unvoted_requests_of_voter($this->user_id)
 				));
 		}
-
+		
 		/***********************      NETWORKS       ********************/
-
+		
 		$menu->addGroup('networks', __('Networks'));
-
+		
 		// list of connection requests
 		if (Settings::get('connection_request_enable') &&
 		    $this->acl_check_view('Connection_Requests_Controller', 'request'))
@@ -1010,7 +1072,7 @@ class Controller extends Controller_Core
 					'count' => $pm->count_undecided_requests()
 				));
 		}
-
+		
 		// list of devices
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Devices_Controller', 'devices'))
@@ -1019,7 +1081,7 @@ class Controller extends Controller_Core
 				'devices/show_all', __('Devices'),
 				'networks');
 		}
-
+		
 		// list of ifaces
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Ifaces_Controller', 'iface'))
@@ -1028,7 +1090,7 @@ class Controller extends Controller_Core
 				'ifaces/show_all', __('Interfaces'),
 				'networks');
 		}
-
+		
 		// list of IP addresses
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Ip_addresses_Controller', 'ip_address'))
@@ -1037,7 +1099,7 @@ class Controller extends Controller_Core
 				'ip_addresses/show_all', __('IP addresses'),
 				'networks');
 		}
-
+		
 		// list of subnets
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Subnets_Controller', 'subnet'))
@@ -1045,7 +1107,7 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'subnets/show_all', __('Subnets'), 'networks');
 		}
-
+		
 		// list of links
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Links_Controller', 'link'))
@@ -1053,7 +1115,7 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'links/show_all', __('Links'), 'networks');
 		}
-
+		
 		// list of VLANs
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Vlans_Controller', 'vlan'))
@@ -1061,7 +1123,7 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'vlans/show_all', __('Vlans'), 'networks');
 		}
-
+		
 		// list of VoIP numbers
 		if (Settings::get('voip_enabled') &&
 		    $this->acl_check_view('VoIP_Controller', 'voip'))
@@ -1069,7 +1131,7 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'voip/show_all', __('VoIP'), 'networks');
 		}
-
+		
 		// list of clouds
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Clouds_Controller', 'clouds'))
@@ -1077,7 +1139,7 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'clouds/show_all', __('Clouds'), 'networks');
 		}
-
+		
 		// tools
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Tools_Controller', 'tools'))
@@ -1085,7 +1147,7 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'tools/ssh', __('Tools'), 'networks');
 		}
-
+		
 		// traffic
 		if (Settings::get('ulogd_enabled') && (
 		    $this->acl_check_view('Ulogd_Controller', 'total') ||
@@ -1095,7 +1157,7 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'traffic', __('Traffic'), 'networks');
 		}
-
+		
 		// monitoring
 		if (Settings::get('monitoring_enabled') &&
 		    $this->acl_check_view('Monitoring_Controller', 'monitoring'))
@@ -1108,7 +1170,7 @@ class Controller extends Controller_Core
 					'color' => 'red'
 				));
 		}
-
+		
 		// list of DHCP servers
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Devices_Controller', 'devices'))
@@ -1121,17 +1183,9 @@ class Controller extends Controller_Core
 					'color' => 'red'
 				));
 		}
-
-		// dns server
-		if (module::e('networks') &&
-			$this->acl_check_view('Dns_Controller', 'zone'))
-		{
-			$menu->addItem(
-				'dns', __('DNS'), 'networks');
-		}
-
+		
 		/*****************     NOTIFICATIONS      *********************/
-
+		
 		if (module::e('notification'))
 		{
 			$menu->addGroup('redirection', __('Notifications'));
@@ -1161,11 +1215,11 @@ class Controller extends Controller_Core
 					'redirection');
 			}
 		}
-
+		
 		/****************       ADMINISTRATION       *******************/
-
+		
 		$menu->addGroup('administration', __('Administration'));
-
+		
 		// list of errors and logs
 		if ($this->acl_check_view('Log_queues_Controller', 'log_queue'))
 		{
@@ -1178,7 +1232,7 @@ class Controller extends Controller_Core
 					'color' => 'red'
 				));
 		}
-
+		
 		// settings
 		if ($this->acl_check_view('Settings_Controller', 'info') ||
 			$this->acl_check_edit('Settings_Controller', 'system_settings') ||
@@ -1200,7 +1254,7 @@ class Controller extends Controller_Core
 				'settings/', __('Settings'),
 				'administration');
 		}
-
+		
 		// list of address points
 		if ($this->acl_check_view('Address_points_Controller', 'address_point'))
 		{
@@ -1208,7 +1262,7 @@ class Controller extends Controller_Core
 				'address_points/show_all', __('Address points'),
 				'administration');
 		}
-
+		
 		// list of SMS messages
 		if (Settings::get('sms_enabled') &&
 			$this->acl_check_view('Sms_Controller', 'sms'))
@@ -1217,7 +1271,7 @@ class Controller extends Controller_Core
 				'sms/show_all', __('SMS messages'),
 				'administration');
 		}
-
+		
 		// list of e-mails
 		if (Settings::get('email_enabled') &&
 			$this->acl_check_view('Email_queues_Controller', 'email_queue'))
@@ -1226,7 +1280,7 @@ class Controller extends Controller_Core
 				'email_queues/show_all_unsent', __('E-mails'),
 				'administration');
 		}
-
+		
 		// list of device_templates
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Device_templates_Controller', 'device_template'))
@@ -1235,7 +1289,7 @@ class Controller extends Controller_Core
 				'device_templates/show_all', __('Device templates'),
 				'administration');
 		}
-
+		
 		// list of device_templates
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Device_active_links_Controller', 'active_links'))
@@ -1244,7 +1298,7 @@ class Controller extends Controller_Core
 					'device_active_links/show_all', __('Device active links'),
 					'administration');
 		}
-
+		
 		// list of approval templates
 		if (Settings::get('approval_enabled') &&
 			$this->acl_check_view('approval', 'templates'))
@@ -1253,7 +1307,7 @@ class Controller extends Controller_Core
 				'approval_templates/show_all', __('Approval templates'),
 				'administration');
 		}
-
+		
 		// access rights
 		if ($this->acl_check_view('Acl_Controller', 'acl'))
 		{
@@ -1267,7 +1321,7 @@ class Controller extends Controller_Core
 				'aro_groups/show_all', __('Access control groups of users'),
 				'administration');
 		}
-
+		
 		// list of fees
 		if (Settings::get('finance_enabled') &&
 			$this->acl_check_view('Fees_Controller', 'fees'))
@@ -1276,7 +1330,7 @@ class Controller extends Controller_Core
 				'fees/show_all', __('Fees'),
 				'administration');
 		}
-
+		
 		// list of login logs
 		if ($this->acl_check_view('Login_logs_Controller', 'logs'))
 		{
@@ -1284,7 +1338,7 @@ class Controller extends Controller_Core
 				'login_logs/show_all', __('Login logs'),
 				'administration');
 		}
-
+		
 		// list of action logs
 		if (Settings::get('action_logs_active') &&
 		    $this->acl_check_view('Logs_Controller', 'logs'))
@@ -1293,18 +1347,18 @@ class Controller extends Controller_Core
 				'logs/show_all', __('Action logs'),
 				'administration');
 		}
-
+		
 		// list of stats
 		if ($this->acl_check_view('Stats_Controller', 'members_fees') ||
 			$this->acl_check_view('Stats_Controller', 'incoming_member_payment') ||
-			$this->acl_check_view('Stats_Controller', 'members_growth') ||
+			$this->acl_check_view('Stats_Controller', 'members_growth') || 
 			$this->acl_check_view('Stats_Controller', 'members_increase_decrease'))
 		{
 			$menu->addItem(
 				'stats', __('Stats'),
 				'administration');
 		}
-
+		
 		// list of translations
 		if ($this->acl_check_view('Translations_Controller', 'translation'))
 		{
@@ -1312,7 +1366,7 @@ class Controller extends Controller_Core
 				'translations/show_all', __('Translations'),
 				'administration');
 		}
-
+		
 		// list of enumerations
 		if ($this->acl_check_view('Enum_types_Controller', 'enum_types'))
 		{
@@ -1320,7 +1374,7 @@ class Controller extends Controller_Core
 				'enum_types/show_all', __('Enumerations'),
 				'administration');
 		}
-
+		
 		// list of phone invoices
 		if (Settings::get('phone_invoices_enabled') &&
 			$this->acl_check_view('Phone_invoices_Controller', 'invoices'))
@@ -1329,7 +1383,7 @@ class Controller extends Controller_Core
 				'phone_invoices/show_all', __('Phone invoices'),
 				'administration');
 		}
-
+		
 		// list of speed classes
 		if ($this->acl_check_view('Speed_classes_Controller', 'speed_classes'))
 		{
@@ -1337,7 +1391,7 @@ class Controller extends Controller_Core
 				'speed_classes/show_all', __('Speed classes'),
 				'administration');
 		}
-
+		
 		// list of phone operators
 		if (Settings::get('sms_enabled') &&
 			$this->acl_check_view('Phone_operators_Controller', 'phone_operators'))
@@ -1346,16 +1400,7 @@ class Controller extends Controller_Core
 				'phone_operators/show_all', __('Phone operators'),
 				'administration');
 		}
-
-		// list of API accouts
-		if (Settings::get('api_enabled') &&
-			$this->acl_check_view('Api_Controller', 'account'))
-		{
-			$menu->addItem(
-				'api_accounts/show_all', __('API accounts'),
-				'administration');
-		}
-
+		
 		// list of filter queries
 		if ($this->acl_check_view('Filter_queries_Controller', 'filter_queries'))
 		{
@@ -1363,13 +1408,13 @@ class Controller extends Controller_Core
 				'filter_queries/show_all', __('Filter queries'),
 				'administration');
 		}
-
+		
 		return $menu;
 	}
-
+	
 	/**
 	 * Return URL for controller and method
-	 *
+	 * 
 	 * @author Michal Kliment
 	 * @param string $method
 	 * @param string $controller
@@ -1379,24 +1424,24 @@ class Controller extends Controller_Core
 	{
 		$args = func_get_args();
 		$additional = '';
-
+		
 		switch (func_num_args())
 		{
 			case 0:
 				// method is not set, use current
 				$debug = debug_backtrace();
 				$method = $debug[1]['function'];
-
+				
 				// controller is not set use current
 				$controller = str_replace('_controller', '', strtolower(get_class($this)));
 				break;
-			case 1:
+			case 1:	
 				$method = $args[0];
-
+				
 				// controller is not set use current
 				$controller = str_replace('_controller', '', strtolower(get_class($this)));
 				break;
-
+			
 			default:
 				$controller = array_shift($args);
 				$method = array_shift($args);
@@ -1405,20 +1450,20 @@ class Controller extends Controller_Core
 					$additional = '/'.$additional;
 				break;
 		}
-
+		
 		return url_lang::base(). $controller.'/'.$method.$additional;
 	}
-
+	
 	/**
 	 * Redirects to uri according to attribute noredirect
-	 *
+	 * 
 	 * @author Michal Kliment
 	 * @param string $uri
 	 * @param integer $id [optional]
 	 * @param string $glue [optional]
 	 */
 	public function redirect($uri = NULL, $id = NULL, $glue = '/')
-	{
+	{	
 		if (($pos = strpos($uri, url::base())) === FALSE)
 		{
 			$url = call_user_func_array(
@@ -1430,7 +1475,7 @@ class Controller extends Controller_Core
 		{
 			$url = trim($uri, '/');
 		}
-
+		
 		if ($id)
 		{
 			$url .= $glue.$id;

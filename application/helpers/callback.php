@@ -174,48 +174,20 @@ class callback
 	}
 	
 	/**
-	
 	 * Callback for money, gets price from property with name given by args.
 	 *
-	 * @author Ondrej Fibich, Honza Dubina
+	 * @author Ondrej Fibich
 	 * @param object $item
 	 * @param string $name
-	 * @param array $args	
-	 *						no_transfer - do not print link to transfer
-	 *						round - custom rounding according to rounding type property
-	 *						print_zero - prints zero price with correct formating  
 	 */
-	public static function money($item, $name, $args = array())
+	public static function money($item, $name)
 	{
-		if (in_array('print_zero', $args))
+		if (empty($item->$name))
 		{
-			
-			if (is_null($item->$name))
-				return; // NULL value
+			return; // NULL value
 		}
-		else
-		{
-			if (empty($item->$name))
-				return; // 0 value
-			
-		}
-
-
-		$price = $item->$name;
 		
-		// has rounding type?
-		
-		/*if (property_exists($item, 'rounding_type') && 
-						in_array('round', $args))
-		{
-			$price = Invoices_Controller::round_price($price, $item->rounding_type);
-		}
-		else
-		{*/
-			$price = round($price, 2);
-		//}
-		
-		$price = number_format($price, 2, ',', ' ') . ' ';
+		$price = number_format($item->$name, 2, ',', ' ') . ' ';
 		$price = str_replace(' ', '&nbsp;', $price);
 		
 		// has currency?
@@ -230,9 +202,7 @@ class callback
 		}
 		
 		// has transfer?
-		if (Settings::get('finance_enabled') && 
-				property_exists($item, 'transfer_id') && $item->transfer_id &&
-				!in_array('no_transfer', $args))
+		if (Settings::get('finance_enabled') && property_exists($item, 'transfer_id') && $item->transfer_id)
 		{
 			echo html::anchor('transfers/show/' . $item->transfer_id, $price);
 		}
@@ -445,57 +415,7 @@ class callback
 			echo $item->amount;
 		}
 	}
-
-	/**
-	 * @author David Raska
-	 * @param $item
-	 * @param $name
-	 */
-	public static function amount_after_transfer_field($item, $name , $args = array())
-	{
-		static $tm = null;
-
-		if ($tm == null)
-		{
-			$tm = new Transfer_Model();
-		}
-
-		if (!isset($args[0]))
-		{
-			return;
-		}
-
-		$sum = $tm->sum_transfers_to_id($args[0], $item->id);
-
-		if ($sum > 0)
-		{
-			echo  '<span style="color:green">'
-				. number_format((float)$sum, 2, ',', ' ')
-				. '</span>';
-		}
-		else if ($sum < 0)
-		{
-			echo  '<span style="color:red">'
-				. number_format((float)$sum, 2, ',', ' ')
-				. '</span>';
-		}
-		else
-		{
-			echo $sum;
-		}
-	}
 	
-	/**
-	 * API account log type callback - simply prints name of type.
-	 * 
-	 * @param object $item
-	 * @param string $name
-	 */
-	public static function api_account_log_type($item, $name)
-	{
-		echo Api_account_log_Model::get_type_name($item->{$name});
-	}
-
 	/**
 	 * Callback function to print ARO groups count with their preview of values
 	 * 
@@ -907,32 +827,6 @@ class callback
 	public static function dhcp_servers_last_access_diff_field($item, $name)
 	{
 		$timeout = Settings::get('dhcp_server_reload_timeout');
-		
-		if (empty($item->$name))
-		{
-			echo '<b class="error_text">' . __('Never') . '</b>';
-		}
-		else if (abs(time() - strtotime($item->$name)) > $timeout)
-		{
-			echo '<b class="error_text">';
-			self::datetime_diff($item, $name);
-			echo '</b>';
-		}
-		else
-		{
-			echo self::datetime_diff($item, $name);
-		}
-	}
-	
-	/**
-	 * DNS last access color diff.
-	 * 
-	 * @param object $item
-	 * @param string $name
-	 */
-	public static function dns_servers_last_access_diff_field($item, $name)
-	{
-		$timeout = Settings::get('dns_server_reload_timeout');
 		
 		if (empty($item->$name))
 		{
@@ -1520,29 +1414,6 @@ class callback
 	}
 
 	/**
-	 * Callback field for user name. Leaves blank name if needed.
-	 *
-	 * @author David Raska
-	 * @param object $item
-	 * @param string $name
-	 */
-	public static function user_field($item, $name, $args = array())
-	{
-		if ($item->user_id)
-		{
-			echo html::anchor("users/show/$item->user_id", $item->user_name);
-		}
-		elseif (isset($args[0]))
-		{
-			echo $args[0];
-		}
-		else
-		{
-			echo '&nbsp';
-		}
-	}
-
-	/**
 	 * Callback field for member name. Leaves blank name if needed.
 	 * 
 	 * @author Jiri Svitak
@@ -2124,18 +1995,6 @@ class callback
 		
 		echo $price;
 	}
-	
-	/**
-	 * Callback function to print TX and RX rate of device
-	 * 
-	 * @author Michal Kliment
-	 * @param object $item
-	 * @param string $name
-	 */
-	public static function rate_field ($item, $name)
-	{
-		echo network::speed($item->tx_rate, 1000).' / '.network::speed($item->rx_rate, 1000);
-	}
 
 	/**
 	 * Callback field for redirection.
@@ -2557,25 +2416,6 @@ class callback
 				     htmlspecialchars($value) . '<br />';
 			}
 		}
-	}
-
-	public static function verified_contact($item , $name)
-	{
-		if ($item->type == Contact_Model::TYPE_EMAIL)
-		{
-			if ($item->verify == 1)
-			{
-				echo "<span class=\"more\" title=\"".__('Contact verified')."\">" . $item->value."</span>";
-			}
-			else
-			{
-				echo "<span class=\"more notverified\" title=\"".__('Contact not verified')."\">" . $item->value."</span>";
-			}
-
-			return;
-		}
-
-		echo $item->value;
 	}
 	
 	/**

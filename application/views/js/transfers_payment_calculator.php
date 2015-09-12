@@ -54,19 +54,9 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				data:		{calculate: calculate, amount: amount, expiration_date: expiration_date},
 				success:	function (data) {
 					$('#'+calculate).val(data);
-					<?php if($show_qr): ?>
-						var accountNumber = "<?php echo $account_nr ?>";
-						var bankCode = "<?php echo $bank_nr ?>";
-						var	currency = "<?php echo Settings::get('currency') ?>";
-						var vs = "<?php echo $variable_symbol ?>";
-						<?php if ($bank_nr != ''): ?>
-						$('#qrpay').attr('src', 'http://api.paylibo.com/paylibo/generator/czech/image?accountNumber='+accountNumber+'&bankCode='+bankCode+'&amount='+$('#amount').val()+'&currency='+currency+'&vs='+vs+'&size=100');
-						<?php endif; ?>
-					<?php endif; ?>
 				},
 				error:		function () {
 					$('#'+calculate).val('');
-					$('#qrpay').attr('src', '');
 					alert('<?php echo __('Error during obtaining data from server') ?>');
 				},
 				dataType:	'html',
@@ -76,7 +66,6 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		else
 		{
 			$('#'+calculate).val('');
-			$('#qrpay').attr('src', '');
 		}
 		
 		$('.add_link').attr('href', '<?php echo url_lang::base() ?>transfers/add_member_fee_payment_by_cash/<?php echo $member_id ?>/'+parseFloat($('#amount').val()))
@@ -86,5 +75,3 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	$('#amount', context).css('width', parseInt($('#amount', context).css('width'))-23);
 	$('<a href="<?php echo url_lang::base() ?>transfers/add_member_fee_payment_by_cash/<?php echo $member_id ?>" class="add_link popup_link"><img class="purse" src="<?php echo url::base() ?>media/images/icons/purse.png" width="16" height="16"></a>').insertAfter($('#amount', context));
 	<?php endif ?>
-		
-	$('#amount').parents('form').after('<img id="qrpay" src="" />');

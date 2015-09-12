@@ -8,7 +8,7 @@
  * @author     Kohana Team
  * @copyright  (c) 2007-2008 Kohana Team
  * @license    http://kohanaphp.com/license.html
- *
+ * 
  * @property Loader $load
  * @property URI $uri
  * @property Input $input
@@ -28,6 +28,9 @@ class Controller_Core {
 			Kohana::$instance = $this;
 
 			// Loader should always be available
+			$this->load = new Loader;
+
+			// Loader should always be available
 			$this->uri = new URI;
 
 			// Input should always be available
@@ -35,6 +38,9 @@ class Controller_Core {
 		}
 		else
 		{
+			// Loader should always be available
+			$this->load = Kohana::$instance->load;
+
 			// Loader should always be available
 			$this->uri = Kohana::$instance->uri;
 

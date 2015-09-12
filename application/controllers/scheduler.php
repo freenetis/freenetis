@@ -345,12 +345,9 @@ class Scheduler_Controller extends Controller
 				// import 
 				try
 				{
-                    $association = new Member_Model(Member_Model::ASSOCIATION);
-                    $user_id = $association->get_main_user();
 					// download&import
 					$bs = Bank_Statement_File_Importer::download(
-							$bank_account_model, $settings, $user_id,
-                            $a_email, $a_sms
+							$bank_account_model, $settings, $a_email, $a_sms
 					);
 					
 					// inform
@@ -1017,13 +1014,8 @@ class Scheduler_Controller extends Controller
 			$recipients = new Swift_RecipientList;
 			$recipients->addTo($email->to);
 			
-			// E-mail hash
-			$hash = sha1($email->id . $email->to . $email->body);
-			$email->hash = $hash;
-			
 			// Build the HTML message
-			$html_message = email::create_preview_link($hash) . $email->body;
-			$message = new Swift_Message($email->subject, $html_messsage, 'text/html');
+			$message = new Swift_Message($email->subject, $email->body, 'text/html');
 			
 			// Send
 			if (Config::get('unit_tester') || 

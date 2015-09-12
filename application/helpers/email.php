@@ -103,21 +103,5 @@ class email {
 
 		return self::$mail->send($message, $to, $from);
 	}
-	
-	/**
-	 * Creates "show e-mail in browser" link
-	 * @param string $hash 
-	 * @return string
-	 */
-	public static function create_preview_link($hash = NULL)
-	{
-		if ($hash === NULL)
-		{
-			return '';
-		}
-		
-		return '<a href="' . url_lang::base() . 'email/preview?id='. $hash. '">' . __('Show e-mail in browser') .
-				'</a><br /><br /><img src="' . url_lang::base() . 'email/displayed/?id=' . $hash . '" /><br />';
-	}
 
 } // End email

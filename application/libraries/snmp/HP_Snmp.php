@@ -37,7 +37,6 @@ class HP_Snmp extends Abstract_Snmp
 		try
 		{
 			$this->startErrorHandler();
-			snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
 			$row = snmp2_get(
 					$device_ip, $this->comunity, 'iso.3.6.1.2.1.1.1.0',
 					$this->timeout, $this->retries
@@ -49,7 +48,17 @@ class HP_Snmp extends Abstract_Snmp
 			return FALSE;
 		}
 		
-		return (text::starts_with($row, 'HP '));
+		// parse result
+		$matches = array();
+		
+		if (preg_match('/STRING: "?(.*)"?/', $row, $matches) > 0)
+		{
+			return (text::starts_with($matches[1], 'HP '));
+		}
+		else
+		{
+			return FALSE;
+		}
 	}
 	
 	/**
@@ -62,22 +71,10 @@ class HP_Snmp extends Abstract_Snmp
 	 */
 	public function getARPMacAddressOf($device_ip)
 	{
-		if (!valid::ip($device_ip))
-		{
-			throw new InvalidArgumentException('Wrong IP address of the device');
-		}
-		
-		$arp_table = $this->getARPTable();
-		
-		if (array_key_exists($device_ip, $arp_table))
-		{
-			return $arp_table[$device_ip]->mac_address;
-		}
-		else
-		{
-			throw new Exception('Given IP address ' . $device_ip
-				. ' not in ARP table on ' . $this->deviceIp);
-		}
+		/**
+		 * @todo Do it :-)
+		 */
+		return FALSE;
 	}
 	
 	/**
@@ -93,7 +90,7 @@ class HP_Snmp extends Abstract_Snmp
 		/**
 		 * @todo Do it :-)
 		 */
-		throw new DHCPMacAddressException('Not implemented');
+		return FALSE;
 	}
 	
 	/**
@@ -114,9 +111,8 @@ class HP_Snmp extends Abstract_Snmp
 		// covert MAC address to decimal format
 		$dec_mac_address = implode('.', array_map('hexdec', explode(":", $mac_address)));
 		
-		// obtain whole MAC table
+		// obtain whole ARP table
 		$this->startErrorHandler();
-		snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
 		$arp_table = snmp2_real_walk(
 				$this->deviceIp, $this->comunity, 'iso.3.6.1.2.1.17.7.1.2.2.1.2',
 				$this->timeout, $this->retries
@@ -138,186 +134,4 @@ class HP_Snmp extends Abstract_Snmp
 		}
 	}
 	
-	/**
-	 * Obtain names of all network interfaces of device
-	 * 
-	 * @return array Network interfaces of device
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public function getIfaces()
-	{
-		$this->startErrorHandler();
-		snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
-		$data = snmp2_real_walk(
-				$this->deviceIp, $this->comunity, 
-				'iso.3.6.1.2.1.31.1.1.1.1',
-				$this->timeout, $this->retries
-		);
-		$this->stopErrorHandler();
-		
-		$ifaces = array();
-		foreach ($data as $key => $value)
-		{
-			$oids = explode('.', $key);
-			
-			$iface_id = array_pop($oids);
-			
-			$ifaces[$iface_id] = $value;
-		}
-		
-		return $ifaces;
-	}
-	
-	/**
-	 * Obtain current state of device's ports
-	 * 
-	 * @return array Current states of all ports
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public function getPortStates()
-	{
-		$this->startErrorHandler();
-		snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
-		$port_states = snmp2_real_walk(
-				$this->deviceIp, $this->comunity, 
-				'iso.3.6.1.2.1.2.2.1.8',
-				$this->timeout, $this->retries
-		);
-		$this->stopErrorHandler();
-		
-		$states = array();
-		foreach ($port_states as $key => $value)
-		{
-			$pieces = explode('.', $key);
-			
-			$port_nr = array_pop($pieces);
-			
-			$states[$port_nr] = $value == 1 ? 1 : 0;
-		}
-		
-		return $states;
-	}
-	
-	/**
-	 * Obtain ARP table of device
-	 * 
-	 * @return array Whole ARP table from device
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public function getARPTable()
-	{
-		// obtain whole ARP table
-		$this->startErrorHandler();
-		snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
-		$arp_table = snmp2_real_walk(
-				$this->deviceIp, $this->comunity, 
-				'iso.3.6.1.2.1.3.1.1',
-				$this->timeout, $this->retries
-		);
-		$this->stopErrorHandler();
-		
-		$ifaces = self::getIfaces();
-		
-		$items = array();
-		foreach ($arp_table as $key => $value)
-		{
-			$pieces = explode('.', $key);
-			
-			$i = implode('.', array_slice($pieces, -4));
-			
-			if (!array_key_exists($i, $items))
-				$items[$i] = new stdClass ();
-			
-			switch ($pieces[9])
-			{
-				case '1':
-					$items[$i]->iface_name = $ifaces[$value];
-					break;
-				
-				case '2':
-					$items[$i]->mac_address = network::bin2mac($value);
-					break;
-				
-				case '3':
-					$items[$i]->ip_address = $value;
-					break;
-			}
-		}
-		
-		return $items;
-	}
-	
-	/**
-	 * Obtain DHCP leases of device
-	 * 
-	 * @return array All DHCP leases
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public function getDHCPLeases()
-	{
-		return array();
-	}
-	
-	/**
-	 * Obtain device's hostname from DHCP leases of device
-	 * 
-	 * @param string $device_ip IP address to which we will search for hostname
-	 * @return string Hostname for given IP address
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 * @throws InvalidArgumentException On wrong IP address
-	 */
-	public function getDHCPHostnameOf($device_ip)
-	{
-		return FALSE;
-	}
-	
-	/**
-	 * Obtain wireless info of device
-	 * 
-	 * @return array Current wireless info
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public function getWirelessInfo()
-	{
-		return array();
-	}
-	
-	/**
-	 * Obtain MAC table from device
-	 * 
-	 * @return array Whole MAC table
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public function getMacTable()
-	{	
-		// obtain whole ARP table
-		$this->startErrorHandler();
-		snmp_set_valueretrieval(SNMP_VALUE_PLAIN);
-		$arp_table = snmp2_real_walk(
-				$this->deviceIp, $this->comunity, 'iso.3.6.1.2.1.17.7.1.2.2.1.2',
-				$this->timeout, $this->retries
-		);
-		$this->stopErrorHandler();
-		
-		$items = array();
-		foreach ($arp_table as $key => $value)
-		{
-			$pieces = explode('.', $key);
-			
-			$item = new stdClass();
-			
-			$item->port_nr = $value;
-			
-			$i = implode('.', array_slice($pieces, -6));
-
-			$item->mac_address = network::dec2mac($i);
-
-			$items[$i] = $item;
-			$ports[$i] = $value;
-		}
-		
-		array_multisort($ports, $items);
-		
-		return $items;
-	}
 }

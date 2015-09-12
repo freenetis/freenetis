@@ -137,11 +137,6 @@ class Message_Model extends ORM
 	 */
 	const FORMER_MEMBER_MESSAGE											= 19;
 	
-	/**
-	 * content of e-mail for contact verification
-	 */
-	const VERIFY_CONTACT_MESSAGE										= 20;
-	
 	// self-cancel constants
 	
 	/**
@@ -188,7 +183,6 @@ class Message_Model extends ORM
 		self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE	=> 'Membership interrupt begins notification',
 		self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE		=> 'Membership interrupt ends notification',
 		self::FORMER_MEMBER_MESSAGE							=> 'Former member message',
-		self::VERIFY_CONTACT_MESSAGE							=> 'Verify contact message'
 	);
 	
 	/**
@@ -314,8 +308,7 @@ class Message_Model extends ORM
 			$type != self::MONITORING_HOST_DOWN &&
 			$type != self::MONITORING_HOST_UP &&
 			$type != self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE &&
-			$type != self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE &&
-			$type != self::VERIFY_CONTACT_MESSAGE
+			$type != self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE
 		);
 	}
 	
@@ -343,8 +336,7 @@ class Message_Model extends ORM
 			$type == self::MONITORING_HOST_UP ||
 			$type == self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE ||
-			$type == self::FORMER_MEMBER_MESSAGE ||
-			$type == self::VERIFY_CONTACT_MESSAGE
+			$type == self::FORMER_MEMBER_MESSAGE
 		);
 	}
 	
@@ -397,8 +389,7 @@ class Message_Model extends ORM
 			$type != self::INTERRUPTED_MEMBERSHIP_MESSAGE &&
 			$type != self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE &&
 			$type != self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE &&
-			$type != self::FORMER_MEMBER_MESSAGE &&
-			$type != self::VERIFY_CONTACT_MESSAGE
+			$type != self::FORMER_MEMBER_MESSAGE
 		);
 	}
 	

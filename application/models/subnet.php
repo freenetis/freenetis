@@ -586,12 +586,10 @@ class Subnet_Model extends ORM
 	 * Returns all subnets by device
 	 * 
 	 * @author Michal Kliment
-	 * @param type $device_id ID of device
-	 * @param type $gateway Returns only subnet where device is gateway
-	 * @param type $dhcp Returns only subnet where DHCP server is runnning
-	 * @return MySQL_Result object
+	 * @param type $device_id
+	 * @return type 
 	 */
-	public function get_all_subnets_by_device ($device_id = NULL, $gateway = FALSE, $dhcp = FALSE)
+	public function get_all_subnets_by_device ($device_id = NULL, $gateway = FALSE)
 	{
 		if (!$device_id)
 			$device_id = $this->id;
@@ -601,17 +599,14 @@ class Subnet_Model extends ORM
 		if ($gateway)
 			$where .= ' AND gateway = 1';
 		
-		if ($dhcp)
-			$where .= ' AND s.dhcp = 1';
-		
 		return $this->db->query("
 			SELECT
-				s.*, s.name AS subnet_name, ip.subnet_id, ip.gateway,
+				s.*, ip.gateway,
 				32-log2((~inet_aton(netmask) & 0xffffffff) + 1) AS subnet_range,
 				ip.ip_address, INET_NTOA(INET_ATON(ip.ip_address)+1) AS subnet_range_start,
 				INET_NTOA(INET_ATON(ip.ip_address)+(~inet_aton(netmask) & 0xffffffff)-2) AS subnet_range_end,
 				INET_NTOA(INET_ATON(ip.ip_address)+(~inet_aton(netmask) & 0xffffffff)-1) AS broadcast,
-				i.name AS iface, i.id AS iface_id, i.name AS iface_name
+				i.name AS iface
 			FROM ip_addresses ip
 			JOIN subnets s ON s.id = ip.subnet_id
 			JOIN ifaces i ON i.id = ip.iface_id

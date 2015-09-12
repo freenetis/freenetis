@@ -172,9 +172,7 @@ class Account_Model extends ORM
 	}
 
 	/**
-	 * Function gets some double-entry accounts. Used in dropdown to select
-     * destination account.
-     *
+	 * Function gets some double-entry accounts. Used in dropdown to select destination account.
 	 * @param integer $origin
 	 * @param integer $account_attribute_id
 	 * @return Mysql_Result
@@ -194,74 +192,50 @@ class Account_Model extends ORM
                     . " AND a.account_attribute_id IN (" 
                     . implode(', ', array_map('intval', $allowed_types)) . ")";
 		}
-		// make account confition
+		// make account attribute condition
 		if ($account_attribute_id)
 		{
 			$where = 'WHERE a.account_attribute_id=' . intval($account_attribute_id);
 		}
 		// query
 		return $this->db->query("
-			SELECT a.id, a.name, a.member_id, m.name AS member_name,
-                a.account_attribute_id
+			SELECT a.id, a.name, a.member_id, a.account_attribute_id,
+                m.name as member_name
 			FROM accounts a
 			JOIN members m ON a.member_id=m.id $cond_origin
 			$where
 			ORDER BY a.name
 		");
 	}
-	
-	/**
-	 * Returns gesult of get_some_doubleentry_account_names for
-	 * dropdown but grouped.
-	 * 
-	 * @author Ondřej Fibich
-	 * @param integer $origin
-	 * @param integer $account_attribute_id
-	 * @return array
-	 */
-	public function get_some_doubleentry_account_names_grouped(
-			$origin = null, $account_attribute_id = null)
-	{
-		// keys
-		$keys = array(__('Association'), __('Members'));
-		
-		// result
-		$grouped_accounts = array
-		(
-			$keys[0]	=> array(),
-			$keys[1]	=> array()
-		);
-		
-		// get accounts
-		$accounts = $this->get_some_doubleentry_account_names(
-			$origin, $account_attribute_id);
-		
-		// group them
-		foreach ($accounts as $account)
+
+    /**
+     * Select some double entry accounts for select. If origin is supplied than
+     * account with origin ID is not in list. If account attribute ID is
+     * supplied than only account with given attribute ID are listed.
+     *
+     * @author Ondřej Fibich <fibich@freenetis.org>
+     * @param integer $origin optional origin account ID to be ignored
+     * @param type $account_attribute_id optional account attribute ID for filter
+     * @return array associative array with account ID as key and text
+     *      reprezentation of account as value (name, ID, attribute ID, owner
+     *      member ID)
+     */
+    public function select_some_list($origin = NULL, $account_attribute_id = NULL)
+    {
+        $accounts = $this->get_some_doubleentry_account_names($origin,
+                $account_attribute_id);
+        $arr_accounts = array();
+		foreach ($accounts as $a)
 		{
-			if ($account->member_id == Member_Model::ASSOCIATION)
-			{
-				$index = $keys[0];
-			}
-			else
-			{
-				$index = $keys[1];
-			}
-			
-			if (!array_key_exists($index, $grouped_accounts))
-			{
-				$grouped_accounts[$index] = array();
-			}
-			
-			$grouped_accounts[$index][$account->id] = $account->name 
-                    . ' (' . $account->id . ', ' 
-                    . $account->account_attribute_id . ', '
-                    . $account->member_id . ')';
+			$name = $a->name . ' (' . $a->id . ', ' . $a->account_attribute_id . ')';
+            if ($a->account_attribute_id == Account_attribute_Model::CREDIT)
+            {
+                $name .= ' - ' . $a->member_name . ' (' . $a->member_id . ')';
+            }
+			$arr_accounts[$a->id] = $name;
 		}
-		
-		// done
-		return $grouped_accounts;
-	}
+        return $arr_accounts;
+    }
 
 	/**
 	 * It gets balance of account.
@@ -780,30 +754,5 @@ class Account_Model extends ORM
 		return $this->in('account_attribute_id', $aaids, TRUE)
 				->select_list('id', $concat, 'account_attribute_id');
     }
-
-	/**
-	 * Returns grouped accounts for use in json response for account filter
-	 *
-	 * @param string $filter_sql
-	 * @return Database_Result
-	 */
-	public function get_accounts_to_dropdown($filter_sql = '')
-	{
-		$having = '';
-
-		// filter
-		if (!empty($filter_sql))
-		{
-			$having = "HAVING $filter_sql";
-		}
-
-		// query
-		return $this->db->query("
-			SELECT a.id, a.member_id, a.name as aname, m.name as mname, a.account_attribute_id
-			FROM accounts a
-			LEFT JOIN members m ON m.id = a.member_id
-			$having
-			ORDER BY aname
-		");
-	}
+	
 }

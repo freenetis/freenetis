@@ -1,6 +1,6 @@
 <?php
 
-require_once APPPATH . '/libraries/variable_key_generators/Checksum_Variable_Key_Generator.php';
+require_once dirname(__FILE__) . '/../../../../application/libraries/variable_key_generators/Checksum_Variable_Key_Generator.php';
 
 /**
  * Test class for Parity_Variable_Key_Generator.

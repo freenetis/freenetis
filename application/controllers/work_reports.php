@@ -32,7 +32,7 @@ class Work_reports_Controller extends Controller
 	public function __construct()
 	{
 	    parent::__construct();
-
+	    
 	    // works are not enabled
 	    if (!Settings::get('works_enabled'))
 			Controller::error (ACCESS);
@@ -53,10 +53,10 @@ class Work_reports_Controller extends Controller
 	 * @param string $order_by
 	 * @param string $order_by_direction
 	 * @param integer $page_word
-	 * @param integer $page
+	 * @param integer $page 
 	 */
 	public function show_all(
-			$limit_results = 20, $order_by = 'id', $order_by_direction = 'DESC',
+			$limit_results = 20, $order_by = 'id', $order_by_direction = 'ASC',
 			$page_word = null, $page = 1)
 	{
 		// acccess control
@@ -426,7 +426,7 @@ class Work_reports_Controller extends Controller
 		/* Approved */
 		
 		$approved = $work_report->get_approved_work_reports_of_user($user->id);
-
+		
 		foreach ($approved as $approve)
 		{
 			$approved_stats['hours'] += $approve->hours;
@@ -934,8 +934,7 @@ class Work_reports_Controller extends Controller
 					if (count($states[Vote_Model::STATE_APPROVED]))
 					{
 						// send money
-						if (Settings::get('finance_enabled') &&
-							$work_report_model->payment_type == Job_report_Model::PAYMENT_BY_CREDIT)
+						if (Settings::get('finance_enabled') && $work_report_model->payment_type == Job_report_Model::PAYMENT_BY_CREDIT)
 						{
 							$transfer_id = Transfer_Model::insert_transfer_for_work_approve(
 									$work_report_model->user->member_id, $amount

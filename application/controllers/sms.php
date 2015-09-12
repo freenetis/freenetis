@@ -565,14 +565,12 @@ class Sms_Controller extends Controller
 		$form->dateselect('stamp')
 				->label(__('Date') . ':');
 		
-		$form->textarea('sms_text')
-				->label('Text')
+		$form->textarea('text')
 				->rules('length[1,760]|required')
 				->style('width: 530px; height: 150px');
 		
 		$form->input('counter')
-				->style('width:530px;')
-				->label('<span></span>');	//use empty span element to prevent adding ":" after empty label
+				->style('width:530px;');
 
 		$form->hidden('s_id')
 				->value($sms_id);
@@ -618,7 +616,7 @@ class Sms_Controller extends Controller
 					$sms->sms_message_id = $form_data['s_id'];
 					$sms->stamp = date('Y-m-d H:i:s', time());
 					$sms->send_date = date('Y-m-d H:i:s', $form_data['stamp']);
-					$sms->text = text::cs_utf2ascii($form_data['sms_text']);
+					$sms->text = text::cs_utf2ascii($form_data['text']);
 					$sms->sender = $form_data['sender_number'];
 					$sms->receiver = $phone;
 					$sms->driver = $form_data['sms_driver'];

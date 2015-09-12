@@ -2,13 +2,13 @@
 /*
  * This file is part of open source system FreenetIS
  * and it is released under GPLv3 licence.
- *
+ * 
  * More info about licence can be found:
  * http://www.gnu.org/licenses/gpl-3.0.html
- *
+ * 
  * More info about project can be found:
  * http://www.freenetis.org/
- *
+ * 
  */
 
 require_once APPPATH."libraries/importers/Raiffeisenbank/RB_Importer.php";
@@ -19,7 +19,7 @@ require_once APPPATH."libraries/importers/Unicredit/UnicreditSaver.php";
 
 /**
  * Handles importing of all types of bank listings into the database.
- *
+ * 
  * @author Tomas Dulik, Jiri Svitak
  * @package Controller
  */
@@ -43,7 +43,7 @@ class Import_Controller extends Controller
 	public function __construct()
 	{
 		parent::__construct();
-
+		
 		if (!Settings::get('finance_enabled'))
 			Controller::error(ACCESS);
 
@@ -82,7 +82,7 @@ class Import_Controller extends Controller
 
 		if (!$bank_acc_model->id)
 			Controller::error(RECORD);
-
+		
 		try
 		{
 			$ba_drive = Bank_Account_Settings::factory($bank_acc_model->type);
@@ -92,19 +92,19 @@ class Import_Controller extends Controller
 		{
 			$ba_drive = NULL;
 		}
-
+			
 		if (!$ba_drive || !$ba_drive->can_import_statements())
 			Controller::error(RECORD);
 
-		// form
+		// form	
 		$form = new Forge('import/upload_bank_file/' . $id);
-
+		
 		$form->group(__('File') . ' - ' . self::$file_types[$bank_acc_model->type]);
 
 		$form->upload('listing', TRUE)
 				->label('File with bank transfer listing')
 				->rules('required');
-
+		
 		if (module::e('notification'))
 		{
 			if (Settings::get('email_enabled') || Settings::get('sms_enabled'))
@@ -141,14 +141,14 @@ class Import_Controller extends Controller
 						->label('Reactivate payment notice redirection after importing');
 			}
 		}
-
+		
 		$form->submit('Submit');
 
 		// validation
 		if ($form->validate())
 		{
 			$form_data = $form->as_array();
-
+			
 			switch ($bank_acc_model->type)
 			{
 					case Bank_account_Model::TYPE_RAIFFEISENBANK:
@@ -156,7 +156,7 @@ class Import_Controller extends Controller
 								$id, $form->listing->value,
 								Settings::get('email_enabled') &&
 								@$form_data['send_email_notice'] == 1,
-								Settings::get('sms_enabled') &&
+								Settings::get('sms_enabled') && 
 								(@$form_data['send_sms_notice'] == 1),
 								@$form_data['reactivate_debtor_redir'] == 1,
 								@$form_data['reactivate_payment_notice_redir'] == 1
@@ -167,7 +167,7 @@ class Import_Controller extends Controller
 								$id, $form->listing->value,
 								Settings::get('email_enabled') &&
 								@$form_data['send_email_notice'] == 1,
-								Settings::get('sms_enabled') &&
+								Settings::get('sms_enabled') && 
 								(@$form_data['send_sms_notice'] == 1),
 								@$form_data['reactivate_debtor_redir'] == 1,
 								@$form_data['reactivate_payment_notice_redir'] == 1
@@ -178,7 +178,7 @@ class Import_Controller extends Controller
 								$id, $form->listing->value,
 								Settings::get('email_enabled') &&
 								@$form_data['send_email_notice'] == 1,
-								Settings::get('sms_enabled') &&
+								Settings::get('sms_enabled') && 
 								(@$form_data['send_sms_notice'] == 1),
 								@$form_data['reactivate_debtor_redir'] == 1,
 								@$form_data['reactivate_payment_notice_redir'] == 1
@@ -188,7 +188,7 @@ class Import_Controller extends Controller
 						break;
 			}
 		}
-
+		
 		// breadcrubs
 		$breadcrumbs = breadcrumbs::add()
 				->link('members/show/1', 'Profile of association',
@@ -212,7 +212,7 @@ class Import_Controller extends Controller
 
 	/**
 	 * Imports fio bank listing items from specified file.
-	 *
+	 * 
 	 * @author Jiri Svitak
 	 * @param integer $back_account_id
 	 * @param string $file_url
@@ -231,21 +231,20 @@ class Import_Controller extends Controller
 
 			// import
 			$statement = Bank_Statement_File_Importer::import(
-					$bank_account, $file_url, 'csv', $this->user_id,
-                    $send_emails, $send_sms
+					$bank_account, $file_url, 'csv', $send_emails, $send_sms
 			);
-
+			
 			// redirection reactivation
 			if ($debtor_redir_react)
 			{
 				$this->reactivate_redir(Message_Model::DEBTOR_MESSAGE);
 			}
-
+			
 			if ($payment_notice_redir_react)
 			{
 				$this->reactivate_redir(Message_Model::PAYMENT_NOTICE_MESSAGE);
 			}
-
+			
 			url::redirect('bank_transfers/show_by_bank_statement/'.$statement->id);
 		}
 		catch (Duplicity_Exception $e)
@@ -263,7 +262,7 @@ class Import_Controller extends Controller
 
 	/**
 	 * Parse ebank account
-	 *
+	 * 
 	 * @author Jiri Svitak
 	 * @param integer $back_account_id
 	 * @param string $file_url
@@ -326,20 +325,20 @@ class Import_Controller extends Controller
 			$statement->opening_balance = $parser->opening_balance;
 			$statement->closing_balance = $parser->closing_balance;
 			$statement->save_throwable();
-
+			
 			$db->transaction_commit();
-
+			
 			// redirection reactivation
 			if ($debtor_redir_react)
 			{
 				$this->reactivate_redir(Message_Model::DEBTOR_MESSAGE);
 			}
-
+			
 			if ($payment_notice_redir_react)
 			{
 				$this->reactivate_redir(Message_Model::PAYMENT_NOTICE_MESSAGE);
 			}
-
+			
 			url::redirect('bank_transfers/show_by_bank_statement/'.$statement->id);
 		}
 		catch (RB_Exception $e)
@@ -372,7 +371,7 @@ class Import_Controller extends Controller
 
 	/**
 	 * Imports fio bank listing items from specified file.
-	 *
+	 * 
 	 * @author Ondrej Fibich
 	 * @param integer $back_account_id
 	 * @param string $file_url
@@ -388,20 +387,20 @@ class Import_Controller extends Controller
 		{
 			$db = new Transfer_Model();
 			$db->transaction_start();
-
+			
 			// parse bank listing items
 			$data = UnicreditImport::getDataFromFile($file_url);
 			// get header
 			$header = UnicreditImport::getListingHeader();
 			// does match bank account in system with bank account of statement?
 			$ba = new Bank_account_Model($bank_account_id);
-
+			
 			if ($ba->account_nr != $header['account_nr'] ||
 				$ba->bank_nr != $header['bank_nr'])
 			{
 				$ba_nr = $ba->account_nr.'/'.$ba->bank_nr;
 				$listing_ba_nr = $header['account_nr'].'/'.$header['bank_nr'];
-
+				
 				throw new UnicreditException(__(
 						'Bank account number in listing (%s) header does not match ' .
 						'bank account %s in database!', array($listing_ba_nr, $ba_nr)
@@ -425,18 +424,18 @@ class Import_Controller extends Controller
 			);
 
 			$db->transaction_commit();
-
+			
 			// redirection reactivation
 			if ($debtor_redir_react)
 			{
 				$this->reactivate_redir(Message_Model::DEBTOR_MESSAGE);
 			}
-
+			
 			if ($payment_notice_redir_react)
 			{
 				$this->reactivate_redir(Message_Model::PAYMENT_NOTICE_MESSAGE);
 			}
-
+			
 			url::redirect('bank_transfers/show_by_bank_statement/'.$statement->id);
 		}
 		catch (UnicreditException $e)
@@ -463,10 +462,10 @@ class Import_Controller extends Controller
 		}
 
 	}
-
+	
 	/**
 	 * Reactivates redirection of a message given by type.
-	 *
+	 * 
 	 * @author Ondřej Fibich
 	 * @param integer $type Message type
 	 * @throws InvalidArgumentException On wrong type
@@ -476,15 +475,15 @@ class Import_Controller extends Controller
 		// member model
 		$member_model = new Member_Model();
 		$message_model = new Message_Model();
-
+		
 		// find message
 		$message = new Message_Model($message_model->get_message_id_by_type($type));
-
+		
 		if (!$message || !$message->id)
 		{
 			throw new InvalidArgumentException('Invalid type');
 		}
-
+		
 		// get all members for messages
 		$members = $member_model->get_members_to_messages($type);
 		// activate notification

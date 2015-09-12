@@ -12,8 +12,6 @@
  *
  */
 
-require_once __DIR__ . '/FioCsvParserUtil.php';
-
 /**
  * Auxiliary class for parsing CSV bank account listings from czech bank
  * "FIO banka". Listing may be obtain from from the ebanking web application
@@ -26,7 +24,7 @@ require_once __DIR__ . '/FioCsvParserUtil.php';
  * "Suma";"";"";"";"";"";"-188170,4";"CZK";"";"";"";"";"";"";"";"";"";""
  *
  * @author Ondřej Fibich <fibich@freenetis.org>
- * @since 1.2
+ * @since 1.1.11
  * @todo i18n of error messages
  */
 class NewFioCsvParser
@@ -93,7 +91,8 @@ class NewFioCsvParser
      *
      * @param string $csv string containing the original csv file.
      * @param string $charset optional charset name of file, default is UTF-8
-     * @return FioCsvStatement result
+	 * @return array[array]	Integer-indexed array of associative arrays.
+	 *						Each associative array represents one line of the CSV
      * @throws Exception on parse error
      */
     public function parse($csv, $charset = self::DEFAULT_CHARSET)
@@ -101,8 +100,8 @@ class NewFioCsvParser
         $total_sum = -1;
         $sum = 0;
         $keys = array_keys(self::$fields);
-        $lines = FioCsvParserUtil::transformFileToLineArray($csv, $charset);
-        $result = new FioCsvStatement;
+        $lines = self::transformFileToLineArray($csv, $charset);
+        $result = array();
         // check each line of CSV
         for ($i = 0; $i < count($lines); $i++)
         {
@@ -126,7 +125,7 @@ class NewFioCsvParser
                 $cols = $this->parseLine($line, $keys);
                 // add data row
                 $sum += $cols['castka'];
-                $result->items[] = $cols;
+                $result[] = $cols;
             }
         }
         $this->checkIntegrity($total_sum, $sum);
@@ -142,7 +141,7 @@ class NewFioCsvParser
      */
     public function accept_file($csv, $charset = self::DEFAULT_CHARSET)
     {
-        $lines = FioCsvParserUtil::transformFileToLineArray($csv, $charset);
+        $lines = self::transformFileToLineArray($csv, $charset);
         if (count($lines) < 3)
         {
             return FALSE;
@@ -240,11 +239,11 @@ class NewFioCsvParser
         // Convert date
         if ($parse_date)
         {
-            $assoc_cols['datum'] = FioCsvParserUtil::parseDate($assoc_cols['datum']);
+            $assoc_cols['datum'] = self::parseDate($assoc_cols['datum']);
         }
 
         // Amount has to be converted
-        $assoc_cols['castka'] = FioCsvParserUtil::parseAmount($assoc_cols['castka']);
+        $assoc_cols['castka'] = self::parseAmount($assoc_cols['castka']);
 
         // Trim leading zeros from VS
         $assoc_cols['vs'] = ltrim($assoc_cols['vs'], '0');
@@ -273,6 +272,70 @@ class NewFioCsvParser
             throw new Exception("Chybný kontrolní součet částky "
                     . "('$calculated_sum' != '$sum').");
         }
+    }
+    
+    /**
+     * Normalize string amount to double value.
+     *
+     * @example "   1000 278,40  " -> "1000278.40"
+     * @param string $amount
+     * @return double
+     * @throws InvalidArgumentException on invalid passed amount
+     */
+    public static function parseAmount($amount)
+    {
+        $norm_amount = str_replace(array(' ', ','), array('', '.'), $amount);
+        if (!is_numeric($norm_amount))
+        {
+            $m = __('Invalid amount format') . ': ' . $amount;
+            throw new InvalidArgumentException($m);
+        }
+        return doubleval($norm_amount);
+    }
+
+    /**
+     * Parse date from format DD.MM.YYYY into YYYY-MM-DD.
+     *
+     * @param string $date in format DD.MM.YYYY
+     * @return string date in format YYYY-MM-DD
+     * @throws InvalidArgumentException on invalid date format
+     */
+    public static function parseDate($date)
+    {
+        $matches = NULL;
+        if (!preg_match("/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/", $date, $matches))
+        {
+            $m = __('Invalid date format') . ': ' . $date;
+            throw new InvalidArgumentException($m);
+        }
+        $timestamp = mktime(0, 0, 0, $matches[2], $matches[1], $matches[3]);
+        return date('Y-m-d', $timestamp);
+    }
+
+    /**
+     * Transforms file content in passed charset into array of its lines encoded
+     * in UTF-8 encoding. This function must handle differences of end of line
+     * separators on all platforms.
+     *
+     * @param string $file_content file countent to be transformed
+     * @param string $charset charset of file content
+     * @return array array of lines in UTF-8 charset
+     */
+    public static function transformFileToLineArray($file_content, $charset)
+    {
+        $internal_charset = 'UTF-8';
+        $fc_utf8 = NULL;
+        // transform to uTF-8
+        if (strtolower($charset) != strtolower($internal_charset))
+        {
+            $fc_utf8 = iconv($charset, $internal_charset, $file_content);
+        }
+        else
+        {
+            $fc_utf8 = $file_content;
+        }
+        // eplode lines
+        return preg_split("/\r\n|\n|\r/", $fc_utf8);
     }
 
 }

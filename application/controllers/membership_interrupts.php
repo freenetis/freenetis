@@ -193,9 +193,6 @@ class Membership_interrupts_Controller extends Controller
 		$this->form = new Forge('membership_interrupts/add/'.$member->id);
 		
 		$this->form->group('Basic data');
-
-		$this->form->hidden('member_id')
-			->value($member->id);
 		
 		if ($member->type != Member_Model::TYPE_FORMER)
 		{
@@ -209,36 +206,31 @@ class Membership_interrupts_Controller extends Controller
 				->years(date('Y')-10, date('Y')+10)
 				->rules('required');
 		
-		$to_date = $this->form->date('to')
+		$this->form->date('to')
 				->label('Date to')
 				->years(date('Y')-10, date('Y')+10)
 				->rules('required')
 				->callback(array($this, 'valid_interrupt_interval'));
-
-		if (intval(Settings::get('membership_interrupt_maximum')) == 0)
-		{
-			$to_date->infinity($this->form);
-		}
 		
 		$this->form->textarea('comment')
 				->rules('length[0,250]|required')
 				->style('width: 350px');
 		
 		$this->form->submit('Save');
-
+		
 		// form validation
 		if ($this->form->validate())
 		{
 			$form_data = $this->form->as_array();
-
+			
 			try
 			{
 				$membership_interrupt = new Membership_interrupt_Model();
 
 				$membership_interrupt->transaction_start();
 
-				$from = $this->form->from->get_string_value_with_infinite();
-				$to = $this->form->to->get_string_value_with_infinite();
+				$from = date('Y-m-d', $form_data['from']);
+				$to = date('Y-m-d', $form_data['to']);
 
 				$fee_model = new Fee_Model();
 				$fee = $fee_model->get_by_special_type(Fee_Model::MEMBERSHIP_INTERRUPT);
@@ -383,9 +375,6 @@ class Membership_interrupts_Controller extends Controller
 		$this->form = new Forge();
 		
 		$this->form->group('Basic data');
-
-		$this->form->hidden('member_id')
-			->value($member->id);
 		
 		if ($member->type != Member_Model::TYPE_FORMER)
 		{
@@ -400,24 +389,13 @@ class Membership_interrupts_Controller extends Controller
 				->years(date('Y')-10, date('Y')+10)
 				->rules('required')
 				->value(strtotime($membership_interrupt->members_fee->activation_date));
-
-		$to_date = $this->form->date('to')
+		
+		$this->form->date('to')
 				->label('Date to (last day in month)')
 				->years(date('Y')-10, date('Y')+10)
 				->rules('required')
 				->callback(array($this, 'valid_interrupt_interval'))
 				->value(strtotime($membership_interrupt->members_fee->deactivation_date));
-
-		if (intval(Settings::get('membership_interrupt_maximum')) == 0)
-		{
-			$to_date->infinity($this->form);
-
-			if ($membership_interrupt->members_fee->deactivation_date == '9999-12-31')
-			{
-				$this->form->inputs['to_infinity']->checked(TRUE);
-				$this->form->inputs['to']->disabled('disabled');
-			}
-		}
 		
 		$this->form->textarea('comment')
 				->rules('length[0,250]|required')
@@ -435,8 +413,8 @@ class Membership_interrupts_Controller extends Controller
 			{
 				$membership_interrupt->transaction_start();
 
-				$from = $this->form->from->get_string_value_with_infinite();
-				$to = $this->form->to->get_string_value_with_infinite();
+				$from = date('Y-m-d', $form_data['from']);
+				$to = date('Y-m-d', $form_data['to']);
 
 				$membership_interrupt->comment = $form_data['comment'];
 				
@@ -609,17 +587,17 @@ class Membership_interrupts_Controller extends Controller
 		{
 			self::error(PAGE);
 		}
-
+		
 		$method = $this->form->from->method;
 		$member_id = $this->input->$method('member_id');
 		$from = date_parse($this->input->$method('from'));
 		$to = date_parse($this->input->$method('to'));
-
+				
 		$from_date = date::round_month($from['day'], $from['month'], $from['year']);
 		$to_date = date::round_month($to['day'], $to['month'], $to['year']);
 		
 		$diff = date::diff_month($to_date, $from_date);
-
+		
 		if ($diff < 0)
 		{
 			$input->add_error('required', __(

@@ -179,7 +179,7 @@ class Bank_accounts_Controller extends Controller
                     ->label('Owner ID')
                     ->type('number');
 
-			// bank accounts			
+			// bank accounts
 			$total_baccounts = $bank_account_model->count_bank_accounts($filter_form->as_sql());
 			
 			if (($sql_offset = ($page - 1) * $limit_results) > $total_baccounts)
@@ -291,23 +291,21 @@ class Bank_accounts_Controller extends Controller
 		// form
 		if (!isset($member_id) || $member_id != Member_Model::ASSOCIATION)
 		{
-			$arr_members = arr::merge(
-				array(NULL => '----- '.__('Select member').' -----'),
-				arr::from_objects(ORM::factory('member')->get_all_members_to_dropdown())
-			);
+			// members list
+			$arr_members = ORM::factory('member')->select_list();
 		
 			if (isset($arr_members[1]))
 			{
 				unset($arr_members[1]);
 			}
 			
-			$form = new Forge();
+			$form = new Forge('bank_accounts/add/');
 			
 			$form->dropdown('member_id')
 					->label('Member name')
 					->options($arr_members)
+					->selected($this->session->get('member_id'))
 					->rules('required')
-					->filter_button('members')
 					->style('width:200px');
 		}
 		else

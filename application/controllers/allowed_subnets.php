@@ -85,7 +85,6 @@ class Allowed_subnets_Controller extends Controller
 		
 		$grid->callback_field('enabled')
 				->callback('callback::enabled_field', $param)
-				->label('Turned on')
 				->class('center');
 		
 		$grid->grouped_action_field()

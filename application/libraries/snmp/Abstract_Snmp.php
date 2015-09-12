@@ -87,7 +87,7 @@ abstract class Abstract_Snmp
 	public abstract function getDHCPMacAddressOf($device_ip);
 	
 	/**
-	 * Obtain port number with given MAC address.
+	 * Obtaint port number with given MAC address.
 	 * 
 	 * @param string $mac_address MAC address of the device (we would like to know to which port is connected)
 	 * @return string MAC address in format xx:xx:xx:xx:xx:xx
@@ -95,64 +95,6 @@ abstract class Abstract_Snmp
 	 * @throws InvalidArgumentException On wrong IP address
 	 */
 	public abstract function getPortNumberOf($mac_address);
-	
-	/**
-	 * Obtain names of all network interfaces of device
-	 * 
-	 * @return array Network interfaces of device
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public abstract function getIfaces();
-	
-	/**
-	 * Obtain current state of device's ports
-	 * 
-	 * @return array Current states of all ports
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public abstract function getPortStates();
-	
-	/**
-	 * Obtain ARP table of device
-	 * 
-	 * @return array Whole ARP table from device
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public abstract function getARPTable();
-	
-	/**
-	 * Obtain DHCP leases of device
-	 * 
-	 * @return array All DHCP leases
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public abstract function getDHCPLeases();
-	
-	/**
-	 * Obtain device's hostname from DHCP leases of device
-	 * 
-	 * @param string $device_ip IP address to which we will search for hostname
-	 * @return string Hostname for given IP address
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 * @throws InvalidArgumentException On wrong IP address
-	 */
-	public abstract function getDHCPHostnameOf($device_ip);
-	
-	/**
-	 * Obtain wireless info of device
-	 * 
-	 * @return array Current wireless info
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public abstract function getWirelessInfo();
-	
-	/**
-	 * Obtain MAC table from device
-	 * 
-	 * @return array Whole MAC table
-	 * @throws Exception On SNMP error or wrong SNMP response
-	 */
-	public abstract function getMacTable();
 
 	/**
 	 * Gets the current number of microseconds until the first timeout.

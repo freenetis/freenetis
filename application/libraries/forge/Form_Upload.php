@@ -308,23 +308,16 @@ class Form_Upload extends Form_Input {
 
 	public function rule_size($size)
 	{
-		$upload_filesize = file::shortened_size_to_bytes(ini_get('upload_max_filesize'));
-		$php_max_shortened = ini_get('upload_max_filesize').'B';
-		$post_size = file::shortened_size_to_bytes(ini_get('post_max_size'));
-		if ($upload_filesize > $post_size)
+		$bytes = (int) $size;
+
+		switch (substr($size, -2))
 		{
-			$upload_filesize = $post_size;
-			$php_max_shortened = ini_get('post_max_size').'B';
+			case 'GB': $bytes *= 1024;
+			case 'MB': $bytes *= 1024;
+			case 'KB': $bytes *= 1024;
+			default: break;
 		}
-		
-		$bytes = file::shortened_size_to_bytes($size);
-		
-		if ($bytes > $upload_filesize)
-		{
-			$bytes = $upload_filesize;
-			$size = $php_max_shortened;
-		}
-		
+
 		if (empty($this->upload['size']) OR $this->upload['size'] > $bytes)
 		{
 			$this->errors['max_size'] = array($size);

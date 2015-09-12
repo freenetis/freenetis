@@ -27,9 +27,7 @@ class Registration_Controller extends Controller
 	public function index()
 	{
 		// if self-registration is not allow, redirect to login page
-		if ((!$this->session->get('user_id', 0) && !$this->settings->get('self_registration')) ||
-			($this->session->get('user_id', 0) && !$this->acl_check_new('Members_Controller', 'applicants'))
-			)
+		if (!$this->settings->get('self_registration') || $this->session->get('user_id', 0))
 		{
 			url::redirect('login');
 		}
@@ -93,33 +91,11 @@ class Registration_Controller extends Controller
 		$form->input('title2')
 				->label('Post title')
 				->rules('length[3,30]');
-
-		$empty_birthday = Settings::get('users_birthday_empty_enabled');
-		$min_age = Settings::get('members_age_min_limit');
-
-		if ($empty_birthday == 0)
-		{
-			$form->date('birthday')
+		
+		$form->date('birthday')
 				->label('Birthday')
 				->years(date('Y') - 100, date('Y'))
 				->rules('required');
-		}
-		else
-		{
-			if (empty($min_age))
-			{
-				$form->date('birthday')
-					->label('Birthday')
-					->years(date('Y') - 100, date('Y'))
-					->value('');
-			}
-			else
-			{
-				$form->checkbox('older_than')
-					->label(__("I'm older than %d years", array($min_age)))
-					->rules('required');
-			}
-		}
 		
 		$legalp_group = $form->group('Legal person innformation')->visible(FALSE);
 		
@@ -151,7 +127,8 @@ class Registration_Controller extends Controller
 				->class('join1');
 			
 			$form->input('district')
-				->class('join2');
+				->class('join2')
+				->rules('required');
 
 			$form->input('street')
 				->label('Street')
@@ -204,15 +181,8 @@ class Registration_Controller extends Controller
 				->class('join2')
 				->style('width:180px');
 		
-		$email_required = '';
-		
-		if (!Settings::get('self_registration_applicant_email_not_required'))
-		{
-			$email_required = 'required|';
-		}
-		
 		$form->input('email')
-				->rules($email_required.'length[3,100]|valid_email')
+				->rules('required|length[3,100]|valid_email')
 				->callback(array($this, 'valid_email'))
 				->style('width:250px');
 		
@@ -294,7 +264,7 @@ class Registration_Controller extends Controller
 					$user->surname = $form_data['surname'];
 					$user->pre_title = $form_data['title1'];
 					$user->post_title = $form_data['title2'];
-					$user->birthday = (empty($form_data['birthday']) ? NULL : date("Y-m-d",$form_data['birthday']));
+					$user->birthday = date('Y-m-d', $form_data['birthday']);
 					$user->type = User_Model::MAIN_USER;
 
 					// entrance fee
@@ -425,15 +395,7 @@ class Registration_Controller extends Controller
 					// commit transaction
 					$user->transaction_commit();
 
-					if ($this->user_id)
-					{
-						status::success('Registration has been sended');
-						$this->redirect('members/show_all');
-					}
-					else
-					{
-						url::redirect('registration/complete');
-					}
+					url::redirect('registration/complete');
 				}
 				catch (Exception $ex)
 				{
@@ -443,35 +405,11 @@ class Registration_Controller extends Controller
 				}
 			}
 		}
-		
-		if ($this->user_id)
-		{
-			$headline = __('Register applicant');
 
-			// breadcrumbs navigation			
-			$breadcrumbs = breadcrumbs::add()
-					->link('members/show_all', 'Members',
-							$this->acl_check_view('Members_Controller','members'))
-					->disable_translation()
-					->text($headline);
-			
-			$view = new View('main');
-			$view->title = $headline;
-			$view->breadcrumbs = $breadcrumbs->html();
-			$view->content = new View('form');
-			$view->content->form = $form->html();
-			$view->content->headline = $headline;
-			$view->render(TRUE);
-		}
-		else
-		{
-			$headline = __('Registration form');
-
-			$view = new View('registration/index');
-			$view->title = $headline;
-			$view->form = $form->html();
-			$view->render(TRUE);
-		}
+		$view = new View('registration/index');
+		$view->title = __('Registration form');
+		$view->form = $form->html();
+		$view->render(TRUE);
 	}
 	
 	/**

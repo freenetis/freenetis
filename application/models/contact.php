@@ -22,7 +22,6 @@
  * @property int $id
  * @property int $type
  * @property string $value
- * @property int $verify
  * @property ORM_Iterator $countries
  * @property ORM_Iterator $users_contacts
  * @property ORM_Iterator $private_users_contacts
@@ -184,8 +183,7 @@ class Contact_Model extends ORM
 	{
 		return $this->db->query("
 				SELECT c.id, c.type, IF(n.country_code IS NULL, c.value,
-					CONCAT(n.country_code, c.value)) AS value, c.verify,
-					u.user_id
+					CONCAT(n.country_code, c.value)) AS value, u.user_id
 				FROM contacts c
 				LEFT JOIN users_contacts u ON u.contact_id = c.id
 				LEFT JOIN contacts_countries o ON o.contact_id = c.id
@@ -270,33 +268,4 @@ class Contact_Model extends ORM
 		return '';
 	}
 
-	public function get_message_info_by_contact_id($contact_id)
-	{
-		if (!$contact_id || $contact_id === NULL)
-		{
-			return NULL;
-		}
-		
-		return $this->db->query("
-			SELECT m.name as member_name,
-					m.id as member_id,
-					? as ip_address,
-					? as subnet_name,
-					(
-						SELECT GROUP_CONCAT(vs.variable_symbol) AS variable_symbol
-						FROM variable_symbols vs
-						LEFT JOIN accounts a ON a.id = vs.account_id
-						WHERE a.member_id = m.id
-					) AS variable_symbol,
-					IFNULL(a.balance,?) AS balance,
-					? as comment,
-					c.value as contact
-			FROM contacts c
-			LEFT JOIN users_contacts uc ON uc.contact_id = c.id
-			LEFT JOIN users u ON u.id = uc.user_id
-			LEFT JOIN members m ON m.id = u.member_id
-			LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
-			WHERE c.id = ?
-		", '???', '???','???','???',$contact_id);
-	}
 }

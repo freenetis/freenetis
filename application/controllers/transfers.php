@@ -28,9 +28,7 @@ class Transfers_Controller extends Controller
 		parent::__construct();
 		
 		if (!Settings::get('finance_enabled'))
-		{
-			self::error(ACCESS);
-		}
+			Controller::error (ACCESS);
 	}
 	
 	/**
@@ -57,16 +55,12 @@ class Transfers_Controller extends Controller
 			$order_by_direction = 'desc', $page_word = null, $page = 1)
 	{
 		if (!$this->acl_check_view('Accounts_Controller', 'transfers'))
-		{
-			self::error(ACCESS);
-		}
-
+			Controller::error(ACCESS);
+		
 		// get new selector
 		if (is_numeric($this->input->post('record_per_page')))
-		{
 			$limit_results = (int) $this->input->post('record_per_page');
-		}
-
+		
 		// parameters control
 		$allowed_order_type = array
 		(
@@ -75,15 +69,11 @@ class Transfers_Controller extends Controller
 		);
 		
 		if (!in_array(strtolower($order_by), $allowed_order_type))
-		{
 			$order_by = 'id';
-		}
-
+		
 		if (strtolower($order_by_direction) != 'desc')
-		{
 			$order_by_direction = 'asc';
-		}
-
+		
 		// there are two groups of transfers
 		$arr_groups[Transfer_Model::OUTER_TRANSFERS] = __('Outer transfers');
 		$arr_groups[Transfer_Model::INNER_TRANSFERS] = __('Inner transfers');
@@ -123,10 +113,8 @@ class Transfers_Controller extends Controller
 		);
 		
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_transfers)
-		{
 			$sql_offset = 0;
-		}
-
+		
 		$alltransfers = $model_transfer->get_all_transfers(
 				$sql_offset, (int) $limit_results, $order_by,
 				$order_by_direction,
@@ -257,7 +245,7 @@ class Transfers_Controller extends Controller
 	 * @param string $order_by_direction
 	 */
 	public function show_by_account(
-			$account_id = NULL, $limit_results = 500, $order_by = 'id',
+			$account_id = NULL, $limit_results = 500, $order_by = 'datetime',
 			$order_by_direction = 'desc', $page_word = null, $page = 1)
 	{
 		if (!isset($account_id))
@@ -269,30 +257,26 @@ class Transfers_Controller extends Controller
 		$variable_symbol_model = new Variable_Symbol_Model();
 		
 		$variable_symbols = 0;
-		if ($account->member_id != Member_Model::ASSOCIATION)
+		if ($account->member_id != 1)
 		{
 		    $variable_symbols = $variable_symbol_model->find_account_variable_symbols($account->id);
 		}
 		
 		if (!$account->id)
-		{
-			self::error(RECORD);
-		}
-
+			Controller::error(RECORD);
+		
 		if (!(
 				$this->acl_check_view('Accounts_Controller', 'transfers', $account->member_id) ||
 				$this->acl_check_view('Members_Controller', 'currentcredit')
 			))
 		{
-			self::error(ACCESS);
+			Controller::error(ACCESS);
 		}
 		
 		// gets grid settings
 		if (is_numeric($this->input->post('record_per_page')))
-		{
 			$limit_results = (int) $this->input->post('record_per_page');
-		}
-
+		
 		// allowed order type array
 		$allowed_order_type = array
 		(
@@ -300,15 +284,11 @@ class Transfers_Controller extends Controller
 		);
 		
 		if (!in_array(strtolower($order_by), $allowed_order_type))
-		{
 			$order_by = 'datetime';
-		}
-
+		
 		if (strtolower($order_by_direction) != 'desc')
-		{
 			$order_by_direction = 'desc';
-		}
-
+		
 		// creates fields for filtering
 		$arr_types[Transfer_Model::INBOUND] = __('Inbound');
 		$arr_types[Transfer_Model::OUTBOUND] = __('Outbound');
@@ -344,12 +324,9 @@ class Transfers_Controller extends Controller
 					)),
 				$filter_form->as_array()
 		);
-		
 		if (($sql_offset = ($page - 1) * $limit_results) > $total_transfers)
-		{
 			$sql_offset = 0;
-		}
-
+		
 		$transfers = $transfer_model->get_transfers(
 				$account_id, $sql_offset, (int) $limit_results, $order_by,
 				$order_by_direction,
@@ -446,10 +423,6 @@ class Transfers_Controller extends Controller
 		$transfers_grid->order_callback_field('amount')
 				->label(__('Amount'))
 				->callback('callback::amount_field');
-
-		$transfers_grid->callback_field('id')
-				->label('Current credit')
-				->callback('callback::amount_after_transfer_field', $account_id);
 		
 		$transfers_grid->order_field('text')
 				->label(__('Text'));
@@ -546,10 +519,8 @@ class Transfers_Controller extends Controller
 		$view->content->transfers_grid = $transfers_grid;
 		
 		if ($this->acl_check_view('Members_Controller', 'comment', $account->member_id))
-		{
 			$view->content->comments_grid = $comments_grid;
-		}
-
+		
 		$view->render(TRUE);
 	} // end of show_by_account function
 
@@ -562,47 +533,37 @@ class Transfers_Controller extends Controller
 	public function show($transfer_id = null)
 	{
 		if (!isset($transfer_id))
-		{
-			self::warning(PARAMETER);
-		}
-
+			Controller::warning(PARAMETER);
+		
 		if (!is_numeric($transfer_id))
-		{
-			self::error(RECORD);
-		}
-
+			Controller::error(RECORD);
+		
 		$transfer_model = new Transfer_Model();
 		$transfer = $transfer_model->get_transfer($transfer_id);
 		
 		if (!is_object($transfer))
-		{
-			self::error(RECORD);
-		}
-
+			Controller::error(RECORD);
+		
 		$oa = new Account_Model($transfer->oa_id);
 		$da = new Account_Model($transfer->da_id);
 		
-		if ($oa->member_id != Member_Model::ASSOCIATION)
-		{
+		if ($oa->member_id != 1)
 			$member_id = $oa->member_id;
-		}
-		elseif ($da->member_id != Member_Model::ASSOCIATION)
-		{
+		elseif ($da->member_id != 1)
 			$member_id = $da->member_id;
-		}
 		else
-		{
-			$member_id = Member_Model::ASSOCIATION;
-		}
-
+			$member_id = 1;
+		
 		if (!$this->acl_check_view('Accounts_Controller', 'transfers', $member_id))
-		{
-			self::error(ACCESS);
-		}
-
+			Controller::error(ACCESS);
+		
 		// transfers dependent on this transfer, if this transfer is member fee payment
 		$dependent_transfers = $transfer_model->get_dependent_transfers($transfer->id);
 		
+		// bank transfer is only assigned to transfer from member fees account to account of association
+		$member_fees = ORM::factory('account')->where(
+				'account_attribute_id', Account_attribute_Model::MEMBER_FEES
+		)->find();
 		// bt has to be first set to null, transfer need not to be of bank type
 		$bt = null;
 		
@@ -611,10 +572,8 @@ class Transfers_Controller extends Controller
 		)->find();
 		
 		if ($bt_model->id)
-		{
 			$bt = $bt_model->get_bank_transfer($transfer_id);
-		}
-
+		
 		$headline = __('Detail of transfer number') . ' ' . $transfer->id;
 		$view = new View('main');
 		$view->title = $headline;
@@ -636,50 +595,44 @@ class Transfers_Controller extends Controller
 	public function add_from_account($origin_account_id = null)
 	{
 		if (!isset($origin_account_id) || !is_numeric($origin_account_id))
-		{
-			self::warning(PARAMETER);
-		}
-
+			Controller::warning(PARAMETER);
+		
 		// save for callback function valid_amount_to_send
 		$this->origin = $origin_account_id;
-		$oa = new Account_Model($origin_account_id);
+		$origin_account = new Account_Model($origin_account_id);
 		
-		if ($oa->id == 0)
-		{
-			self::error(RECORD);
-		}
-
-		if (!$this->acl_check_new('Accounts_Controller', 'transfers', $oa->member_id))
-		{
-			self::error(ACCESS);
-		}
-
+		if ($origin_account->id == 0)
+			Controller::error(RECORD);
+		
+		if (!$this->acl_check_new('Accounts_Controller', 'transfers', $origin_account->member_id))
+			Controller::error(ACCESS);
+		
 		// destination account, instead of origin one
-		$dst_accounts = $oa->get_some_doubleentry_account_names_grouped($origin_account_id);
-		$dst_accounts = arr::merge(array
-		(
-			NULL => '----- ' . __('Select account') . ' -----'
-		), $dst_accounts);
+		$dst_account_model = new Account_Model();
+		$arr_dst_accounts = $dst_account_model->select_some_list($origin_account_id);
+		asort($arr_dst_accounts, SORT_LOCALE_STRING);
 		// default destination account
 		$operating = ORM::factory('account')->where(
 				'account_attribute_id', Account_attribute_Model::OPERATING
 		)->find();
 		// array with only one origin account
-		$arr_orig_accounts[$oa->id] = $oa->name . ' (' . $oa->id . ', '
-                . $oa->account_attribute_id . ', ' . $oa->member_id . ')';
+		$arr_orig_accounts[$origin_account->id] = $origin_account->name . ' ('
+                . $origin_account->id . ', '
+                . $origin_account->account_attribute_id . ', '
+                . $origin_account->member_id . ')';
 		// account attributes for types of accounts
 		$aa_model = new Account_attribute_Model();
 		$account_attributes = $aa_model->get_account_attributes();
 		
-		foreach ($account_attributes as $aattr)
+		foreach ($account_attributes as $account_attribute)
 		{
-			$arr_attributes[$aattr->id] = $aattr->id . ' ' . $aattr->name;
+			$arr_attributes[$account_attribute->id] = $account_attribute->id . ' ' . $account_attribute->name;
 		}
 		
 		$arr_attributes = arr::merge(array
 		(
-			NULL => '----- ' . __('Select account type') . ' -----'
-		), $arr_attributes);
+			NULL => '----- ' . __('Select account type') . ' -----'), $arr_attributes
+		);
 		
 		// form
 		$form = new Forge('transfers/add_from_account/' . $origin_account_id);
@@ -691,22 +644,21 @@ class Transfers_Controller extends Controller
 				->label('Origin account (name, ID, type, member ID)')
 				->options($arr_orig_accounts)
 				->rules('required')
-				->style('width:450px');
+				->style('width:600px');
 		
 		// destination account
 		$form->group('Destination account');
 		
 		$form->dropdown('account_type')
 				->options($arr_attributes)
-				->style('width:450px');
+				->style('width:600px');
 		
 		$form->dropdown('aname')
 				->label('Destination account (name, ID, type, member ID)')
-				->options($dst_accounts)
+				->options($arr_dst_accounts)
 				->rules('required')
 				->selected($operating->id)
-				->style('width:450px')
-				->filter_button('transfers');
+				->style('width:600px');
 		
 		// other information
 		$form->group('Transfer');
@@ -745,7 +697,7 @@ class Transfers_Controller extends Controller
 				$member_model = new Member_Model();
 				$dst_account = new Account_Model($form_data['aname']);
 				
-				$member_model->reactivate_messages($oa->member_id);
+				$member_model->reactivate_messages($origin_account->member_id);
 				$member_model->reactivate_messages($dst_account->member_id);
 				
 				$db->transaction_commit();
@@ -765,14 +717,14 @@ class Transfers_Controller extends Controller
 				->link('members/show_all', 'Members',
 						$this->acl_check_view('Members_Controller', 'members')
 				)->disable_translation()
-				->link('members/show/' . $oa->member_id,
-						'ID ' . $oa->member->id . ' - ' . $oa->member->name,
+				->link('members/show/' . $origin_account->member_id,
+						'ID ' . $origin_account->member->id . ' - ' . $origin_account->member->name,
 						$this->acl_check_view(
 								'Members_Controller', 'members',
-								$oa->member_id
+								$origin_account->member_id
 						)
 				)->enable_translation()
-				->link('transfers/show_by_account/' . $oa->id, 'Transfers')
+				->link('transfers/show_by_account/' . $origin_account->id, 'Transfers')
 				->text('Add new transfer');
 
 		$headline = __('Add new transfer');
@@ -796,15 +748,16 @@ class Transfers_Controller extends Controller
 	public function add()
 	{
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-		{
-			self::error(ACCESS);
-		}
-
-		$a_model = new Account_Model();
+			Controller::error(ACCESS);
+		
+		$account_model = new Account_Model();
+		
+		$arr_dst_accounts = $account_model->select_some_list();
+		asort($arr_dst_accounts);
 		
 		// array origin accounts for dropdown
-		$arr_accounts = $a_model->get_some_doubleentry_account_names_grouped();
-		
+		$arr_orig_accounts = $arr_dst_accounts;
+
 		// default destination account
 		$operating = ORM::factory('account')->where(
 				'account_attribute_id', Account_attribute_Model::OPERATING
@@ -818,34 +771,36 @@ class Transfers_Controller extends Controller
 		
 		$form->dropdown('oname')
 				->label('Origin account (name, ID, type, member ID)')
-				->options($arr_accounts)
+				->options($arr_orig_accounts)
 				->rules('required')
-				->style('width:450px');
+				->style('width:600px');
 		// destination account
 		$form->group('Destination account');
 		
 		$form->dropdown('aname')
 				->label('Destination account (name, ID, type, member ID)')
-				->options($arr_accounts)
+				->options($arr_dst_accounts)
 				->rules('required')
 				->selected($operating->id)
-				->style('width:450px');
+				->style('width:600px');
 		
 		// other information
 		$form->group('Transfer');
 		
 		$form->date('datetime')
-				->label('Date and time')
+				->label(__('Date and time') . ':')
 				->years(date('Y') - 20, date('Y'))
 				->rules('required');
 		
 		// no amount on origin account is required, this arbitrary transfers 
 		// should only admin or accountant of association who knows what is he doing
 		$form->input('amount')
+				->label(__('Amount') . ':')
 				->rules('required|valid_numeric')
 				->callback(array($this, 'valid_amount'));
 		
 		$form->input('text')
+				->label(__('Text') . ':')
 				->rules('required');
 		
 		$form->submit('Send');
@@ -873,7 +828,7 @@ class Transfers_Controller extends Controller
 			{
 				$db->transaction_rollback();
 				Log::add_exception($e);
-				status::success('Transfer has not been successfully added');
+				status::success('Transfer hasnot been successfully added');
 			}
 			url::redirect('transfers/show_all');
 		}
@@ -901,31 +856,34 @@ class Transfers_Controller extends Controller
 	public function add_voip($origin_account = NULL)
 	{
 		if (!isset($origin_account))
-		{
-			self::warning(PARAMETER);
-		}
+			Controller::warning(PARAMETER);
 		
-		$origin_acc = new Account_Model($origin_account);
-		
-		if (!$origin_acc->id)
-		{
-			self::error(RECORD);
-		}
-		
-		if (!$this->acl_check_new('Accounts_Controller', 'transfers', $origin_acc->member_id))
-		{	// does the user have rights for this?
-			self::error(ACCESS);
-		}
+		$account = ORM::factory('account')->where('id', $origin_account)->find();
 		
 		if (!Billing::instance()->has_driver() ||
-			!Billing::instance()->get_account($origin_acc->member_id))
+			!Billing::instance()->get_account($account->member_id))
 		{
-			self::error(RECORD);
+			Controller::error(RECORD);
 		}
 		
-		$arr_orig_accounts[$origin_acc->id] =
-			$origin_acc->name . ' - ' . __('Account ID') . ' ' . $origin_acc->id .
-			' - ' . __('Member ID') . ' ' . $origin_acc->member_id;
+		// transfer from specific account?
+        // save for callback function valid_amount_to_send
+        $this->origin = $origin_account;
+        $origin_acc = new Account_Model($origin_account);
+
+        if (!$origin_acc->id)
+        {
+            Controller::error(RECORD);
+        }
+
+        if (!$this->acl_check_new('Accounts_Controller', 'transfers', $origin_acc->member_id))
+        {	// does the user have rights for this?
+            Controller::error(ACCESS);
+        }
+
+		$arr_orig_accounts[$origin_acc->id] = $origin_acc->name . ' - '
+                . __('Account ID') . ' ' . $origin_acc->id . ' - '
+				. __('Member ID') . ' ' . $origin_acc->member_id;
 		
 		// form
 		$form = new Forge('transfers/add_voip/' . $origin_account);
@@ -933,17 +891,16 @@ class Transfers_Controller extends Controller
 		$form->group('Transfer');
 		
 		$form->dropdown('oname')
-				->label('Origin account')
-				->options($arr_orig_accounts)
-				->style('width:450px');
+				->label(__('Origin account'))
+				->options($arr_orig_accounts);
 		
 		$form->date('datetime')
-				->label('Date and time')
+				->label(__('Date and time') . ':')
 				->years(date('Y') - 20, date('Y'))
 				->rules('required');
 		
 		$form->input('amount')
-				->label('Amount')
+				->label(__('Amount') . ':')
 				->rules('required|valid_numeric')
 				->callback(array($this, 'valid_amount_to_send'));
 		
@@ -983,33 +940,26 @@ class Transfers_Controller extends Controller
 				status::success('Transfer has not been successfully added');
 			}
 			url::redirect('transfers/show_by_account/' . $origin_account);
+		}		if ($this->acl_check_view('Members_Controller', 'members', $account->member_id))
+		{
+			$links[] = html::anchor(
+					'members/show/' . $account->member_id, __('Back to the member')
+			);
 		}
 		
+		$links[] = html::anchor(
+				'transfers/show_by_account/' . $origin_account,
+				__('Back to transfers of account')
+		);
+		
 		$headline = __('Add new VoIP transfer');
-		
-		// breadcrumbs navigation
-		$breadcrumbs = breadcrumbs::add()
-				->link('members/show_all', 'Members',
-						$this->acl_check_view('Members_Controller', 'members')
-				)->disable_translation()
-				->link('members/show/' . $origin_acc->member->id,
-						'ID ' . $origin_acc->member->id . ' - ' . $origin_acc->member->name,
-						$this->acl_check_view(
-								'Members_Controller', 'members',
-								$origin_acc->member->id
-						)
-				)->enable_translation()
-				->link('transfers/show_by_account/' . $origin_account,
-						'Transfers', $origin_account)
-				->text($headline);
-		
 		$info[] = __('Information') . ' : ' . __('Transfer will be effected within 15 minutes.');
 		$view = new View('main');
 		$view->title = $headline;
 		$view->content = new View('form');
-		$view->breadcrumbs = $breadcrumbs->html();
 		$view->content->headline = $headline;
 		$view->content->form = $form->html();
+		$view->content->link_back = implode(' | ', $links);
 		$view->content->aditional_info = $info;
 		$view->render(TRUE);
 	}
@@ -1024,16 +974,12 @@ class Transfers_Controller extends Controller
 	public function edit($transfer_id = NULL)
 	{
 		if (!isset($transfer_id))
-		{
-			self::warning(PARAMETER);
-		}
-
+			Controller::warning(PARAMETER);
+		
 		// access rights
 		if (!$this->acl_check_edit('Accounts_Controller', 'transfers'))
-		{
-			self::error(ACCESS);
-		}
-
+			Controller::error(ACCESS);
+		
 		$transfer = new Transfer_Model($transfer_id);
 		
 		$form = new Forge('transfers/edit/' . $transfer_id);
@@ -1098,16 +1044,12 @@ class Transfers_Controller extends Controller
 	{
 		// access rights
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-		{
-			self::error(ACCESS);
-		}
-
+			Controller::error(ACCESS);
+		
 		// content of dropdown for months
 		for ($i = 1; $i <= 12; $i++)
-		{
 			$arr_months[$i] = $i;
-		}
-
+		
 		$current_month = (int) date('n');
 		
 		// association
@@ -1202,16 +1144,12 @@ class Transfers_Controller extends Controller
 	{
 		// access rights
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-		{
-			self::error(ACCESS);
-		}
-
+			Controller::error(ACCESS);
+		
 		// content of dropdown for months
 		for ($i = 1; $i <= 12; $i++)
-		{
 			$arr_months[$i] = $i;
-		}
-
+		
 		$current_month = (int) date('n');
 		
 		// association
@@ -1308,16 +1246,12 @@ class Transfers_Controller extends Controller
 	{	
 		// access rights
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-		{
-			self::error(ACCESS);
-		}
-
+			Controller::error(ACCESS);
+		
 		// content of dropdown for months
 		for ($i = 1; $i <= 12; $i++)
-		{
 			$arr_months[$i] = $i;
-		}
-
+		
 		$current_month = (int) date('n');
 		
 		// association
@@ -1419,22 +1353,16 @@ class Transfers_Controller extends Controller
 	{
 		// bad parameter
 		if (!isset($member_id))
-		{
-			self::warning(PARAMETER);
-		}
-
+			Controller::warning(PARAMETER);
+		
 		$member = new Member_Model($member_id);
 		
 		if ($member->id == 0)
-		{
-			self::error(RECORD);
-		}
-
+			Controller::error(RECORD);
+		
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers'))
-		{
-			self::error(ACCESS);
-		}
-
+			Controller::error(ACCESS);
+		
 		$credit = ORM::factory('account')->where(array
 		(
 			'member_id'				=> $member_id,
@@ -1447,14 +1375,10 @@ class Transfers_Controller extends Controller
 		$fee = $fee_model->get_by_date_type(date('Y-m-d'), 'transfer fee');
 		
 		if (is_object($fee) && $fee->id)
-		{
 			$transfer_fee = $fee->fee;
-		}
 		else
-		{
 			$transfer_fee = 0;
-		}
-
+		
 		$amount = num::decimal_point((float) $amount);
 		
 		// form
@@ -1482,7 +1406,8 @@ class Transfers_Controller extends Controller
 				->value(__('Member fee payment by cash'))
 				->rules('required');
 		
-		$form->group('Transfer fee');
+		$form->group('')
+				->label(__('Transfer fee'));
 		
 		$form->input('transfer_fee')
 				->label('Amount')
@@ -1603,23 +1528,17 @@ class Transfers_Controller extends Controller
 	{
 		// bad parameter
 		if (!$account_id || !is_numeric($account_id))
-		{
-			self::warning(PARAMETER);
-		}
-
+			Controller::warning(PARAMETER);
+		
 		$account = new Account_Model($account_id);
 
 		// account doesn't exist
 		if (!$account->id)
-		{
-			self::error(RECORD);
-		}
-
+			Controller::error(RECORD);
+		
 		// access control
 		if (!$this->acl_check_view('Accounts_Controller', 'transfers', $account->member_id))
-		{
-			self::error(ACCESS);
-		}
+			Controller::error(ACCESS);
 
 		$fee_model = new Fee_Model();
 		$device_model = new Device_Model();
@@ -2151,104 +2070,4 @@ class Transfers_Controller extends Controller
 		}
 	}
 
-	/**
-	 * Method used for popup filtering
-	 *
-	 * @author David Raska
-	 */
-	public function filter()
-	{
-		// access rights
-		if (!$this->acl_check_view('Accounts_Controller', 'transfers'))
-		{
-			self::error(ACCESS);
-		}
-
-		// account attributes for types of accounts
-		$aa_model = new Account_attribute_Model();
-		$account_attributes = $aa_model->get_account_attributes();
-
-		foreach ($account_attributes as $aattr)
-		{
-			$arr_attributes[$aattr->id] = $aattr->id . ' ' . $aattr->name;
-		}
-
-		// create filter form
-		$filter_form = new Filter_form();
-
-		$filter_form->add('member_id')
-			->label('Member ID')
-			->type('number');
-
-		$filter_form->add('mname')
-			->label('Member name')
-			->callback('json/member_name');
-
-		$filter_form->add('aname')
-			->label('Account name');
-
-		$filter_form->add('id')
-			->label('Account ID')
-			->type('number');
-
-		$filter_form->add('account_attribute_id')
-			->label('Account type')
-			->type('select')
-			->values($arr_attributes);
-
-		// filter form is submited => print only result in JSON format
-		if (!$filter_form->is_first_load())
-		{
-			$filter_sql = $filter_form->as_sql();
-
-			$account_model = new Account_Model();
-
-			$accounts = $account_model->get_accounts_to_dropdown($filter_sql);
-
-			// keys
-			$keys = array(__('Association'), __('Members'));
-
-			// result
-			$grouped_accounts = array
-			(
-				$keys[0]	=> array(),
-				$keys[1]	=> array()
-			);
-
-			// transform members from objects to array
-			$x = 0;
-			foreach ($accounts as $account)
-			{
-				if ($account->member_id == Member_Model::ASSOCIATION)
-				{
-					$i = 0;
-				}
-				else
-				{
-					$i = 1;
-				}
-
-				$grouped_accounts[$keys[$i]][$x++] = array
-				(
-					'id' => $account->id,
-					'name' => $account->aname.' ('.$account->id.', '.$account->account_attribute_id.', '.$account->member_id.')'
-				);
-			}
-
-			// print array with members in JSON
-			die(json_encode($grouped_accounts));
-		}
-		// filter form is not submited => print only form
-		else
-		{
-			$title = __('Filter accounts');
-
-			$view = new View('main');
-			$view->title = $title;
-			$view->content = new View('form');
-			$view->content->headline = $title;
-			$view->content->form = $filter_form;
-			$view->render(TRUE);
-		}
-	}
 }

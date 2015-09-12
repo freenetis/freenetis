@@ -294,34 +294,8 @@ class Links_Controller extends Controller
 					->label('Remove interface from link');
 		}
 		
+		
 		$grid->datasource($link->get_items());
-        
-        $subnet_header = __('Subnets on link');
-
-		$grid_subnet = new Grid('subnets/show/' . $link_id, $subnet_header, array
-		(
-			'use_paginator'	 => false,
-			'use_selector'	 => false
-		));
-
-		$grid_subnet->order_field('id')
-				->label('ID');
-
-		$grid_subnet->order_field('name')
-				->label('Subnet');
-
-		$grid_subnet->order_callback_field('cidr')
-				->label('Network address')
-				->callback('callback::cidr_field');
-
-		if ($this->acl_check_view('Subnets_Controller', 'subnet'))
-		{
-			$grid_subnet->grouped_action_field()->add_action('id')
-					->icon_action('show')
-					->url('subnets/show');
-		}
-
-		$grid_subnet->datasource($link->get_subnets_on_link());
 
 		$breadcrumbs = breadcrumbs::add()
 				->link('links/show_all', 'Links',
@@ -354,7 +328,6 @@ class Links_Controller extends Controller
 		$view->content->duplex = $duplex;
 		$view->content->medium = $medium;
 		$view->content->grid = $grid;
-		$view->content->grid_subnet = $grid_subnet;
 		$view->content->links = implode(' | ',$links);
 		$view->content->headline = $headline;
 		$view->render(TRUE);

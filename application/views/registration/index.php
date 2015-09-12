@@ -46,7 +46,7 @@
 				<div id="content">
 					<h2><?php echo $title ?></h2>
 					<?php echo isset($message) ? '<div class="message">' . $message . '</div>' : '' ?>
-					<?php echo Settings::get('registration_form_info') ?>
+					<?php echo Settings::get('registration_license') ?>
 					<?php echo $form ?>
 					<p><?php echo html::anchor(url_lang::base() . 'login', '&laquo; ' . __('back to login')) ?></p>
 				</div>

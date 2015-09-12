@@ -198,13 +198,6 @@
             <axo usage_type="breadcrumbs" section="Aro_groups_Controller" value="aro_group" action="view" own="false"></axo>
             <axo usage_type="breadcrumbs" section="Aro_groups_Controller" value="aro_group" action="view" own="false"></axo>
         </method>
-        <method name="edit_user" comment-en="Edit users groups" comment-cs="Úprava skupin uživatele">
-            <axo usage_type="access" section="Aro_groups_Controller" value="aro_group" action="edit" own="false"></axo>
-            <axo usage_type="breadcrumbs" section="Members_Controller" value="members" action="view" own="false"></axo>
-            <axo usage_type="breadcrumbs" section="Members_Controller" value="members" action="view" own="true"></axo>
-            <axo usage_type="breadcrumbs" section="Users_Controller" value="users" action="view" own="true"></axo>
-            <axo usage_type="breadcrumbs" section="Users_Controller" value="users" action="view" own="true"></axo>
-        </method>
         <method name="delete" comment-en="Delete an item" comment-cs="Odstranění položky">
             <axo usage_type="access" section="Aro_groups_Controller" value="aro_group" action="delete" own="false"></axo>
         </method>
@@ -742,33 +735,6 @@
             <axo usage_type="breadcrumbs" section="Devices_Controller" value="devices" action="edit" own="true"></axo>
         </method>
     </object>
-	<object name="dns" type="controller" comment-en="Administration of DNS zones" comment-cs="Spravování DNS zón">
-		<method name="index" hide="true"></method>
-		<method name="add" comment-en="Add a new item" comment-cs="Přidání položky">
-			<axo usage_type="access" section="Dns_Controller" value="zone" action="new" own="false"></axo>
-			<axo usage_type="breadcrumbs" section="Dns_Controller" value="zone" action="view" own="false"></axo>
-		</method>
-		<method name="edit" comment-en="Edit an item" comment-cs="Úprava položky">
-			<axo usage_type="access" section="Dns_Controller" value="zone" action="edit" own="false"></axo>
-			<axo usage_type="breadcrumbs" section="Dns_Controller" value="zone" action="view" own="false"></axo>
-			<axo usage_type="breadcrumbs" section="Dns_Controller" value="zone" action="view" own="false"></axo>
-		</method>
-		<method name="show" comment-en="Show and item" comment-cs="Zobrazí položku">
-			<axo usage_type="access" section="Dns_Controller" value="zone" action="view" own="false"></axo>
-			<axo usage_type="breadcrumbs" section="Dns_Contoller" value="zone" action="view" own="false"></axo>
-		</method>
-		<method name="show_all" comment-en="Show all items" comment-cs="Zobrazí všechny položky">
-			<axo usage_type="access" section="Dns_Controller" value="zone" action="view" own="false"></axo>
-			<axo usage_type="grid-action" section="Dns_Controller" value="zone" action="view" own="false"></axo>
-			<axo usage_type="grid-action" section="Dns_Controller" value="zone" action="edit" own="false"></axo>
-			<axo usage_type="grid-action" section="Dns_Controller" value="zone" action="new" own="false"></axo>
-			<axo usage_type="grid-action" section="Dns_Controller" value="zone" action="delete" own="false"></axo>
-			<axo usage_type="links" section="Dns_Controller" value="zone" action="new" own="false"></axo>
-		</method>
-		<method name="delete" comment-en="Detete an item" comment-cs="Smaže položku">
-			<axo usage_type="access" section="Dns_Controller" value="zone" action="delete" own="false"></axo>
-		</method>
-	</object>
     <object name="email" type="controller" comment-en="E-mail - allows sending e-mail" comment-cs="E-mail - umožňuje odesílání mailů">
         <method name="__construct" hide="true"></method>
         <method name="index" hide="true"></method>
@@ -2734,7 +2700,6 @@
             <axo usage_type="links" section="Ulogd_Controller" value="member" action="view" own="false"></axo>
             <axo usage_type="links" section="Monitoring_Controller" value="monitoring" action="view" own="false"></axo>
             <axo usage_type="links" section="Devices_Controller" value="devices" action="view" own="false"></axo>
-			<axo usage_type="links" section="Dns_Controller" value="zone" action="view" own="false"></axo>
             <axo usage_type="links" section="Messages_Controller" value="message" action="view" own="false"></axo>
             <axo usage_type="links" section="Members_whitelists_Controller" value="whitelist" action="view" own="false"></axo>
             <axo usage_type="links" section="Redirect_Controller" value="redirect" action="view" own="false"></axo>
@@ -2824,7 +2789,7 @@
     <object name="grid/Order_link_field" type="library"></object>
     <object name="importers/Csv_Fio_Bank_Statement_File_Importer" type="library"></object>
     <object name="importers/Duplicity_Exception" type="library"></object>
-    <object name="importers/Fio/FioCsvParser" type="library"></object>
+    <object name="importers/Fio/FioParser" type="library"></object>
     <object name="importers/Fio_Bank_Statement_File_Importer" type="library"></object>
     <object name="importers/Json_Fio_Bank_Statement_File_Importer" type="library"></object>
     <object name="importers/Raiffeisenbank/Parser_Ebanka" type="library"></object>
@@ -2984,12 +2949,6 @@
     <object name="devices/topology" type="view">
         <axo usage_type="links" section="Devices_Controller" value="topology" action="view" own="true"></axo>
     </object>
-	<object name="dns/show" type="view">
-		<axo usage_type="links" section="Dns_Controller" value="zone" action="edit" own="false"></axo>
-		<axo usage_type="links" section="Dns_Controller" value="zone" action="delete" own="false"></axo>
-		<axo usage_type="access-partial" section="Ip_addressess_Controller" value="ip_address" action="view" own="true"></axo>
-		<axo usage_type="access-partial" section="Ip_addressess_Controller" value="ip_address" action="view" own="true"></axo>
-	</object>
     <object name="email/show" type="view"></object>
     <object name="email/write" type="view"></object>
     <object name="export/export_eform" type="view"></object>
@@ -3023,7 +2982,6 @@
     </object>
     <object name="js/__pieces/address_point_street" type="view"></object>
     <object name="js/__pieces/application_password" type="view"></object>
-	<object name="js/__pieces/dns_records" type="view"></object>
     <object name="js/__pieces/domicile" type="view"></object>
     <object name="js/__pieces/google_jsapi" type="view"></object>
     <object name="js/__pieces/gps" type="view"></object>
@@ -3048,7 +3006,6 @@
     <object name="js/devices_show" type="view"></object>
     <object name="js/devices_show_by_user" type="view"></object>
     <object name="js/devices_topology" type="view"></object>
-	<object name="js/dns_edit" type="view"></object>
     <object name="js/email_queues_show_all_sent" type="view"></object>
     <object name="js/ifaces_add" type="view"></object>
     <object name="js/links_add" type="view"></object>
@@ -3206,10 +3163,8 @@
         <axo usage_type="links" section="Users_Controller" value="password" action="edit" own="true"></axo>
         <axo usage_type="links" section="Users_Controller" value="application_password" action="edit" own="true"></axo>
         <axo usage_type="links" section="Login_logs_Controller" value="logs" action="view" own="true"></axo>
-        <axo usage_type="links" section="Aro_groups_Controller" value="aro_group" action="edit" own="false"></axo>
         <axo usage_type="access-partial" section="Users_Controller" value="application_password" action="view" own="true"></axo>
         <axo usage_type="links" section="Users_Controller" value="additional_contacts" action="view" own="true"></axo>
-        <axo usage_type="links" section="Aro_groups_Controller" value="aro_group" action="view" own="false"></axo>
     </object>
     <object name="variable_symbols/edit" type="view"></object>
     <object name="variable_symbols/show_by_account" type="view"></object>

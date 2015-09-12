@@ -98,13 +98,6 @@ class Setup_config_Controller extends Controller
 			}
 			else
 			{
-				$upload_filesize = file::shortened_size_to_bytes(ini_get('upload_max_filesize'));
-				$post_size = file::shortened_size_to_bytes(ini_get('post_max_size'));
-				if ($upload_filesize > $post_size)
-				{
-					$upload_filesize = $post_size;
-				}
-				
 				foreach ($htaccessFile as $line_num => $line)
 				{
 					// find line with RewriteBase
@@ -122,20 +115,6 @@ class Setup_config_Controller extends Controller
 						$htaccessFile[$line_num] = str_replace(
 								' en/', ' ' . Config::get('lang') . '/',
 								$htaccessFile[$line_num]
-						);
-					}
-					else if (preg_match("/^php_value upload_max_filesize (.+)/", $line))
-					{
-						$htaccessFile[$line_num] = preg_replace(
-								"/^(php_value upload_max_filesize )(.+)/", 
-								'${1}'.$upload_filesize, $line
-						);
-					}
-					else if (preg_match("/^php_value post_max_size (.+)/", $line))
-					{
-						$htaccessFile[$line_num] = preg_replace(
-								"/^(php_value post_max_size )(.+)/", 
-								'${1}'.$upload_filesize, $line
 						);
 					}
 				}
@@ -394,7 +373,7 @@ class Setup_config_Controller extends Controller
 		}
 
 		$value = $input->value;
-        
+
 		if (!empty($value) && !preg_match('/^[a-z0-9_-]+$/i', $value))
 		{
 			$input->add_error('required', __(

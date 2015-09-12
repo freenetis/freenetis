@@ -24,7 +24,6 @@
  * @property string $body
  * @property integer $state
  * @property timestamp $access_time
- * @property string $hash
  */
 class Email_queue_Model	extends ORM
 {
@@ -41,12 +40,7 @@ class Email_queue_Model	extends ORM
 	/**
 	 * Unsuccessfully sent e-mail, almost same as new
 	 */
-	const STATE_FAIL	= 2;
-	
-	/**
-	 * E-mail has been read by recipient
-	 */
-	const STATE_READ	= 3;
+	const STATE_FAIL		= 2;
 	
 	/**
 	 * Returns current email queue, by default 10 e-mails to send
@@ -57,13 +51,7 @@ class Email_queue_Model	extends ORM
 	 */
 	public function get_current_queue($count = 10)
 	{		
-		return $this
-			->in('state',
-				array(
-					self::STATE_NEW,
-					self::STATE_FAIL
-				)
-			)
+		return $this->where('state <> ',self::STATE_OK)
 			->orderby('access_time')
 			->limit($count,0)
 			->find_all();
@@ -85,7 +73,7 @@ class Email_queue_Model	extends ORM
 			$order_by = 'id', $order_by_direction = 'ASC', $filter_sql='')
 	{
 		// args
-		$args = array(Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK, self::STATE_READ);
+		$args = array(Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK);
 		
 		// sql body
 		$body = "SELECT eq.id, eq.from, eq.to, eq.subject, eq.state, eq.access_time,
@@ -100,14 +88,14 @@ class Email_queue_Model	extends ORM
 				LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 				LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 				LEFT JOIN users tu ON tuc.user_id = tu.id
-				WHERE eq.state = ? OR eq.state = ? ";
+				WHERE eq.state = ?
+				GROUP BY eq.id";
 		
 		// filter
 		if (empty($filter_sql))
 		{
 			return $this->db->query("
 				$body
-				GROUP BY eq.id
 				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
 				LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
 			", $args);
@@ -137,8 +125,8 @@ class Email_queue_Model	extends ORM
 			return  $this->db->query("
 				SELECT COUNT(*) AS total
 				FROM email_queues eq
-				WHERE eq.state = ? OR eq.state = ? 
-			", self::STATE_OK, self::STATE_READ)->current()->total;
+				WHERE eq.state = ?
+			", self::STATE_OK)->current()->total;
 		}
 		
 		// filter
@@ -159,12 +147,13 @@ class Email_queue_Model	extends ORM
 			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 			LEFT JOIN users tu ON tuc.user_id = tu.id
-			WHERE eq.state = ? OR eq.state = ? 
+			WHERE eq.state = ?
+            GROUP BY eq.id
 			$having
 		", array
 		(
 			Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL,
-			self::STATE_OK, self::STATE_READ
+			self::STATE_OK
 		))->count();
 	}
 	
@@ -201,10 +190,11 @@ class Email_queue_Model	extends ORM
 				LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 				LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 				LEFT JOIN users tu ON tuc.user_id = tu.id
-				WHERE eq.state = ? OR eq.state = ?
+				WHERE eq.state = ?
+				GROUP BY eq.id
 				$having
 			) eq
-		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK, self::STATE_READ);
+		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK);
 	}
 	
 	/**
@@ -233,12 +223,13 @@ class Email_queue_Model	extends ORM
 			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 			LEFT JOIN users tu ON tuc.user_id = tu.id
-			WHERE eq.state = ? OR eq.state = ?
+			WHERE eq.state = ?
+            GROUP BY eq.id
 			$having
 		", array
 		(
 			Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL,
-			self::STATE_OK, self::STATE_READ
+			self::STATE_OK
 		))->as_array();
 		
 		$pids = array();
@@ -286,11 +277,12 @@ class Email_queue_Model	extends ORM
 			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 			LEFT JOIN users tu ON tuc.user_id = tu.id
-			WHERE eq.state <> ? AND eq.state <> ?
+			WHERE eq.state <> ?
+            GROUP BY eq.id
 			$having
 			ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
 			LIMIT " . intval($limit_from) . "," . intval($limit_results) . "
-		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK, self::STATE_READ);
+		", Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL, self::STATE_OK);
 	}
 	
 	/**
@@ -307,8 +299,8 @@ class Email_queue_Model	extends ORM
 			return  $this->db->query("
 				SELECT COUNT(*) AS total
 				FROM email_queues eq
-				WHERE eq.state <> ? AND eq.state <> ?
-			", self::STATE_OK, self::STATE_READ)->current()->total;
+				WHERE eq.state <> ?
+			", self::STATE_OK)->current()->total;
 		}
 		
 		// filter
@@ -329,12 +321,13 @@ class Email_queue_Model	extends ORM
 			LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 			LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 			LEFT JOIN users tu ON tuc.user_id = tu.id
-			WHERE eq.state <> ? AND eq.state <> ?
+			WHERE eq.state <> ?
+            GROUP BY eq.id
 			$having
 		", array
 		(
 			Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL,
-			self::STATE_OK, self::STATE_READ
+			self::STATE_OK
 		))->count();
 	}
 	

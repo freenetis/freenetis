@@ -52,18 +52,6 @@ class ORM_Iterator implements Iterator, ArrayAccess, Countable {
 
 		return $array;
 	}
-	
-	/**
-	 * Returns an array of the results as arrays.
-	 *
-	 * @author Ondrej Fibich
-	 * @return  array
-	 */
-	public function as_arrays()
-	{
-		$results = $this->result->result_array();
-		return ($results) ? $results : array();
-	}
 
 	/**
 	 * Return an array of all of the primary keys for this object.

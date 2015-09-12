@@ -1,0 +1,28 @@
+/*
+	Mobile device style
+*/
+
+@media only screen and (max-device-width : 640px) { /* firefox 3 require this to work properly */
+	#main {
+		width: 100% !important;
+	}
+	
+	#main h1 {
+		margin: 0 auto;
+	}
+	
+	#main h1 i {
+		margin: 0;
+		display: block;
+		top: 12px;
+		position: relative;
+		text-align: right;
+		right: 5px;
+	}
+	
+	#main .flags {
+		text-align: center;
+		float: none;
+		margin: 25px 0 0 0;
+	}
+}

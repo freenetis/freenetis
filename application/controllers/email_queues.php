@@ -430,8 +430,13 @@ class Email_queues_Controller extends Controller
 		$recipients = new Swift_RecipientList;
 		$recipients->addTo($email_queue->to);
 			
+		// E-mail hash
+		$hash = sha1($email_queue->id . $email_queue->to . $email_queue->body);
+		$email_queue->hash = $hash;
+		
 		// Build the HTML message
-		$message = new Swift_Message($email_queue->subject, $email_queue->body, "text/html");
+		$html_message = email::create_preview_link($hash) . $email_queue->body;
+		$message = new Swift_Message($email_queue->subject, $html_message, "text/html");
 			
 		// Send
 		$state = (

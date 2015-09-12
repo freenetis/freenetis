@@ -1,0 +1,18 @@
+Výpis vybraných transakcí na úètu "1111122222/2010"
+Majitel úètu: FirmaXY, Ulice 11/12, Mìsto 13, 12345, Èeská republika
+Vytvoøeno v aplikaci Internetbanking: 16.01.2011 10:29:39
+Období: 16.12.2010 - 1.1.2011
+Poèáteèní stav úètu k 16.12.2010: 12 345,67 CZK
+Koncový stav úètu k 16.1.2011: 16 812,78 CZK
+Suma pøíjmù: +5 467,11 CZK
+Suma výdajù: -1 000,00 CZK
+
+Datum;ID pohybu;ID pokynu;Kód banky;KS;Mìna;Název banky;Název protiúètu;Objem;Protiúèet;Provedl;Pøevod;SS;Typ;Upøesnìní;Uživatelská identifikace;VS;Zpráva pro pøíjemce;
+16.12.2010;1115991591;7848488787;6210;78945;CZK;BRE Bank S.A., organizaèní složka podniku;int78;2 111,11;670100-2202442842;Emanuel Bacigala;0;7845;Bezhotovostní pøíjem;G45;DOMINIK  BUREŠ;00215;pøichozí platba s neplatným VS;
+17.12.2010;1115991592;4838729084;0500;;CZK;ÈSOB, a.s.;;930,00;2001345678;;0;;Bezhotovostní pøíjem;;Kuèera Milan;654123;pøichozí platba s VS a existujicim uctem v DB (clen Kucera);
+17.12.2010;1115991593;4838729085;4400;;CZK;FIO;;-1000,00;25445451;;0;789;Bezhotovostní platba;;hxfdx;878487;odchozí platba;
+31.12.2010;1115991594;4838729086;;;CZK;;;4.00;;;0;101;Pøipsaný úrok;;;;pøipsaný úrok;
+31.12.2010;1115991595;4838729087;;;CZK;;;1 200,00;;;0;0558;Vklad pokladnou;;;;platba pokladnou bez VS;
+31.12.2010;1115991596;4838729088;;;CZK;;;1 211,00;;;0;0558;Vklad pokladnou;;;5462317894;platba pokladnou s validnim VS (clen Emanuel Bacigala);
+01.01.2011;1115992597;4838729089;;;CZK;;;11,00;;;0;0558;Vklad pokladnou;;;5462317895;platba pokladnou s neplatnym VS (tady JE DUPLIKAT);
+Suma;0;;;;;;;4 467,11;;;0;;;;;;;

@@ -1358,22 +1358,22 @@ class Database {
 
 		return FALSE;
 	}
-	
+
 	/**
 	 * Sets benchmark on or off
 	 *
 	 * @author Ondřej Fibich
-	 * @param boolean $is_on 
+	 * @param boolean $is_on
 	 */
 	public function set_benchmark($is_on)
 	{
 		$this->config['benchmark'] = ($is_on === TRUE);
 	}
-	
+
 	/**
 	 * Gets value of database variable. If variable not present in the database
 	 * NULL is returned.
-	 * 
+	 *
 	 * @author Ondřej Fibich
 	 * @param string $name Variable name
 	 * @return string|null
@@ -1381,23 +1381,23 @@ class Database {
 	public function get_variable_value($name)
 	{
 		$result = $this->query("SHOW VARIABLES LIKE ?", $name);
-		
+
 		if ($result->count() == 1)
 		{
 			$o = $result->current();
-			
+
 			if (isset($o->Value))
 			{
 				return $o->Value;
 			}
 		}
-		
+
 		return NULL;
 	}
-	
+
 	/**
 	 * Alterch character set amd collate of database to given values.
-	 * 
+	 *
 	 * @author Ondřej Fibich
 	 * @param string $db_name Database name
 	 * @param string $set Character set name
@@ -1406,12 +1406,57 @@ class Database {
 	public function alter_db_character_set($db_name, $set, $collate)
 	{
 		$db_name = $this->escape_table($db_name);
-		
+
 		$this->query("ALTER DATABASE $db_name DEFAULT CHARACTER SET ? COLLATE ?", array
 		(
 			$set, $collate
 		));
 	}
+
+    /**
+     * Truncate DB table name.
+     *
+     * @author Ondřej Fibich <fibich@freenetis.org>
+     * @since 1.2
+     *
+     * @param string $table_name
+     */
+    public function truncate($table_name)
+    {
+        $esc_table_name = $this->escape_table($table_name);
+
+        $this->query("TRUNCATE TABLE $esc_table_name");
+    }
+
+    /**
+     * Drop DB table name.
+     *
+     * @author Ondřej Fibich <fibich@freenetis.org>
+     * @since 1.2
+     *
+     * @param string $table_name
+     */
+    public function drop($table_name)
+    {
+        $esc_table_name = $this->escape_table($table_name);
+
+        $this->query("DROP TABLE $esc_table_name");
+    }
+
+    /**
+     * Enable/disable foreign key checks.
+     *
+     * @author Ondřej Fibich <fibich@freenetis.org>
+     * @since 1.2.0
+     *
+     * @param boolean $enabled flag
+     */
+    public function foreign_key_check($enabled)
+    {
+        $enabled_num = $enabled ? 1 : 0;
+
+        $this->query("SET FOREIGN_KEY_CHECKS = $enabled_num");
+    }
 
 } // End Database Class
 

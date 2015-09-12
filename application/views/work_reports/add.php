@@ -151,7 +151,7 @@
 
 <br />
 
-<?php echo form::open(url::base(TRUE) . url::current(TRUE), array('id' => 'article_form')) ?>
+<?php echo form::open(url::base(TRUE) . url::current(TRUE), array('id' => 'article_form', 'class' => 'form')) ?>
 
 	<table cellspacing="0" class="form" style="width: 100%">
 		<tr>

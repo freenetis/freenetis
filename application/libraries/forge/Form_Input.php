@@ -595,7 +595,7 @@ class Form_Input
 
 		if (!empty($this->rules))
 		{
-			foreach ($this->rules as $rule)
+			foreach ($this->rules as &$rule)
 			{
 				if (($offset = strpos($rule, '[')) !== FALSE)
 				{
@@ -610,7 +610,7 @@ class Form_Input
 				{
 					$func = substr($rule, 6);
 
-					if ($this->value AND !valid::$func($this->value))
+					if ($this->value != '' AND !valid::$func($this->value))
 					{
 						$this->errors[$rule] = TRUE;
 					}

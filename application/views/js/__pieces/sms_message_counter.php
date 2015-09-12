@@ -17,7 +17,7 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 	function count_char(form)
 	{
 		form.counter.disabled=true;
-		var message = form.text;
+		var message = form.sms_text;
 		var text_length = message.value.length;
 		var text_left = totalmaxlen - message.value.length;
 		var parts = Math.ceil(text_length/maxpartsize).toString();
@@ -38,11 +38,11 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 			parts + ' SMS.';
 	}
 	
-	count_char(document.sms_form);
+	count_char($('#sms_text').parents('form')[0]);
 	
-	$('#text').keyup(function ()
+	$('#sms_text').keyup(function ()
 	{
-		count_char(document.sms_form)
+		count_char($(this).parents('form')[0]);
 	});
 	
 	

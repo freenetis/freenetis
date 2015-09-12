@@ -233,6 +233,69 @@ class Email_Controller extends Controller
 	}
 	
 	/**
+	 * This function show email without FreenetIS GUI
+	 * 
+	 * @author David Raska
+	 */
+	public function preview()
+	{
+		$email_hash = $this->input->get('id');
+		if (!isset($email_hash))
+		{
+			Controller::warning(PARAMETER);
+		}
+
+		$eq_model = new Email_queue_Model();
+		$email = $eq_model->where('hash', $email_hash)->find_all();
+		
+		if (!count($email))
+		{
+			Controller::error(ACCESS);
+		}
+		
+		$email = $email->current();
+		
+		echo $email->body;
+		
+		$email->state = Email_queue_Model::STATE_READ;
+		$email->save();
+	}
+	
+	/**
+	 * Return image and marks e-mail as read
+	 * 
+	 * @author David Raška
+	 */
+	public function displayed()
+	{
+		$im = imagecreatetruecolor(1, 1);
+		$color = imagecolorallocate($im, 255,255,255);
+		imagefill($im, 0, 0, $color);
+		header('Content-Type: image/png');
+		imagepng($im);
+		imagedestroy($im);
+		
+		$email_hash = $this->input->get('id');
+		if (!isset($email_hash))
+		{
+			die;
+		}
+
+		$eq_model = new Email_queue_Model();
+		$email = $eq_model->where('hash', $email_hash)->find_all();
+		
+		if (!count($email))
+		{
+			die;
+		}
+		
+		$email = $email->current();
+		
+		$email->state = Email_queue_Model::STATE_READ;
+		$email->save();
+	}
+	
+	/**
 	 * Callback for state of SMS message
 	 *
 	 * @param object $item
@@ -243,6 +306,10 @@ class Email_Controller extends Controller
 		if ($item->state == Email_queue_Model::STATE_OK)
 		{
 			echo '<div style="color:green;">' . __('Sent') . '</div>';
+		}
+		elseif ($item->state == Email_queue_Model::STATE_READ)
+		{
+			echo '<div style="color:green;">' . __('Read') . '</div>';
 		}
 		elseif ($item->state == Email_queue_Model::STATE_NEW)
 		{

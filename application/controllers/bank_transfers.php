@@ -667,9 +667,6 @@ class Bank_transfers_Controller extends Controller
 			if ($dst_acc->id == 0)
 			{
 				// account has not been selected, trying to find member by correct variable symbol
-				/*$member = ORM::factory('member')
-						->where('variable_symbol', $form_data['correct_vs'])
-						->find();*/
 				$member = ORM::factory('variable_symbol')
 						->where('variable_symbol', $form_data['correct_vs'])
 						->find()->account->member;

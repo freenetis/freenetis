@@ -165,8 +165,7 @@ class Subnets_Controller extends Controller
 			$grid->add_new_button('subnets/add', __('Add new subnet'),
 			array
 			(
-				'title' => __('Add new subnet'),
-				'class' => 'popup_link'
+				'title' => __('Add new subnet')
 			));
 		}
 		
@@ -544,7 +543,8 @@ class Subnets_Controller extends Controller
 
 		$form->dropdown('owner_id')
 				->label(__('Owner').' '.help::hint('subnet_owner'))
-				->options($arr_members);
+				->options($arr_members)
+				->filter_button('members');
 
 		// add cloud to subnet
 		$cloud = new Cloud_Model();
@@ -811,7 +811,8 @@ class Subnets_Controller extends Controller
 		$form->dropdown('owner_id')
 				->label(__('Owner').' '.help::hint('subnet_owner'))
 				->options($arr_members)
-				->selected($subnet_model->subnets_owner->member->id);
+				->selected($subnet_model->subnets_owner->member->id)
+				->filter_button('members');
 		
         $form->submit('Update');
 

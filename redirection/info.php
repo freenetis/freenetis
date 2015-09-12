@@ -126,28 +126,23 @@ mysql_close($link);
 <title>FreenetIS</title>
 <link href="../media/images/favicon.ico" rel="shorcut icon" type="image/x-icon" />
 <link href="../media/css/style.css" rel="stylesheet" type="text/css" />
-<style type="text/css">
-#content-padd h2 {margin: 10px 0px;}
-#content-padd h3 {margin: 10px 0px;}
-#content-padd li {margin-left: 20px;}
-#content-padd a {font-weight: bold;}
-td {width: 100px;}
+<style type="text/css"><!--
+	#content-padd {margin:10px;}
+	#content-padd h2 {margin: 10px 0px;}
+	#content-padd h3 {margin: 10px 0px;}
+	#content-padd li {margin-left: 20px;}
+	#content-padd a {font-weight: bold;}
+	td {width: 100px;}
+	h1 {position:absolute; top:24px; left:18px; background:url(<?php echo $logo ?>);
+		width:212px; height:49px; background-repeat:no-repeat;}
+-->
 </style>
 </head>
 <body>
 <div id="main">
 	<div id="header">
-		<h1 style="position:absolute;
-			top:24px;
-			left:18px;
-			background:url(<?php echo $logo ?>);
-			width:212px;
-			height:49px;
-			background-repeat:no-repeat;
-		"></h1>
-		<div class="status">
-
-		</div>
+		<h1></h1>
+		<div class="status"></div>
 		<div class="map"></div>
 	</div>
 	<div id="middle">
@@ -157,8 +152,7 @@ td {width: 100px;}
 			</div>
 		</div>
 		<div id="content">
-			<div id="content-padd" style="margin:10px">
-
+			<div id="content-padd">
 			</div>
 		</div>
 		<div class="clear"></div>

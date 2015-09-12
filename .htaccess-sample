@@ -20,3 +20,6 @@ RewriteRule ^(index\.php/?)?(.*)$ en/$2 [R=301,L]
 # Silently prepend index.php to EVERY URL.
 RewriteCond $1 !^(index\.php)
 RewriteRule ^(.*)$ index.php/$1 [L]
+
+php_value upload_max_filesize 2M
+php_value post_max_size 2M

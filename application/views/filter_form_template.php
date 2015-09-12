@@ -53,6 +53,9 @@ $(document).ready(function(){
 		
 		// remove old CSS classes
 		$val.removeClass();
+
+		// remove validator error
+		$(this).parent().find("label.error").remove();
 		
 		// type returns key (not value), change value input to select
 		if (types[val]['returns'] == 'key')
@@ -69,7 +72,7 @@ $(document).ready(function(){
 			b = ["<select name='" + name + "' class='v'>"];
 			for (var i in types[val]['values'])
 			{
-				b.push("<option value='"+i+"'>"+types[val]['values'][i]+"</option>");
+				b.push("<option value='"+types[val]['values'][i]['key']+"'>"+types[val]['values'][i]['value']+"</option>");
 			}
 			b.push("</select>");
 			// replace old input with select
@@ -106,6 +109,11 @@ $(document).ready(function(){
 			$val.autocomplete({
 				source: "<?php echo url_lang::base() ?>"+types[val]['callback']
 			});
+		}
+
+		if ($val.val() !== '')
+		{
+			$val.valid();
 		}
 	});
 	

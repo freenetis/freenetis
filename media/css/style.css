@@ -69,6 +69,15 @@ input.error, input.error:focus, textarea.error, textarea.error:focus, select.err
 	border: 1px solid red;
 }
 
+input.v.error {
+	margin-right: 5px;
+}
+
+input.join2.checkbox {
+    margin: 0px 5px 0px 10px;
+    width: initial;
+}
+
 .error_text {
 	color: white;
 	background-color: red;
@@ -719,6 +728,23 @@ span.highlighted {
 	border-bottom: 1px dotted black;
 }
 
+.more.notverified {
+    color: red;
+    font-weight: bold;
+    border-color: red;
+    vertical-align: super;
+}
+
+.submit_hint {
+    display: inline-block;
+}
+
+.submit_hint > img.help_hint {
+    padding: 0px 5px;
+    top: 7px;
+    position: relative;
+}
+
 .ui-widget-header	{
 	border-width: 0px ! important;
 	border-bottom-width: 1px ! important;
@@ -746,6 +772,7 @@ a.action_field_icon {
 a.action_field_icon:hover img {
 	background-color: #EC7A04;
 	border-color: #ac8736;
+	cursor: pointer;
 }
 
 a.action_field_icon img {
@@ -1096,4 +1123,85 @@ div.map_zoom_out {
 	height: 10px;
 	padding: 5px;
 	background: url('../images/icons/ico_math_minus.gif') #2F7CC4 no-repeat center center;
+}
+
+#secondary_options option:disabled {
+	color: #AAAAAA;
+}
+
+#record_template {
+	display: none;
+}
+
+.dns_record {
+	padding: 5px 0px 5px 5px;
+	width: auto !important;
+}
+
+.dns_record > input,
+.dns_record > select,
+.dns_record > span {
+	float: left;
+	margin-right: 10px;
+}
+
+.dns_record img.r {
+	top: 1px;
+	position: relative;
+}
+
+.dns_record > span {
+	font-weight: bold;
+}
+
+.dns_record input.n {
+	width: 100px;
+}
+
+.dns_record span.fqdn {
+	min-width: 100px;
+}
+
+.dns_record input.ttl {
+	width: 50px;
+}
+
+.dns_record .p {
+	display: none;
+	width: 30px;
+}
+
+.dns_record .p.mx {
+	display: inline-block;
+	margin-right: 8px;
+}
+
+.dns_record .d.mx {
+	width: 150px;
+}
+
+.dns_record .ptr,
+.dns_record .ptr_container {
+	width: 20px;
+	height: 20px;
+}
+
+#add_new_record{
+	vertical-align: middle;
+}
+
+.remove_record,
+.add_record {
+	vertical-align: top;
+}
+
+.dns_record .add_record.hide {
+	display: none;
+}
+
+.dns_record label.error {
+	/*display: none !important;*/
+	float: left;
+	margin-right: 10px;
+	font-weight: normal;
 }

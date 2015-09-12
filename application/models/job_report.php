@@ -47,6 +47,8 @@ class Job_report_Model extends ORM
 	const PAYMENT_BY_CREDIT = 0;
 	/** Constant of cash payment for column payment_type */
 	const PAYMENT_BY_CASH = 1;
+	/** Constant of different payment for column payment_type */
+	const PAYMENT_OTHER = 2;
 
 	/**
 	 * Payments types
@@ -56,7 +58,8 @@ class Job_report_Model extends ORM
 	protected static $PAYMENT_TYPES = array
 	(
 		self::PAYMENT_BY_CREDIT	=> 'Payment by FreenetIS credit',
-		self::PAYMENT_BY_CASH	=> 'Payment by cash'
+		self::PAYMENT_BY_CASH	=> 'Payment by cash',
+		self::PAYMENT_OTHER		=> 'Other type of payment'
 	);
 	
 	/**
@@ -71,7 +74,9 @@ class Job_report_Model extends ORM
 		foreach (self::$PAYMENT_TYPES as $key => $value)
 		{
 			if ($key != self::PAYMENT_BY_CREDIT || Settings::get('finance_enabled'))
+			{
 				$types[$key] = __($value);
+			}
 		}
 		
 		return $types;
@@ -424,6 +429,7 @@ class Job_report_Model extends ORM
 				WHERE r.concept = 0 AND r.user_id = ?
 				GROUP BY r.id
 				HAVING state ' . ($lower ? '<' : '=') . ' ?
+				ORDER BY r.id DESC
 		', __('Payment by cash'), $user_id, $state);
 	}
 	

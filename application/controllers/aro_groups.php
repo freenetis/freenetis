@@ -452,6 +452,111 @@ class Aro_groups_Controller extends Controller
 		$view->content->form = $form;
 		$view->render(TRUE);
 	}
+
+	/**
+	 * Edits ARO groups of user
+	 *
+	 * @author David Raska
+	 * @param integer $user_id
+	 */
+	public function edit_user ($user_id = NULL)
+	{
+		// bad parameter
+		if (!$user_id || !is_numeric($user_id))
+			Controller::warning(PARAMETER);
+
+		// record doesn't exist
+		if (!$user_id)
+			Controller::error(RECORD);
+
+		$user = new User_Model($user_id);
+		// access check
+		if (!$this->acl_check_edit('Aro_groups_Controller', 'aro_group'))
+			Controller::Error(ACCESS);
+
+		$form = new Forge(url::base(TRUE).url::current(TRUE));
+
+		$aro_groups_model = new Aro_group_Model();
+		$aro_groups = $aro_groups_model->select_list();
+
+		$users_aro_groups = $user->get_aro_groups_of_user($user_id);
+
+		$sel_groups = array();
+		foreach ($users_aro_groups as $aro)
+			$sel_groups[] = $aro->id;
+
+		$form->dropdown('groups[]')
+			->label('Aro groups')
+			->options($aro_groups)
+			->selected($sel_groups)
+			->multiple('multiple')
+			->size(20);
+
+		$form->submit('submit')
+			->value(__('Update'));
+
+		// form is validate
+		if ($form->validate())
+		{
+			$form_data = $form->as_array();
+
+			$groups = (isset($_POST["groups"])) ? $_POST["groups"] : array();
+
+			try
+			{
+				$aro_groups_model->transaction_start();
+
+				// cleans group - remove all old AROs
+				$aro_groups_model->clean_aro($user_id);
+
+				// inserts new AROs
+				$aro_groups_model->insert_groups($groups, $user_id);
+
+				$aro_groups_model->transaction_commit();
+				status::success('Access control groups of user has been successfully updated.');
+			}
+			catch (Exception $e)
+			{
+				$aro_groups_model->transaction_rollback();
+				Log::add_exception($e);
+				status::error('Error - cannot update access control groups.', $e);
+			}
+			url::redirect (url_lang::base().'users/show/'.$user_id);
+		}
+
+		$headline = __('Edit access control groups of user');
+
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+			->link('members/show_all', 'Members',
+				$this->acl_check_view('Members_Controller','members'))
+			->disable_translation()
+			->link('members/show/' . $user->member->id,
+				"ID ".$user->member->id." - ".$user->member->name,
+				$this->acl_check_view(
+					'Members_Controller','members', $user->member->id
+				)
+			)->enable_translation()
+			->link('users/show_by_member/' . $user->member_id, 'Users',
+				$this->acl_check_view(
+					'Users_Controller', 'users', $user->member_id
+				)
+			)
+			->link('users/show/' . $user_id, "$user->name $user->surname ($user->login)",
+				$this->acl_check_view(
+					'Users_Controller', 'users', $user->member_id
+				)
+			)
+			->text($headline);
+
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $headline;
+		$view->content = new View('form');
+		$view->content->headline = $headline;
+		$view->content->form = $form;
+		$view->render(TRUE);
+	}
 	
 	/**
 	 * Deletes group

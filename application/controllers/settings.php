@@ -849,12 +849,25 @@ class Settings_Controller extends Controller
         $this->form->checkbox('user_email_duplicities_enabled')
                 ->label('Enable multiple users to have assigned same e-mail contact')
 				->checked(Settings::get('user_email_duplicities_enabled'));
+
+		$this->form->group('Members - date of born');
+
+		$this->form->checkbox('users_birthday_empty_enabled')
+			->label('Users birthday can be empty')
+			->checked(Settings::get('users_birthday_empty_enabled'));
+
+		$this->form->input('members_age_min_limit')
+			->label('Minimum age of main user')
+			->rules('valid_digit')
+			->class('increase_decrease_buttons')
+			->style('width:30px')
+			->value(Settings::get('members_age_min_limit'));
 		
 		$this->form->group('Security');
 		
 		$this->form->input('security_password_length')
 				->label('Minimal password length')
-				->rules('required|valid_numeric')
+				->rules('required|valid_digit')
 				->class('increase_decrease_buttons')
 				->style('width:30px')
 				->value(Settings::get('security_password_length'));
@@ -880,12 +893,16 @@ class Settings_Controller extends Controller
 
 			$this->form->input('membership_interrupt_minimum')
 					->label('Minimum membership interrupt period (months)')
-					->rules('valid_numeric')
+					->rules('valid_digit')
+					->class('increase_decrease_buttons')
+					->style('width:35px')
 					->value(Settings::get('membership_interrupt_minimum'));
 
 			$this->form->input('membership_interrupt_maximum')
 					->label('Maximum membership interrupt period (months)')
-					->rules('valid_numeric')
+					->rules('valid_digit')
+					->class('increase_decrease_buttons')
+					->style('width:35px')
 					->value(Settings::get('membership_interrupt_maximum'));
 		}
 		

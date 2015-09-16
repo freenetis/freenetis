@@ -85,6 +85,11 @@ abstract class Tatra_Banka_Statement_File_Importer extends Bank_Statement_File_I
 
 				if ($item['counter_account'] == 'VKLAD V HOTOVOSTI')
 				{
+					if (empty($item['message']))
+					{
+						$item['message'] = $item['counter_account'];
+					}
+					
 					if (!$member_id)
 					{
 						// undefined member fee - double-entry incoming transfer

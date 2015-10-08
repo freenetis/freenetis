@@ -231,11 +231,13 @@ class Bank_accounts_auto_down_settings_Controller extends Controller
 				$baad->type = $form_data['type'];
 				$baad->attribute = implode('/', $attrs_finished);
 				
-				$baad->email_enabled = 
+				$baad->email_enabled =
+						module::e('notification') &&
 						Settings::get('email_enabled') && 
 						$form_data['email_enabled'];
 				
-				$baad->sms_enabled = 
+				$baad->sms_enabled =
+						module::e('notification') &&
 						Settings::get('sms_enabled') && 
 						$form_data['sms_enabled'];
 				

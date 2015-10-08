@@ -532,7 +532,14 @@ class Message_Model extends ORM
 		// order by check
 		if (!$this->has_column($order_by))
 		{
-			$order_by = 'id';
+			if ($order_by == 'message')
+			{
+				$order_by = 'name';
+			}
+			else
+			{
+				$order_by = 'id';
+			}
 		}
 		// order by direction check
 		if (strtolower($order_by_direction) != 'desc')

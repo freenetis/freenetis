@@ -98,7 +98,8 @@ class Scheduler_Controller extends Controller
 	{
 		// script needs to be run from its server machine
 		
-		if (server::remote_addr() != server::server_addr())
+		if (server::remote_addr() != server::server_addr() &&
+			server::remote_addr() != "127.0.0.1")
 		{
 			echo 'access denied';
 			die();

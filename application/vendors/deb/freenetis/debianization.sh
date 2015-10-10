@@ -68,7 +68,7 @@ rm -rf usr/share/${NAME}/application/vendors/phpwhois/testsuite.php
 # remove hidden
 rm -rf usr/share/${NAME}/.htaccess
 rm -rf usr/share/${NAME}/config.php
-rm -rf usr/share/${NAME}/upload/*
+rm -rf usr/share/${NAME}/upload
 rm -rf usr/share/${NAME}/logs
 rm -rf usr/share/${NAME}/doc
 rm -rf usr/share/${NAME}/tests

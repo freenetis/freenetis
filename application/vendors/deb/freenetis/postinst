@@ -112,7 +112,7 @@ fi
 
 # 0) Access rights to some directories
 chmod ugo+w /usr/share/freenetis
-chmod ugo+w /usr/share/freenetis/upload
+mkdir -m 0777 /usr/share/freenetis/upload 2>/dev/null || true
 mkdir -m 0777 /usr/share/freenetis/logs 2>/dev/null || true
 
 # 1) Apache config

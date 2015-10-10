@@ -1,7 +1,7 @@
 Priority: optional
 Section: web
 Pre-Depends: debconf (>= 0.5) | debconf-2.0
-Depends: coreutils (>= 6.10-6), wget (>= 1.11-4.1), grep (>= 2.5.3), apache2, php5, php5-curl, libapache2-mod-php5, php5-mysql | php5-mysqli, mysql-client, php5-mcrypt, php5-gd, php5-snmp, php-imap, cron | anacron | cron-daemon, locales
+Depends: coreutils (>= 6.10-6), wget (>= 1.11-4.1), grep (>= 2.5.3), apache2, php5, php5-curl, libapache2-mod-php5, php5-mysql | php5-mysqli, mysql-client, php5-mcrypt, php5-gd, php5-snmp, php5-imap, cron | anacron | cron-daemon, locales
 Suggests: mysql-server (>= 5.0.0), mysql-client
 Architecture: all
 Maintainer: Ondrej Fibich <ondrej.fibich@gmail.com>

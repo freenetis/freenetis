@@ -92,23 +92,6 @@ class Aro_group_Model extends ORM
 			WHERE group_id = ?
 		", $group_id);
 	}
-
-	/**
-	 * Cleans ARO - deletes all ARO groups
-	 *
-	 * @author David Raska
-	 * @param integer $aro_id
-	 */
-	public function clean_aro ($aro_id)
-	{
-		if (!$aro_id)
-			return;
-
-		$this->db->query("
-			DELETE FROM groups_aro_map
-			WHERE aro_id = ?
-		", $aro_id);
-	}
 	
 	/**
 	 * Counts all childrens of given group
@@ -372,31 +355,5 @@ class Aro_group_Model extends ORM
 			$this->db->query($sql_insert);
 		}
 	}
-
-	/**
-	 * Inserts given groups to given ARO
-	 *
-	 * @author David Raska
-	 * @param array $groups
-	 * @param integer $aro_id
-	 */
-	public function insert_groups($groups = array(), $aro_id)
-	{
-		if (!$aro_id)
-			return;
-
-		$aro_id = intval($aro_id);
-
-		$sql_insert = "INSERT INTO groups_aro_map (group_id, aro_id) VALUES ";
-
-		$values = array();
-		foreach ($groups as $group)
-			$values[] = "(".intval($group).", $aro_id)";
-
-		if (count($values))
-		{
-			$sql_insert .= implode(',', $values);
-			$this->db->query($sql_insert);
-		}
-	}
+	
 }

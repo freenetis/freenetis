@@ -91,11 +91,6 @@ class Members_whitelists_Controller extends Controller
 				->type('select')
 				->label('Whitelist')
 				->values(Ip_address_Model::get_whitelist_types());
-
-		$filter_form->add('user_name')
-				->label('Added by')
-				->type('combo')
-				->callback('json/user_fullname');
 		
 		$filter_form->add('balance')
 				->type('number');
@@ -143,10 +138,6 @@ class Members_whitelists_Controller extends Controller
 		$grid->order_callback_field('whitelisted')
 				->label('Whitelist')
 				->callback('callback::whitelisted_field');
-
-		$grid->order_callback_field('user_name')
-				->label('Added by')
-				->callback('callback::user_field');
 		
 		$grid->order_callback_field('balance')
 				->callback('callback::balance_field');
@@ -228,10 +219,6 @@ class Members_whitelists_Controller extends Controller
 		
 		$grid->callback_field('active')
 				->callback('callback::active_field');
-
-		$grid->callback_field('user_name')
-				->label('Added by')
-				->callback('callback::user_field');
 		
 		$grid->field('comment');
 		
@@ -354,7 +341,6 @@ class Members_whitelists_Controller extends Controller
 				$mw->since = $form_data['since'];
 				$mw->until = $form_data['until'];
 				$mw->comment = $form_data['comment'];
-				$mw->user_id = $this->user_id;
 				$mw->save_throwable();
 				
 				// reactivate messages
@@ -482,7 +468,6 @@ class Members_whitelists_Controller extends Controller
 				$mw->since = $form_data['since'];
 				$mw->until = $form_data['until'];
 				$mw->comment = $form_data['comment'];
-				$mw->user_id = $this->user_id;
 				$mw->save_throwable();
 				
 				// reactivate messages

@@ -124,8 +124,7 @@ class Fees_Controller extends Controller
 		$grid->order_callback_field('name')
 				->callback(array($this, 'name_field'));
 		
-		$grid->order_callback_field('fee')
-				->callback('callback::money', 'print_zero');
+		$grid->order_field('fee');
 		
 		$grid->order_field('from')
 				->label(__('Date from'));

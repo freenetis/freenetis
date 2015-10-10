@@ -162,41 +162,37 @@ if ($suffix_array &&
 <?php if (!empty($redirect_to)): ?>
 <meta http-equiv="Refresh" content="5; url=<?php echo $redirect_to ?>" />
 <?php endif; ?>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<meta name="format-detection" content="telephone=no" />
 <title>FreenetIS</title>
 <link href="../media/images/favicon.ico" rel="shorcut icon" type="image/x-icon" />
 <link href="../media/css/style.css" rel="stylesheet" type="text/css" />
-<style type="text/css"><!--
-	#main {background-image: none; min-width: 0; width: 800px; min-height: 0;}
-	#content-padd h2 {margin: 10px 0px;}
-	#content-padd h3 {margin: 10px 0px;}
-	#content-padd li {margin-left: 20px;}
-	#content-padd a {font-weight: bold;}
-	td {width: 100px;}
-	li {list-style-type: none;}
-	h1 {position:absolute; top:24px; left:18px; background:url(<?php echo $logo ?>);
-		width:212px; height:49px; background-repeat:no-repeat;}
-	#cancel_body {margin:10px; text-align:left;}
---></style>
-<style type="text/css" media="handheld, screen and (max-device-width: 640px)"><!--
-@media only screen and (max-device-width : 640px) {
-	#main {width: auto;}
-	#header {width: 100%;}
-	#cancel_body {width: 100%;}
-	#header .map {display: none;}
+<style type="text/css">
+#content-padd h2 {margin: 10px 0px;}
+#content-padd h3 {margin: 10px 0px;}
+#content-padd li {margin-left: 20px;}
+#content-padd a {font-weight: bold;}
+td {width: 100px;}
+li {
+	list-style-type: none;
 }
---></style>
+</style>
 </head>
 <body>
-<div id="main">
+<div style="position:relative;width:1000px;margin:auto;">
  	<div id="header">
-		<h1></h1>
+		<h1 style="position:absolute;
+			top:24px;
+			left:18px;
+			background:url(<?php echo $logo ?>);
+			width:212px;
+			height:49px;
+			background-repeat:no-repeat;
+		"></h1>
 		<div class="status">
+
 		</div>
 		<div class="map"></div>
 	</div>
-	<div id="cancel_body">
+	<div style="margin-top:10px;">
 		<?php echo $content; ?>
 	</div>
 </div>

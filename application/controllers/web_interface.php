@@ -733,25 +733,4 @@ class Web_interface_Controller extends Controller
 		}
 	}
 	
-	/**
-	 * Configuration for DNS synchronzation script
-	 * 
-	 * @author David Raška
-	 */
-	public function dns_server_config()
-	{
-		$ip_address = ORM::factory('ip_address')->where(array('ip_address' => server::remote_addr()))->find();
-		
-		// only enabled if IP address that requested for this page is from
-		// one of allowed ranges in the FreenetIS
-		if (!network::ip_address_in_ranges(server::remote_addr()) || !$ip_address || !$ip_address->dns)
-		{
-			@header('HTTP/1.0 403 Forbidden');
-			die;
-		}
-		
-		echo json_encode(Dns_Controller::generate_config($ip_address));
-		
-		die;
-	}
 }

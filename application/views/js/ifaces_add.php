@@ -292,7 +292,7 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			$('#link_comment').val(null);
 			$('#medium').val((type == <?php echo Iface_Model::TYPE_WIRELESS ?>) ? <?php echo Link_Model::MEDIUM_AIR ?> : <?php echo Link_Model::MEDIUM_CABLE ?>);
 			$('#bitrate').val((type == <?php echo Iface_Model::TYPE_WIRELESS ?>) ? '<?php echo Link_Model::get_wireless_max_bitrate(Link_Model::NORM_802_11_G) ?>M' :  '100M');
-			$('#duplex').val((type != <?php echo Iface_Model::TYPE_WIRELESS ?> && type != <?php echo Iface_Model::TYPE_VIRTUAL_AP ?>) ? 1 : 0);
+			$('#duplex').val(0);
 			$('#wireless_ssid').val(null);
 			$('#wireless_norm').val((type == <?php echo Iface_Model::TYPE_WIRELESS ?>) ? '<?php echo Link_Model::NORM_802_11_G ?>' : null);
 			$('#wireless_frequency').val(null);

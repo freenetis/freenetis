@@ -104,11 +104,6 @@ class Settings_Controller extends Controller
 			'name'			=> 'sms_enabled',
 			'dependencies'	=> array()
 		),
-		'api'					=> array
-		(
-			'name'			=> 'api_enabled',
-			'dependencies'	=> array()
-		),
 		'snmp'					=> array
 		(
 			'name'			=> 'snmp_enabled',
@@ -408,19 +403,6 @@ class Settings_Controller extends Controller
 				->options(arr::bool())
 				->default(Settings::get('grid_hide_on_first_load'))
 				->help('grid_hide_on_first_load');
-
-		$upload_filesize = file::shortened_size_to_bytes(ini_get('upload_max_filesize'));
-		$post_size = file::shortened_size_to_bytes(ini_get('post_max_size'));
-		if ($upload_filesize > $post_size)
-		{
-			$upload_filesize = $post_size;
-		}
-		
-		$this->form->input('upload_max_filesize')
-				->label('Max size of uploaded files')
-				->rules('valid_file_size')
-				->help('upload_max_filesize')
-				->value(network::speed($upload_filesize));
 		
 		$form_modules = array();
                 
@@ -497,12 +479,6 @@ class Settings_Controller extends Controller
 				->label('Networks')
 				->options(arr::bool())
 				->default(Settings::get('networks_enabled'));
-		
-		// API
-		$form_modules['api'] = $this->form->radio('api_enabled')
-				->label('API')
-				->options(arr::bool())
-				->default(Settings::get('api_enabled'));
 		
 		// SNMP
 		$form_modules['snmp'] = $this->form->radio('snmp_enabled')
@@ -675,19 +651,6 @@ class Settings_Controller extends Controller
 
 				if ($htaccessFile)
 				{
-					$upload_max_filesize_changed = FALSE;
-					$post_max_size_changed = FALSE;
-
-					$max_filesize = $form_data['upload_max_filesize'];
-
-					if (network::str2bytes($max_filesize) < 1024*1024)	// If less than 1M, set to 1M
-					{
-						$max_filesize = network::speed(1024*1024);
-					}
-
-					// do not save to DB, it's useless
-					unset($form_data['upload_max_filesize']);
-
 					foreach ($htaccessFile as $line_num => $line)
 					{
 						// find line with RewriteBase
@@ -699,32 +662,6 @@ class Settings_Controller extends Controller
 									'${1}/'.trim($form_data['suffix'], " /").'/', $line
 							);
 						}
-						else if (preg_match("/^php_value upload_max_filesize (.+)/", $line))
-						{
-							$htaccessFile[$line_num] = preg_replace(
-									"/^(php_value upload_max_filesize )(.+)/", 
-									'${1}'.$max_filesize, $line
-							);
-							$upload_max_filesize_changed = TRUE;
-						}
-						else if (preg_match("/^php_value post_max_size (.+)/", $line))
-						{
-							$htaccessFile[$line_num] = preg_replace(
-									"/^(php_value post_max_size )(.+)/", 
-									'${1}'.$max_filesize, $line
-							);
-							$post_max_size_changed = TRUE;
-						}
-					}
-
-					if (!$upload_max_filesize_changed)
-					{
-						$htaccessFile[] = "\nphp_value upload_max_filesize ".$max_filesize."\n";
-					}
-					
-					if (!$post_max_size_changed)
-					{
-						$htaccessFile[] = "\nphp_value post_max_size ".$max_filesize."\n";
 					}
 					
 					$handle = @fopen('.htaccess', 'w');
@@ -849,25 +786,12 @@ class Settings_Controller extends Controller
         $this->form->checkbox('user_email_duplicities_enabled')
                 ->label('Enable multiple users to have assigned same e-mail contact')
 				->checked(Settings::get('user_email_duplicities_enabled'));
-
-		$this->form->group('Members - date of born');
-
-		$this->form->checkbox('users_birthday_empty_enabled')
-			->label('Users birthday can be empty')
-			->checked(Settings::get('users_birthday_empty_enabled'));
-
-		$this->form->input('members_age_min_limit')
-			->label('Minimum age of main user')
-			->rules('valid_digit')
-			->class('increase_decrease_buttons')
-			->style('width:30px')
-			->value(Settings::get('members_age_min_limit'));
 		
 		$this->form->group('Security');
 		
 		$this->form->input('security_password_length')
 				->label('Minimal password length')
-				->rules('required|valid_digit')
+				->rules('required|valid_numeric')
 				->class('increase_decrease_buttons')
 				->style('width:30px')
 				->value(Settings::get('security_password_length'));
@@ -893,16 +817,12 @@ class Settings_Controller extends Controller
 
 			$this->form->input('membership_interrupt_minimum')
 					->label('Minimum membership interrupt period (months)')
-					->rules('valid_digit')
-					->class('increase_decrease_buttons')
-					->style('width:35px')
+					->rules('valid_numeric')
 					->value(Settings::get('membership_interrupt_minimum'));
 
 			$this->form->input('membership_interrupt_maximum')
 					->label('Maximum membership interrupt period (months)')
-					->rules('valid_digit')
-					->class('increase_decrease_buttons')
-					->style('width:35px')
+					->rules('valid_numeric')
 					->value(Settings::get('membership_interrupt_maximum'));
 		}
 		
@@ -920,18 +840,6 @@ class Settings_Controller extends Controller
 						->label('Enable additional member fee during the approval of membership')
 						->checked(Settings::get('self_registration_enable_additional_payment'));
 			}
-			
-			$this->form->group('Registration form');
-			
-			$this->form->checkbox('self_registration_applicant_email_not_required')
-					->label('Applicant e-mail is not required')
-					->checked(Settings::get('self_registration_applicant_email_not_required'));
-			
-			$this->form->html_textarea('registration_form_info')
-					->label('Info')
-					->rows(5)
-					->cols(100)
-					->value(Settings::get('registration_form_info'));
 		}
 		
 		$this->form->group('Export of registration');
@@ -953,7 +861,6 @@ class Settings_Controller extends Controller
 		{
 			$additional_info = '';
 			$logo = Settings::get('registration_logo');
-			$document = Settings::get('registration_document');
 			
 			if (file_exists($logo))
 			{
@@ -965,22 +872,6 @@ class Settings_Controller extends Controller
 					->rules('allow[jpg]')
 					->new_name('registration_logo.jpg')
 					->help(help::hint('registration_logo'))
-					->additional_info($additional_info);
-			
-			if (file_exists($document))
-			{
-				$additional_info = '<img src="'. url::base().'media/images/icons/activate.png" style="margin-left:10%;vertical-align:middle"/>';
-			}
-			else
-			{	
-				$additional_info = '';
-			}
-			
-			$this->form->upload('registration_document')
-					->label('Attached document')
-					->rules('allow[pdf]')
-					->new_name('registration_document.pdf')
-					->help(help::hint('registration_document'))
 					->additional_info($additional_info);
 		}
 
@@ -1007,12 +898,7 @@ class Settings_Controller extends Controller
 
 			foreach ($form_data as $name => $value)
 			{
-				if ((is_a($this->form->$name, "Form_Upload") && $value !== '') ||
-					!is_a($this->form->$name, "Form_Upload")
-					)
-				{
-					$issaved = $issaved && Settings::set($name, $value);
-				}
+				$issaved = $issaved && Settings::set($name, $value);
 			}
 			
 			if ($issaved)
@@ -1457,14 +1343,6 @@ class Settings_Controller extends Controller
 				->value(Settings::get('dhcp_server_reload_timeout'))
 				->style('width:50px')
 				->help('dhcp_server_reload_timeout');
-		
-		$this->form->input('dns_server_reload_timeout')
-				->label('DNS server maximal timeout')
-				->rules('required|valid_numeric')
-				->class('increase_decrease_buttons')
-				->value(Settings::get('dns_server_reload_timeout'))
-				->style('width:50px')
-				->help('dns_server_reload_timeout');
 		
 		if (Settings::get('connection_request_enable'))
 		{
@@ -2063,12 +1941,7 @@ class Settings_Controller extends Controller
 			
 			foreach ($form_data as $name => $value)
 			{
-				if ((is_a($this->form->$name, "Form_Upload") && $value !== '') ||
-					!is_a($this->form->$name, "Form_Upload")
-					)
-				{
-					$issaved = $issaved && Settings::set($name, $value);
-				}
+				$issaved = $issaved && Settings::set($name, $value);
 			}
 			
 			if ($issaved)
@@ -2178,7 +2051,7 @@ class Settings_Controller extends Controller
 		
 		$this->form->checkbox('syslog_ng_mysql_api_enabled')
 				->value('1')
-				->label('Turn on');
+				->label('Enable');
 		
 		if (Settings::get('syslog_ng_mysql_api_enabled') == 1)
 			$this->form->syslog_ng_mysql_api_enabled->checked('checked');
@@ -2838,7 +2711,7 @@ class Settings_Controller extends Controller
         }
 		
 		// parse interval to array of VoIP numbers
-		$numbers = explode(';', $input->value);
+		$numbers = explode(';', $value);
 		// check if count of numbers is smaller or longer than 2 
 		// (123456789, 987654321; NOT 123456,654321,987654)
 

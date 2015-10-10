@@ -104,39 +104,38 @@ class network
 	 *
 	 * @author Michal Kliment
 	 * @param integer $speed In B/s
-	 * @param integer $delimiter
 	 * @return string
 	 */
-	public static function speed($speed, $delimiter = 1024)
+	public static function speed($speed)
 	{
 		// default unit is nothing
 		$unit = '';
 		
-		if ($speed >= $delimiter)
+		if ($speed >= 1024)
 		{
 			$unit = 'k';
-			$speed = round($speed / $delimiter, 2);
+			$speed = round($speed / 1024, 2);
 
 			// size is too big
-			if ($speed >= $delimiter)
+			if ($speed >= 1024)
 			{
 				// transforms to Mega
 				$unit = 'M';
-				$speed = round($speed / $delimiter, 2);
+				$speed = round($speed / 1024, 2);
 
 				// size is still too big
-				if ($speed >= $delimiter)
+				if ($speed >= 1024)
 				{
 					// transforms to Giga
 					$unit = 'G';
-					$speed = round($speed / $delimiter, 2);
+					$speed = round($speed / 1024, 2);
 
 					// size is still too big
-					if ($speed >= $delimiter)
+					if ($speed >= 1024)
 					{
 						// transforms to Giga
 						$unit = 'T';
-						$speed = round($speed / $delimiter, 2);
+						$speed = round($speed / 1024, 2);
 					}
 				}
 			}
@@ -166,39 +165,22 @@ class network
 
 		foreach ($ranges as $range_address)
 		{
-			if (self::ip_address_in_range($ip_address, $range_address))
+			// address contains / => it's in CIDR format
+			if (strpos($range_address, '/') !== FALSE)
+			// split address and mask
+				list ($range_address, $range_mask) = explode('/', $range_address);
+			// address is without / => it's single address
+			else
+				$range_mask = 32;
+
+			$net = ip2long($range_address);
+			$mask = ip2long(network::cidr2netmask($range_mask));
+
+			// success
+			if (($ip_address & $mask) == $net)
 				return true;
 		}
 		return false;
-	}
-	
-	/**
-	 * Checks whether IP address belongs to given address range
-	 * 
-	 * @author Michal Kliment
-	 * @param type $ip_address
-	 * @param type $range_address
-	 * @return boolean
-	 */
-	public static function ip_address_in_range($ip_address, $range_address)
-	{
-		// address contains / => it's in CIDR format
-		if (strpos($range_address, '/') !== FALSE)
-		// split address and mask
-			list ($range_address, $range_mask) = explode('/', $range_address);
-		// address is without / => it's single address
-		else
-			$range_mask = 32;
-		
-		if (valid::ip($ip_address))
-			$ip_address = ip2long ($ip_address);
-
-		$net = ip2long($range_address);
-		$mask = ip2long(network::cidr2netmask($range_mask));
-
-		// success
-		if (($ip_address & $mask) == $net)
-			return true;
 	}
 	
 	/**
@@ -299,54 +281,4 @@ class network
 		);
 	}
 
-	/**
-	 * Converts MAC address in binary format to classic format
-	 * 
-	 * @author Michal Kliment
-	 * @param string $str
-	 * @return string|boolean
-	 */
-	public static function bin2mac ($str)
-	{
-		$str = bin2hex($str);
-		
-		$regex = '/([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})/';
-		
-		$matches = array();
-		
-		if (preg_match($regex, $str, $matches))
-		{
-			unset($matches[0]);
-			
-			return implode(':', $matches);
-		}
-		else
-		{
-			return FALSE;
-		}
-	}
-	
-	/**
-	 * Converts MAC address in decimal format to classic format
-	 * 
-	 * @author Michal Kliment
-	 * @param type $str
-	 * @return boolean
-	 */
-	public static function dec2mac ($str)
-	{
-		$pieces = explode('.', $str);
-		
-		if (count ($pieces) != 6)
-			return FALSE;
-		
-		$pieces = array_map('dechex', $pieces);
-		
-		$pieces = array_map(
-			'num::null_fill',
-			$pieces, array('2', '2', '2', '2', '2', '2')
-		);
-		
-		return implode(':', $pieces);
-	}
 }

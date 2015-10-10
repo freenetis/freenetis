@@ -147,15 +147,6 @@ class Members_Controller extends Controller
 			));
 		}
 
-		if (Settings::get('self_registration') &&
-			$this->acl_check_new(get_class($this), 'applicants'))
-		{
-			$grid->add_new_button('registration', 'Register new applicant', array
-			(
-				'title' => __('Registration form'),
-			));
-		}
-		
 		if (!$hide_grid && $this->acl_check_edit('Members_Controller', 'registration'))
 		{
 			if (!$regs)
@@ -246,8 +237,6 @@ class Members_Controller extends Controller
 		$grid->order_field('street_number');
 
 		$grid->order_field('town');
-		
-		$grid->order_field('quarter');
 
 		if (Settings::get('finance_enabled'))
 		{
@@ -431,15 +420,7 @@ class Members_Controller extends Controller
 			'filter'					=> $filter_form,
 			'method'					=> 'get'
 		));
-
-		if ($this->acl_check_new(get_class($this), 'applicants'))
-		{
-			$grid->add_new_button('registration', 'Register new applicant', array
-			(
-				'title' => __('Registration form'),
-			));
-		}
-
+		
 		// approve applicant checkbox
 		$grid->order_form_field('toapprove')
 				->callback('callback::member_approve_avaiable')
@@ -2020,15 +2001,6 @@ class Members_Controller extends Controller
 							'class' => 'popup_link'
 						)
 				);
-
-				$user_links[] = html::anchor(
-						'users/generate_password/'.$user->id, __('Generate onetime password'),
-						array
-						(
-							'title' => strtolower(__('Generate onetime password')),
-							'class' => 'confirm_link'
-						)
-				);
 			}
 
 			// change application password link
@@ -2401,13 +2373,7 @@ class Members_Controller extends Controller
 		
 		$form->password('confirm_password')
 				->rules('required|length['.$pass_min_len.',50]')
-				->matches($form->password)
-				->class('join1');
-
-		$form->checkbox('autogen_pass')
-				->label('Generate onetime password')
-				->class('join2')
-				->style('width: initial; margin-left: 15px;');
+				->matches($form->password);
 
 		$form->group('Address of connecting place');
 		
@@ -2556,13 +2522,8 @@ class Members_Controller extends Controller
 		
 		$form->input('email')
 				->rules('valid_email')
-				->class('join1')
                 ->callback(array($this, 'valid_unique_email'))
 				->style('width:250px');
-
-		$form->checkbox('send_verify_email')
-			->label('Send verify message')
-			->class('join2 checkbox');
 		
 		if (Settings::get('finance_enabled'))
 		{
@@ -2612,24 +2573,11 @@ class Members_Controller extends Controller
 				->selected($default_speed_class ? $default_speed_class->id : NULL)
 				->add_button('speed_classes')
 				->style('width:200px');
-
-		$empty_birthday = Settings::get('users_birthday_empty_enabled');
-		$min_age = Settings::get('members_age_min_limit');
-
+		
 		$form->date('birthday')
-			->label('Birthday')
-			->years(date('Y') - 100, date('Y'));
-
-		if ($empty_birthday == 0)
-		{
-			$form->inputs['birthday']
+				->label('Birthday')
+				->years(date('Y')-100, date('Y'))
 				->rules('required');
-		}
-		else
-		{
-			$form->inputs['birthday']
-				->value('');
-		}
 		
 		$form->date('entrance_date')
 				->label('Entrance date')
@@ -2641,138 +2589,343 @@ class Members_Controller extends Controller
 				->rules('length[0,250]');
 		
 		$form->submit('Add');
-
-		if ($_POST)
+		
+		// posted
+		if($form->validate())
 		{
-			if (@$_POST['autogen_pass'] == "1")
+			$form_data = $form->as_array();
+			
+			$match = array();
+			$match2 = array();
+			
+			// validate address
+			if ($address_point_server_active &&
+				(
+					!Address_points_Controller::is_address_point_valid(
+						$form_data['country_id'],
+						$form_data['town'],
+						$form_data['district'],
+						$form_data['street'],
+						$form_data['zip']
+					) ||
+					!preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $form_data['street'], $match)
+				))
 			{
-				$form->inputs['password']->rules('-length['.$pass_min_len.',50]')->rules('-required');
-				$form->inputs['confirm_password']->rules('-length['.$pass_min_len.',50]')->rules('-required');
+				$form->street->add_error('required', __('Invalid address point.'));
 			}
-
-			// posted
-			if($form->validate())
-			{
-				$form_data = $form->as_array();
-
-				$match = array();
-				$match2 = array();
-
-				// validate address
-				if ($address_point_server_active &&
-					(
-						!Address_points_Controller::is_address_point_valid(
-							$form_data['country_id'],
-							$form_data['town'],
-							$form_data['district'],
-							$form_data['street'],
-							$form_data['zip']
-						) ||
-						!preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $form_data['street'], $match)
-					))
-				{
-					$form->street->add_error('required', __('Invalid address point.'));
-				}
-				else if ($form_data['use_domicile'] &&
+			else if ($form_data['use_domicile'] &&
 					$address_point_server_active &&
 					(
-						!Address_points_Controller::is_address_point_valid(
-							$form_data['domicile_country_id'],
-							$form_data['domicile_town'],
-							$form_data['domicile_district'],
-							$form_data['domicile_street'],
-							$form_data['domicile_zip']
-						) ||
-						!preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $form_data['domicile_street'], $match2)
+					!Address_points_Controller::is_address_point_valid(
+						$form_data['domicile_country_id'],
+						$form_data['domicile_town'],
+						$form_data['domicile_district'],
+						$form_data['domicile_street'],
+						$form_data['domicile_zip']
+					) ||
+					!preg_match('((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', $form_data['domicile_street'], $match2)
 					))
+			{
+				$form->domicile_street->add_error('required', __('Invalid address point.'));
+			}
+			else
+			{
+				// street
+				if ($address_point_server_active)
 				{
-					$form->domicile_street->add_error('required', __('Invalid address point.'));
+					$street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $form_data['street']));
+
+					$number = $match[0];
 				}
-				else
+				if ($form_data['use_domicile'] &&
+					$address_point_server_active)
 				{
-					// street
+					$domicile_street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $form_data['domicile_street']));
+
+					$domicile_number = $match2[0];
+				}
+				
+				// gps
+				$gpsx = NULL;
+				$gpsy = NULL;
+
+				if (!empty($form_data['gpsx']) && !empty($form_data['gpsy']))
+				{
+					$gpsx = doubleval($form_data['gpsx']);
+					$gpsy = doubleval($form_data['gpsy']);
+
+					if (gps::is_valid_degrees_coordinate($form_data['gpsx']))
+					{
+						$gpsx = gps::degrees2real($form_data['gpsx']);
+					}
+
+					if (gps::is_valid_degrees_coordinate($form_data['gpsy']))
+					{
+						$gpsy = gps::degrees2real($form_data['gpsy']);
+					}
+				}
+
+				// gps domicicle
+				$domicile_gpsx = NULL;
+				$domicile_gpsy = NULL;
+
+				if (!empty($form_data['domicile_gpsx']) && !empty($form_data['domicile_gpsy']))
+				{
+					$domicile_gpsx = doubleval($form_data['domicile_gpsx']);
+					$domicile_gpsy = doubleval($form_data['domicile_gpsy']);
+
+					if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsx']))
+					{
+						$domicile_gpsx = gps::degrees2real($form_data['domicile_gpsx']);
+					}
+
+					if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsy']))
+					{
+						$domicile_gpsy = gps::degrees2real($form_data['domicile_gpsy']);
+					}
+				}
+
+				$member = new Member_Model();
+
+				try
+				{
+					//$profiler = new Profiler();
+					// let's start safe transaction processing
+					$member->transaction_start();
+
+					$user = new User_Model();
+					$account = new Account_Model();
+					$address_point_model = new Address_point_Model();
+
 					if ($address_point_server_active)
 					{
-						$street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $form_data['street']));
+						$t = new Town_Model();
+						$s = new Street_Model();
+						$t_id = $t->get_town($form_data['zip'], $form_data['town'], $form_data['district'])->id;
+						$s_id = $s->get_street($street, $t_id)->id;
 
-						$number = $match[0];
+						$address_point = $address_point_model->get_address_point($form_data['country_id'], $t_id, $s_id, $number,
+								$gpsx, $gpsy);
 					}
-					if ($form_data['use_domicile'] &&
-						$address_point_server_active)
+					else
 					{
-						$domicile_street = trim(preg_replace(' ((ev\.č\.)?[0-9][0-9]*(/[0-9][0-9]*[a-zA-Z]*)*)', '', $form_data['domicile_street']));
-
-						$domicile_number = $match2[0];
-					}
-
-					// gps
-					$gpsx = NULL;
-					$gpsy = NULL;
-
-					if (!empty($form_data['gpsx']) && !empty($form_data['gpsy']))
-					{
-						$gpsx = doubleval($form_data['gpsx']);
-						$gpsy = doubleval($form_data['gpsy']);
-
-						if (gps::is_valid_degrees_coordinate($form_data['gpsx']))
-						{
-							$gpsx = gps::degrees2real($form_data['gpsx']);
-						}
-
-						if (gps::is_valid_degrees_coordinate($form_data['gpsy']))
-						{
-							$gpsy = gps::degrees2real($form_data['gpsy']);
-						}
+						$address_point = $address_point_model->get_address_point(
+								$form_data['country_id'], $form_data['town_id'],
+								$form_data['street_id'], $form_data['street_number'],
+								$gpsx, $gpsy
+						);
 					}
 
-					// gps domicicle
-					$domicile_gpsx = NULL;
-					$domicile_gpsy = NULL;
-
-					if (!empty($form_data['domicile_gpsx']) && !empty($form_data['domicile_gpsy']))
+					// add address point if there is no such
+					if (!$address_point->id)
 					{
-						$domicile_gpsx = doubleval($form_data['domicile_gpsx']);
-						$domicile_gpsy = doubleval($form_data['domicile_gpsy']);
-
-						if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsx']))
-						{
-							$domicile_gpsx = gps::degrees2real($form_data['domicile_gpsx']);
-						}
-
-						if (gps::is_valid_degrees_coordinate($form_data['domicile_gpsy']))
-						{
-							$domicile_gpsy = gps::degrees2real($form_data['domicile_gpsy']);
-						}
+						$address_point->save_throwable();
 					}
 
-					$member = new Member_Model();
+					// add GPS
+					if (!empty($gpsx) && !empty($gpsy))
+					{ // save
+						$address_point->update_gps_coordinates(
+								$address_point->id, $gpsx, $gpsy
+						);
+					}
+					else
+					{ // delete gps
+						$address_point->gps = '';
+						$address_point->save_throwable();
+					}
 
-					try
+					$member->address_point_id = $address_point->id;
+
+					$account->account_attribute_id = Account_attribute_Model::CREDIT;
+
+					if ($form_data['membername'] == '')
 					{
-						//$profiler = new Profiler();
-						// let's start safe transaction processing
-						$member->transaction_start();
+						$account->name = $form_data['surname'].' '.$form_data['name'];
+					}
+					else
+					{
+						$account->name = $form_data['membername'];
+					}
 
-						$user = new User_Model();
-						$account = new Account_Model();
-						$address_point_model = new Address_point_Model();
+					$user->name = $form_data['name'];
+					$user->middle_name = $form_data['middle_name'];
+					$user->login = $form_data['login'];
+					$user->surname = $form_data['surname'];
+					$user->pre_title = $form_data['title1'];
+					$user->post_title = $form_data['title2'];
+					$user->birthday	= date("Y-m-d",$form_data['birthday']);
+					$user->password	= sha1($form_data['password']);
+					$user->type = User_Model::MAIN_USER;
+					$user->application_password = security::generate_password();
 
+					// id of user who added member
+					$member->user_id = $this->session->get('user_id');
+					$member->comment = $form_data['comment'];
+
+					if ($form_data['membername'] == '')
+					{
+						$member->name = $form_data['name'].' '.$form_data['surname'];
+					}
+					else
+					{
+						$member->name = $form_data['membername'];
+					}
+
+					$member->type = $form_data['type'];
+
+					// access control
+					if ($this->acl_check_new('Members_Controller', 'organization_id'))
+					{
+						$member->organization_identifier = $form_data['organization_identifier'];
+					}
+
+					// access control
+					if ($this->acl_check_new('Members_Controller', 'vat_organization_identifier'))
+					{
+						$member->vat_organization_identifier = $form_data['vat_organization_identifier'];
+					}
+
+					$member->speed_class_id = $form_data['speed_class'];
+
+					if (Settings::get('finance_enabled'))
+					{
+						$member->entrance_fee = $form_data['entrance_fee'];
+						$member->debt_payment_rate = $form_data['debt_payment_rate'];
+					}
+
+					if ($member->type == Member_Model::TYPE_APPLICANT)
+					{
+						$member->entrance_date = NULL;
+					}
+					else
+					{
+						$member->entrance_date = date('Y-m-d', $form_data['entrance_date']);
+					}
+
+					// saving member
+					$member->save_throwable();
+
+					// saving user
+					$user->member_id = $member->id;
+					$user->save_throwable();
+
+					// telephone
+					$contact_model = new Contact_Model();
+
+					// search for contacts
+					$p_contact_id = $contact_model->find_contact_id(
+							Contact_Model::TYPE_PHONE, $form_data['phone']
+					);
+
+					if ($p_contact_id)
+					{
+						$contact_model = ORM::factory('contact', $p_contact_id);
+						$contact_model->add($user);
+						$contact_model->save_throwable();
+					}
+					else
+					{ // add whole contact
+						$contact_model->type = Contact_Model::TYPE_PHONE;
+						$contact_model->value = $form_data['phone'];
+						$contact_model->save_throwable();
+
+						$contact_model->add($user);
+
+						$phone_country = new Country_Model($form_data['phone_prefix']);
+						$contact_model->add($phone_country);
+
+						$contact_model->save_throwable();
+					}
+
+					$contact_model->clear();
+
+					// email
+					if (!empty($form_data['email']))
+					{
+                        // search for contacts
+                        $e_contact_id = $contact_model->find_contact_id(
+                                Contact_Model::TYPE_EMAIL, $form_data['email']
+                        );
+
+                        if ($e_contact_id)
+                        {
+                            $contact_model = ORM::factory('contact', $e_contact_id);
+                            $contact_model->add($user);
+                            $contact_model->save_throwable();
+                        }
+                        else
+                        { // add whole contact
+                            $contact_model->type = Contact_Model::TYPE_EMAIL;
+                            $contact_model->value = $form_data['email'];
+                            $contact_model->save_throwable();
+                            $contact_model->add($user);
+                            $contact_model->save_throwable();
+                        }
+					}
+
+					// saving account
+					$account->member_id	= $member->id;
+					$account->save_throwable();
+
+					if (Settings::get('finance_enabled'))
+					{
+						// saving variable symbol
+						if (!isset($form_data['variable_symbol_generate']) ||
+							!$form_data['variable_symbol_generate'])
+						{
+							$var_sym = $form_data['variable_symbol'];
+						}
+						else
+						{
+							$var_sym = Variable_Key_Generator::factory()->generate($member->id);
+						}
+
+						if (empty($var_sym))
+						{
+							throw new Exception(__('Empty variable symbol.'));
+						}
+
+						$variable_symbol_model = new Variable_Symbol_Model();
+						$variable_symbol_model->account_id = $account->id;
+						$variable_symbol_model->variable_symbol = $var_sym;
+						$variable_symbol_model->save_throwable();
+					}
+
+					// save allowed subnets count of member
+					$allowed_subnets_count = new Allowed_subnets_count_Model();
+					$allowed_subnets_count->member_id = $member->id;
+					$allowed_subnets_count->count = Settings::get('allowed_subnets_default_count');
+					$allowed_subnets_count->save();
+
+					// address of connecting place is different than address of domicile
+					if ($form_data['use_domicile'])
+					{
 						if ($address_point_server_active)
 						{
 							$t = new Town_Model();
 							$s = new Street_Model();
-							$t_id = $t->get_town($form_data['zip'], $form_data['town'], $form_data['district'])->id;
-							$s_id = $s->get_street($street, $t_id)->id;
+							$t_id = $t->get_town($form_data['domicile_zip'],
+												$form_data['domicile_town'],
+												$form_data['domicile_district'])->id;
+							$s_id = $s->get_street($domicile_street, $t_id)->id;
 
-							$address_point = $address_point_model->get_address_point($form_data['country_id'], $t_id, $s_id, $number,
-								$gpsx, $gpsy);
+							$address_point = $address_point_model->get_address_point(
+								$form_data['domicile_country_id'],
+								$t_id,
+								$s_id,
+								$domicile_number,
+								$domicile_gpsx, $domicile_gpsy
+							);
 						}
 						else
 						{
 							$address_point = $address_point_model->get_address_point(
-								$form_data['country_id'], $form_data['town_id'],
-								$form_data['street_id'], $form_data['street_number'],
-								$gpsx, $gpsy
+									$form_data['domicile_country_id'],
+									$form_data['domicile_town_id'],
+									$form_data['domicile_street_id'],
+									$form_data['domicile_street_number'],
+									$domicile_gpsx, $domicile_gpsy
 							);
 						}
 
@@ -2782,313 +2935,69 @@ class Members_Controller extends Controller
 							$address_point->save_throwable();
 						}
 
-						// add GPS
-						if (!empty($gpsx) && !empty($gpsy))
-						{ // save
-							$address_point->update_gps_coordinates(
-								$address_point->id, $gpsx, $gpsy
-							);
-						}
-						else
-						{ // delete gps
-							$address_point->gps = '';
-							$address_point->save_throwable();
-						}
-
-						$member->address_point_id = $address_point->id;
-
-						$account->account_attribute_id = Account_attribute_Model::CREDIT;
-
-						if ($form_data['membername'] == '')
+						// test if address of connecting place is really
+						// different than address of domicile
+						if ($member->address_point_id != $address_point->id)
 						{
-							$account->name = $form_data['surname'] . ' ' . $form_data['name'];
-						}
-						else
-						{
-							$account->name = $form_data['membername'];
-						}
-
-						if ($form_data['autogen_pass'] == "1")
-						{
-							// generate random password
-							$raw_password = security::generate_password(6);
-							$user->password_is_onetime = 1;
-						}
-						else
-						{
-							$raw_password = $form_data['password'];
-						}
-
-						$user->name = $form_data['name'];
-						$user->middle_name = $form_data['middle_name'];
-						$user->login = $form_data['login'];
-						$user->surname = $form_data['surname'];
-						$user->pre_title = $form_data['title1'];
-						$user->post_title = $form_data['title2'];
-						$user->birthday = (empty($form_data['birthday']) ? NULL : date("Y-m-d",$form_data['birthday']));
-						$user->password = sha1($raw_password);
-						$user->type = User_Model::MAIN_USER;
-						$user->application_password = security::generate_password();
-
-						// id of user who added member
-						$member->user_id = $this->session->get('user_id');
-						$member->comment = $form_data['comment'];
-
-						if ($form_data['membername'] == '')
-						{
-							$member->name = $form_data['name'] . ' ' . $form_data['surname'];
-						}
-						else
-						{
-							$member->name = $form_data['membername'];
-						}
-
-						$member->type = $form_data['type'];
-
-						// access control
-						if ($this->acl_check_new('Members_Controller', 'organization_id'))
-						{
-							$member->organization_identifier = $form_data['organization_identifier'];
-						}
-
-						// access control
-						if ($this->acl_check_new('Members_Controller', 'vat_organization_identifier'))
-						{
-							$member->vat_organization_identifier = $form_data['vat_organization_identifier'];
-						}
-
-						$member->speed_class_id = $form_data['speed_class'];
-
-						if (Settings::get('finance_enabled'))
-						{
-							$member->entrance_fee = $form_data['entrance_fee'];
-							$member->debt_payment_rate = $form_data['debt_payment_rate'];
-						}
-
-						if ($member->type == Member_Model::TYPE_APPLICANT)
-						{
-							$member->entrance_date = NULL;
-						}
-						else
-						{
-							$member->entrance_date = date('Y-m-d', $form_data['entrance_date']);
-						}
-
-						// saving member
-						$member->save_throwable();
-
-						// saving user
-						$user->member_id = $member->id;
-						$user->save_throwable();
-
-						// telephone
-						$contact_model = new Contact_Model();
-
-						// search for contacts
-						$p_contact_id = $contact_model->find_contact_id(
-							Contact_Model::TYPE_PHONE, $form_data['phone']
-						);
-
-						if ($p_contact_id)
-						{
-							$contact_model = ORM::factory('contact', $p_contact_id);
-							$contact_model->add($user);
-							$contact_model->save_throwable();
-						}
-						else
-						{ // add whole contact
-							$contact_model->type = Contact_Model::TYPE_PHONE;
-							$contact_model->value = $form_data['phone'];
-							$contact_model->save_throwable();
-
-							$contact_model->add($user);
-
-							$phone_country = new Country_Model($form_data['phone_prefix']);
-							$contact_model->add($phone_country);
-
-							$contact_model->save_throwable();
-						}
-
-						$contact_model->clear();
-
-						// email
-						if (!empty($form_data['email']))
-						{
-							// search for contacts
-							$e_contact_id = $contact_model->find_contact_id(
-								Contact_Model::TYPE_EMAIL, $form_data['email']
-							);
-
-							if ($e_contact_id)
-							{
-								$contact_model = ORM::factory('contact', $e_contact_id);
-								$contact_model->add($user);
-								$contact_model->save_throwable();
-							} else
-							{ // add whole contact
-								$contact_model->type = Contact_Model::TYPE_EMAIL;
-								$contact_model->value = $form_data['email'];
-								$contact_model->save_throwable();
-								$contact_model->add($user);
-								$contact_model->save_throwable();
-							}
-
-							if ($form_data['send_verify_email'])
-							{
-								try
-								{
-									Contacts_Controller::send_verify_message($contact_model->id);
-									status::success('Verification message have been successfully sent.');
-								}
-								catch (Exception $ex)
-								{
-									status::error('Error - cant send Verification message', $ex);
-									Log::add_exception($ex);
-								}
-							}
-						}
-
-						// saving account
-						$account->member_id = $member->id;
-						$account->save_throwable();
-
-						if (Settings::get('finance_enabled'))
-						{
-							// saving variable symbol
-							if (!isset($form_data['variable_symbol_generate']) ||
-								!$form_data['variable_symbol_generate'])
-							{
-								$var_sym = $form_data['variable_symbol'];
-							}
-							else
-							{
-								$var_sym = Variable_Key_Generator::factory()->generate($member->id);
-							}
-
-							if (empty($var_sym))
-							{
-								throw new Exception(__('Empty variable symbol.'));
-							}
-
-							$variable_symbol_model = new Variable_Symbol_Model();
-							$variable_symbol_model->account_id = $account->id;
-							$variable_symbol_model->variable_symbol = $var_sym;
-							$variable_symbol_model->save_throwable();
-						}
-
-						// save allowed subnets count of member
-						$allowed_subnets_count = new Allowed_subnets_count_Model();
-						$allowed_subnets_count->member_id = $member->id;
-						$allowed_subnets_count->count = Settings::get('allowed_subnets_default_count');
-						$allowed_subnets_count->save();
-
-						// address of connecting place is different than address of domicile
-						if ($form_data['use_domicile'])
-						{
-							if ($address_point_server_active)
-							{
-								$t = new Town_Model();
-								$s = new Street_Model();
-								$t_id = $t->get_town($form_data['domicile_zip'],
-									$form_data['domicile_town'],
-									$form_data['domicile_district'])->id;
-								$s_id = $s->get_street($domicile_street, $t_id)->id;
-
-								$address_point = $address_point_model->get_address_point(
-									$form_data['domicile_country_id'],
-									$t_id,
-									$s_id,
-									$domicile_number,
-									$domicile_gpsx, $domicile_gpsy
-								);
-							}
-							else
-							{
-								$address_point = $address_point_model->get_address_point(
-									$form_data['domicile_country_id'],
-									$form_data['domicile_town_id'],
-									$form_data['domicile_street_id'],
-									$form_data['domicile_street_number'],
-									$domicile_gpsx, $domicile_gpsy
-								);
-							}
-
-							// add address point if there is no such
-							if (!$address_point->id)
-							{
-								$address_point->save_throwable();
-							}
-
-							// test if address of connecting place is really
-							// different than address of domicile
-							if ($member->address_point_id != $address_point->id)
-							{
-								// add GPS
-								if (!empty($domicile_gpsx) && !empty($domicile_gpsy))
-								{ // save
-									$address_point->update_gps_coordinates(
+							// add GPS
+							if (!empty($domicile_gpsx) && !empty($domicile_gpsy))
+							{ // save
+								$address_point->update_gps_coordinates(
 										$address_point->id, $domicile_gpsx,
 										$domicile_gpsy
-									);
-								}
-								else
-								{ // delete gps
-									$address_point->gps = '';
-									$address_point->save_throwable();
-								}
-								// add domicicle
-								$members_domicile = new Members_domicile_Model();
-								$members_domicile->member_id = $member->id;
-								$members_domicile->address_point_id = $address_point->id;
-								$members_domicile->save_throwable();
+								);
 							}
+							else
+							{ // delete gps
+								$address_point->gps = '';
+								$address_point->save_throwable();
+							}
+							// add domicicle
+							$members_domicile = new Members_domicile_Model();
+							$members_domicile->member_id = $member->id;
+							$members_domicile->address_point_id = $address_point->id;
+							$members_domicile->save_throwable();
 						}
+					}
 
-						// insert regular member access rights
-						$groups_aro_map = new Groups_aro_map_Model();
-						$groups_aro_map->aro_id = $user->id;
-						$groups_aro_map->group_id = Aro_group_Model::REGULAR_MEMBERS;
-						$groups_aro_map->save_throwable();
+					// insert regular member access rights
+					$groups_aro_map = new Groups_aro_map_Model();
+					$groups_aro_map->aro_id = $user->id;
+					$groups_aro_map->group_id = Aro_group_Model::REGULAR_MEMBERS;
+					$groups_aro_map->save_throwable();
 
-						$password_message = '';
-						if ($form_data['autogen_pass'] == 1)
-						{
-							$password_message = '<br />'.__('Generated password of user is: %s', $raw_password);
-						}
+					// reset post
+					unset($form_data);
 
-						// reset post
-						unset($form_data);
-
-						// send welcome message to member
-						Mail_message_Model::create(
+					// send welcome message to member
+					Mail_message_Model::create(
 							Member_Model::ASSOCIATION, $user->id,
 							mail_message::format('welcome_subject'),
 							mail_message::format('welcome'), 1
-						);
+					);
 
-						// commit transaction
-						$member->transaction_commit();
-						status::success(__('Member has been successfully added.').$password_message, FALSE);
+					// commit transaction
+					$member->transaction_commit();
+					status::success('Member has been successfully added.');
+					
+					// add information about last added member by logged user
+					// for selecting member in dropdown for connection request
+					$this->session->set('last_added_member_id', $member->id);
 
-						// add information about last added member by logged user
-						// for selecting member in dropdown for connection request
-						$this->session->set('last_added_member_id', $member->id);
-
-						// redirect
-						url::redirect('members/show/' . $member->id);
-					}
-					catch (Exception $e)
-					{
-						// rollback transaction
-						$member->transaction_rollback();
-						Log::add_exception($e);
-						status::error('Error - cant add new member.', $e);
-						$this->redirect('members/show_all');
-					}
+					// redirect
+					url::redirect('members/show/'.$member->id);
+				}
+				catch (Exception $e)
+				{
+					// rollback transaction
+					$member->transaction_rollback();
+					Log::add_exception($e);
+					status::error('Error - cant add new member.', $e);
+					$this->redirect('members/show_all');
 				}
 			}
 		}
-
+		
 		$headline = __('Add new member');
 
 		// breadcrumbs navigation			
@@ -4258,15 +4167,8 @@ class Members_Controller extends Controller
 
 				case 'pdf':
 					// do pdf export
-					if ($this->registration_pdf_export($member_id))
-					{
-						die();
-					}
-					else
-					{
-						status::error('Cannot append PDF document to registration, please create PDF document in MS Word, PDF Creator or Adobe Illustrator.');
-						$this->redirect(url_lang::previous());
-					}
+					$this->registration_pdf_export($member_id);
+					die();
 					break;
 			}
 		}
@@ -4601,37 +4503,7 @@ class Members_Controller extends Controller
 		$filename = url::title(__('registration').'-'.$member->name).'.pdf';
 		$mpdf = new mPDF('utf-8', 'A4');
 		$mpdf->WriteHTML($html_logo_correct);
-		$mpdf->SetImportUse();
-		if (Settings::get('registration_document'))
-		{
-			try
-			{
-				$pages_count = $mpdf->SetSourceFile(Settings::get('registration_document'));
-			}
-			catch (Exception $e)
-			{
-				return false;
-			}
-			if ($pages_count !== false)
-			{
-				for ($i = 1; $i <= $pages_count; $i++)
-				{
-					$import_page = $mpdf->ImportPage($i);
-					$s = $mpdf->GetTemplateSize($i);
-					if ($s['w'] > $s['h'])
-					{
-						$mpdf->AddPage('L');
-					}
-					else
-					{
-						$mpdf->AddPage();
-					}
-					$mpdf->UseTemplate($import_page);
-				}
-			}
-		}
 		$mpdf->Output($filename, 'I');
-		return true;
 	}
 
 	/**
@@ -4864,13 +4736,6 @@ class Members_Controller extends Controller
 		$filter_form->add('entrance_date')
 				->type('date');
 		
-		if (module::e('self_registration'))
-		{
-			$filter_form->add('applicant_connected_from')
-					->label('Applicant connected from')
-					->type('date');
-		}
-		
 		$filter_form->add('leaving_date')
 				->type('date');
 		
@@ -4900,10 +4765,6 @@ class Members_Controller extends Controller
 						$town_model->select_list('town', 'town')
 					)
 				);
-		
-		$filter_form->add('quarter')
-			->table('t')
-			->callback('json/quarter_name');
 		
 		$filter_form->add('street')
 				->type('select')
@@ -5629,66 +5490,6 @@ class Members_Controller extends Controller
 		{
 			//login failed
 			throw new Exception(__('Connection to vtiger server has failed'));
-		}
-	}
-	
-	/**
-	 * Method used for popup filtering
-	 * 
-	 * @author Michal Kliment
-	 */
-	public function filter()
-	{
-		// access rights
-		if (!$this->acl_check_view(get_class($this), 'members'))
-			Controller::error(ACCESS);
-		
-		// create filter form
-		$filter_form = self::create_filter_form();
-		
-		// filter form is submited => print only result in JSON format
-		if (!$filter_form->is_first_load())
-		{
-			$filter_sql = $filter_form->as_sql();
-			
-			$member_model = new Member_Model();
-		
-			// counts all members
-			$total_members = $member_model->count_all_members($filter_sql);
-			
-			// returns all members
-			$members = $member_model->get_all_members(
-					0, $total_members, 'surname', 'asc',
-					$filter_sql
-			);
-			
-			$data = array();
-			
-			// transform members from objects to array
-			$x = 0;
-			foreach ($members as $member)
-			{
-				$data[$x++] = array
-				(
-					'id' => $member->id,
-					'name' => $member->surname.' '.$member->firstname.' (ID '.$member->id.')'
-				);
-			}
-			
-			// print array with members in JSON
-			die(json_encode($data));
-		}
-		// filter form is not submited => print only form
-		else
-		{
-			$title = __('Filter members');
-			
-			$view = new View('main');
-			$view->title = $title;
-			$view->content = new View('form');
-			$view->content->headline = $title;
-			$view->content->form = $filter_form;
-			$view->render(TRUE);
 		}
 	}
 }

@@ -432,13 +432,7 @@
 				</tr>
 			</table>
 		</th>
-		<td><?php if ($contact->verify == 1): ?>
-				<span class="more" title="<?php echo __('Contact verified')?>"><?php echo $contact->value ?></span>
-			<?php else: ?>
-				<span class="more notverified" title="<?php echo __('Contact not verified')?>"><?php echo $contact->value ?></span>
-				<?php echo html::anchor('contacts/verify/'.$contact->id, html::image(array('src' => 'media/images/icons/grid_action/approve.png'), array('alt' => __('Verify contact'), 'title' => __('Verify contact'))), array('title' => __('Verify contact'), 'class' => 'popup_link action_field_icon')); ?>
-			<?php endif;?>
-		</td>
+		<td><?php echo $contact->value ?></td>
 		<?php else: ?>
 		<th><?php echo  $contact_types[$i] ?></th>
 		<td><?php echo  $contact->value ?></td>

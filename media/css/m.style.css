@@ -4,38 +4,38 @@
 
 @media only screen and (max-device-width : 640px) { /* firefox 3 require this to work properly */
 	
-.cellphone #main { 
+#main { 
 	background-image: none;
 	width: auto;
 	max-width: none;
 	min-width: 0;
 }
 
-.cellphone #middle { 
+#middle { 
 	font-size: 120%;
 	-webkit-text-size-adjust: 100%;
 }
 
-.cellphone #header, #content, #footer {
+#header, #content, #footer {
 	width: 100%;
 }
 
-.cellphone #content {
+#content {
 	margin-left: 0px;
 	max-width: none;
 	min-width: 0;
 }
 
-.cellphone #content-padd {
+#content-padd {
 	max-width: none;
 	min-width: 0;
 }
 
-.cellphone #footer {
+#footer {
 	display: none;
 }
 
-.cellphone #menu {
+#menu {
 	background-color: #fff;
 	position: absolute;
 	width: 100%;
@@ -43,11 +43,11 @@
 	display: none;
 }
 
-.cellphone #content.dispNone {
+#content.dispNone {
 	display: none;
 }
 
-.cellphone #cellphone_hide_menu {
+#cellphone_hide_menu {
 	width: 50px;
 	position: absolute;
 	height: 100%;
@@ -56,7 +56,7 @@
 	cursor: pointer;
 }
 
-.cellphone #cellphone_show_menu {
+#cellphone_show_menu {
 	top: 24px;
 	left: 18px;
 	background: #FF5C00 url('../../media/images/layout/logo_freenetis.jpg') no-repeat -1px 0px;
@@ -66,7 +66,7 @@
 	cursor: pointer;
 }
 
-.cellphone #cellphone_menu_tooltip {
+#cellphone_menu_tooltip {
 	display: none;
 	text-align: left;
 	background-color: #FF833D;
@@ -81,58 +81,57 @@
 	opacity: 0.9;
 }
 
-.cellphone h1#logo {
+h1#logo {
 	display: none;
 }
 
-.cellphone .cellphone_hide,
-.cellphone a.action_field_icon.cellphone_hide {
-	display: none !important;
+.cellphone_hide {
+	display: none;
 }
 
-.cellphone #header .separator1 {
+#header .separator1 {
 	left: 75px;
 }
 
-.cellphone #header .status {
+#header .status {
 	left: 87px;
 }
 
-.cellphone #header .logout {
+#header .logout {
 	top: 64px;
 }
 
-.cellphone #menu-padd {
+#menu-padd {
 	width: 240px;
 }
 
-.cellphone table.form {
+table.form {
 	width: auto ! important;
 }
 
-.cellphone table.extended {
+table.extended {
 	float: none ! important;
 	margin-left: 0 ! important;
 }
 
-.cellphone #loading-overlay {
+#loading-overlay {
 	left: 0;
 	top: 95px;
 }
 
-.cellphone .status div#user_ip_address {
+.status div#user_ip_address {
 	display: inline-block;
 	width: 90px;
 	overflow: hidden;
 	font-weight: normal;
 }
 
-.cellphone input, .cellphone textarea {
+input, textarea {
 	margin: 0 ! important;
 	max-width: 100px ! important;
 }
 
-.cellphone textarea {
+textarea {
 	width: 100% ! important;
 	max-width: 100% ! important;
 	padding: 0;
@@ -142,12 +141,12 @@
 	box-sizing: border-box;
 }
 
-.cellphone select {
+select {
 	margin: 0 ! important;
 	max-width: 100px ! important;
 }
 
-.cellphone .search input#keyword {
+.search input#keyword {
 	max-width: 210px ! important;
 	width: 210px;
 }

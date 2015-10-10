@@ -1,4 +1,4 @@
-<?php
+<?php defined('SYSPATH') or die('No direct script access.');
 /*
  * This file is part of open source system FreenetIS
  * and it is released under GPLv3 licence.

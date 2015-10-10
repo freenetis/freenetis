@@ -194,20 +194,6 @@ $(document).ready(function()
 			input_add_increase_decrease_buttons($(e));
 		}
 	});
-
-	$('.infinitycheckbox').change(function()
-	{
-		var id = this.id.replace('_infinity', '');
-		if (this.checked)
-		{
-			$("#"+id).attr('disabled', 'disabled');
-			$("#"+id).val('9999-12-31');
-		}
-		else
-		{
-			$("#"+id).removeAttr('disabled');
-		}
-	}).trigger('change');
 	
 	// dialog with help
 	$('.help_hint').unbind('click').bind('click', function ()
@@ -263,8 +249,6 @@ $(document).ready(function()
 			
 			if (this._items[id] == undefined)
 				this._items[id] = new Dialog(id, parent, isReloadOn);
-			
-			this._items[id]._opened_count++;
 			
 			return this._items[id];
 		},
@@ -398,8 +382,6 @@ $(document).ready(function()
 		
 		this._data = '';
 		
-		this._opened_count = 0;
-		
 		// set parent
 		this.setParent(parent);
 		
@@ -448,16 +430,11 @@ $(document).ready(function()
 							// result is html
 							case '<':
 								parent._format = 'html';
-								
-								// this is hack because jQuery auto removes scipt tags (credits: http://blog.devlpr.net/2012/04/29/how-to-get-script-tags-with-jquery-find-from-ajax-result/)
-								data = data.replace(/script/gi, 'myscript');
-								
 								parent._data = $(data).find('#content-padd');
 								break;
 
 							// result is json
 							case '{':
-							case '[':
 								parent._format = 'json';
 								parent._data = jQuery.parseJSON(data);
 								break;
@@ -505,19 +482,7 @@ $(document).ready(function()
 				context = this._element;
 				$.getScript('<?php echo url_lang::base() ?>js/'+str_replace('<?php echo url_lang::base() ?>', '', this._url)+glue+'nobase=1');
 				
-				// this is hack because jQuery auto removes scipt tags (credits: http://blog.devlpr.net/2012/04/29/how-to-get-script-tags-with-jquery-find-from-ajax-result/)
-				this._element.find("myscript").each (function (){
-					eval($(this).html());
-					
-					$(this).remove();
-				});
-				
-				this._element.find('#filter_form').addClass('nopopup');
-				
-				this._element.find(".form, #filter_form").each(function()
-				{
-					$(this).validate();
-				});
+				this._element.find(".form").validate();
 				
 				update_select_multiple();
 			}
@@ -658,16 +623,6 @@ $(document).ready(function()
 		getLink: function ()
 		{
 			return $('#popup-link-' + this.id);
-		},
-		
-		/**
-		 * Get count of opened dialogs
-		 * 
-		 * @returns integer
-		 */
-		getOpenedCount: function ()
-		{
-			return this._opened_count;
 		}
 	};
 	
@@ -700,12 +655,9 @@ $(document).ready(function()
 
 				// create new dialog
 				var dialog = dialogs.add($this, parent, !$this.hasClass('isReloadOff'));
-				
-				if (dialog.getOpenedCount() == 1)
-				{
-					// load url in it
-					dialog.load(url);
-				}
+
+				// load url in it
+				dialog.load(url);
 				
 				// init TinyMCE Editors in dialog
 				if (window['advancedTinyMCE'] !== undefined)
@@ -807,13 +759,6 @@ $(document).ready(function()
 					if (dialog.isReloadOn())
 					{
 						reload_element('#'+$(dropdown).attr('id'), url, limit);
-						
-						var text = $('#'+$(dropdown).attr('id')+" option[value="+data.id+"]").text();
-						
-						if (dropdown.attr('multiple') == 'multiple')
-						{
-							select_multiple[$(dropdown).attr('id')].push({'key': data.id, 'value': text});
-						}
 					}
 					
 					dropdown.trigger('addOption', data.id);
@@ -878,67 +823,6 @@ $(document).ready(function()
 		}
 		
 		// prevent real submit
-		return false;
-	});
-	
-	/**
-	* Submit of form in filter dialog
-	* 
-	* @author Michal Kliment
-	 */
-	$(".dialog #filter_form").live('submit', function()
-	{
-		// get dialog
-		var dialog = dialogs.get($(this).parent());
-		
-		var glue = ($(this).attr('action').indexOf('?') == -1) ? '?' : '&';
-		
-		var url = $(this).attr('action')+glue+'noredirect=1';
-		
-		// find link which open this dialog
-		var link = dialogs.links.get($(this).parent());
-		
-		// find parent of dialog (another dialog or main page)
-		var parent = dialog.getParent();
-		
-		var dropdown = link.prev();
-		
-		$.ajax({
-			async: false,
-			type: 'GET',
-			url: url,
-			data: dialog.getFormData(),
-			success: function (data)
-			{				
-				var first_option_text = dropdown.children().first().text();
-				
-				dropdown.html('');
-				
-				dropdown.append('<option>'+first_option_text+'</option>');
-				
-				data = jQuery.parseJSON(data);
-
-				for (key in data)
-				{
-					if ($.isArray(data[key]))	// is grouped?
-					{
-						dropdown.append('<optgroup label="'+key+'">');
-						for (subkey in data[key])
-						{
-							dropdown.append('<option value="'+data[key][subkey].id+'">'+data[key][subkey].name+'</option>');
-						}
-						dropdown.append('</optgroup>');
-					}
-					else	// no group
-					{
-						dropdown.append('<option value="'+data[key].id+'">'+data[key].name+'</option>');
-					}
-				}
-			}
-		});
-		
-		dialog.hide();
-		
 		return false;
 	});
 	
@@ -1310,28 +1194,10 @@ $(document).ready(function()
 
 	/* Validators *************************************************************/
 	
-	$.validator.addMethod('ttl', function(value)
-	{
-		value = value.replace(new RegExp("\\n", "g"), ",");
-		return value == '' || value.match(/^[0-9]+[mhdw]?$/g);
-	}, '<?php echo __('Invalid time to live format') ?>');
-	
-	$.validator.addMethod('domain_name', function(value)
-	{
-		value = value.replace(new RegExp("\\n", "g"), ",");
-		return value == '' || value == '@' || value.match(/^([A-Za-z0-9]+\.)*[A-Za-z0-9]+\.?$/g);
-	}, '<?php echo __('Invalid domain name') ?>');
-	
 	$.validator.addMethod('ip_address', function(value)
 	{
 		value = value.replace(new RegExp("\\n", "g"), ",");
 		return value == '' || value.match(/^(((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9])\.((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9])\.((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9])\.((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9]),?)+$/g);
-	}, '<?php echo __('Invalid IP address') ?>');
-	
-	$.validator.addMethod('ipv6_address', function(value)
-	{
-		value = value.replace(new RegExp("\\n", "g"), ",");
-		return value == '' || value.match(/^((([0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){6}:[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){5}:([0-9A-Fa-f]{1,4}:)?[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){4}:([0-9A-Fa-f]{1,4}:){0,2}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){3}:([0-9A-Fa-f]{1,4}:){0,3}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){2}:([0-9A-Fa-f]{1,4}:){0,4}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){6}((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|(([0-9A-Fa-f]{1,4}:){0,5}:((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|(::([0-9A-Fa-f]{1,4}:){0,5}((\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b)\.){3}(\b((25[0-5])|(1\d{2})|(2[0-4]\d)|(\d{1,2}))\b))|([0-9A-Fa-f]{1,4}::([0-9A-Fa-f]{1,4}:){0,5}[0-9A-Fa-f]{1,4})|(::([0-9A-Fa-f]{1,4}:){0,6}[0-9A-Fa-f]{1,4})|(([0-9A-Fa-f]{1,4}:){1,7}:))$/g);
 	}, '<?php echo __('Invalid IP address') ?>');
 	
 	$.validator.addMethod('ip_address_check', function(value, element)
@@ -1359,32 +1225,7 @@ $(document).ready(function()
 		
 		return ret;
 	}, '<?php echo __('IP address already exists.') ?>');
-	
-	$.validator.addMethod('zone_name_check', function(value, element)
-	{
-		var ret = false;
-		
-		$.ajax({
-			url:		'<?php echo url_lang::base() ?>json/zone_name_check',
-			async:		false,
-			dataType:	'json',
-			data:		{zone_id: dns_zone_id, zone: value},
-			success:	function(result)
-			{
-				if(result.state)
-				{
-					ret = true;
-				}
-				else
-				{
-					$.validator.messages.zone_name_check = result.message;
-				}
-            }
-		});
-		
-		return ret;
-	}, '<?php echo __('Zone already exists.') ?>');
-	
+
 	$.validator.addMethod('cidr', function(value)
 	{
 		var result = value.match(/^((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9])\.((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9])\.((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9])\.((25[0-5])|(2[0-4][0-9])|(1[0-9][0-9])|([1-9][0-9])|[0-9])\/((3[0-2])|(2[0-9])|(1[0-9])|([0-9]))$/);
@@ -1537,36 +1378,22 @@ $(document).ready(function()
 		
 		return confirm;
 	});
-
-	// asking before action
-	$('.confirm_link').live('click', function(e)
-	{
-		var action = $(this).attr('title');
-		var confirm = window.confirm('<?php echo __('Do you really want to') ?> '+action+'?');
-
-		if (!confirm)
-			e.stopImmediatePropagation();
-
-		return confirm;
-	});
 	
-	// validate all form and filters
-	$('.form, #filter_form').each(function() {
-		$(this).validate({
-			errorPlacement: function(error, el)
+	// validate all form
+	$('.form').validate({
+		errorPlacement: function(error, el)
+		{
+			// if element has multiple inputs in row, insert error message after
+			// second input to prevent destroying layout
+			if (el.hasClass('join1') || el.hasClass('join2'))
 			{
-				// if element has multiple inputs in row, insert error message after
-				// second input to prevent destroying layout
-				if (el.hasClass('join1') || el.hasClass('join2'))
-				{
-					error.insertAfter(el.parent().find('.join2'));
-				}
-				else // insert error after first element
-				{
-					error.insertAfter(el);
-				}
+				error.insertAfter(el.parent().find('.join2'));
 			}
-		});
+			else // insert error after first element
+			{
+				error.insertAfter(el);
+			}
+		}
 	});
 
 	// gave focus to focus classed objects
@@ -1600,8 +1427,6 @@ $(document).ready(function()
 	// Set show and hide menu events on mobile device
 	if (jQuery.browser.mobile)
 	{
-		$('body').addClass('cellphone');
-		
 		$('#cellphone_hide_menu').click(function()
 		{
 			cellphone_hide_menu();
@@ -1624,7 +1449,7 @@ $(document).ready(function()
 		});
 
 		// menu tooltip
-		if ($.cookie('cellphone_menu_tooltip') !== '1')
+		if ($.cookie('cellphone_menu_tooltip') != '1')
 		{
 			$('#cellphone_menu_tooltip').fadeIn(function(){
 				$.cookie('cellphone_menu_tooltip', '1', { path: '<?php echo Settings::get('suffix') ?>' });

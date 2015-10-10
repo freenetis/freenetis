@@ -1,4 +1,4 @@
-<?php
+<?php defined('SYSPATH') or die('No direct script access.');
 /*
  * This file is part of open source system FreenetIS
  * and it is released under GPLv3 licence.
@@ -11,10 +11,9 @@
  *
  */
 
-require_once __DIR__ . '/Fio_Bank_Statement_File_Importer.php';
-require_once __DIR__ . '/Fio/FioCsvStatement.php';
-require_once __DIR__ . '/Fio/FioCsvParser.php';
-require_once __DIR__ . '/Fio/NewFioCsvParser.php';
+require dirname(__FILE__) . '/Fio_Bank_Statement_File_Importer.php';
+require dirname(__FILE__) . '/Fio/FioParser.php';
+require dirname(__FILE__) . '/Fio/NewFioCsvParser.php';
 
 /**
  * FIO importer for statements in CSV format that are obtained from the FIO
@@ -27,21 +26,14 @@ require_once __DIR__ . '/Fio/NewFioCsvParser.php';
  */
 class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Importer
 {
-    /**
-     * Required currency.
-     *
-     * @todo we want to handle more currency, maybe it will be good to have
-     *       currency of each association bank account set by settings
-     */
-    const CURRENCY = 'CZK';
 
 	/**
 	 * Data reprezentation of import.
 	 *
-	 * @var FioCsvStatement
+	 * @var array
 	 */
 	private $data = NULL;
-    
+
     /**
      * Indicates whether header is available or not.
      *
@@ -49,7 +41,7 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
      */
     private $header_available = TRUE;
 
-    /*
+	/*
 	 * @Override
 	 */
 	protected function check_file_data_format()
@@ -60,25 +52,29 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
 		// parse (we have no function for checking)
 		try
 		{
-            $file_data = $this->get_file_data();
-            // new parser
-            $parserNew = new NewFioCsvParser;
-            if ($parserNew->accept_file($file_data))
+            $parser_new = new NewFioCsvParser;
+            if ($parser_new->accept_file($this->get_file_data()))
             {
                 $this->header_available = FALSE;
-                $this->data = $parserNew->parse($file_data);
+                $this->data = $parser_new->parse($this->get_file_data());
+                // correct data
+                foreach ($this->data as &$row)
+                {
+                    $this->correct_new_listing_row($row);
+                }
             }
             // old parser
             else
             {
-                $parserOld = new FioCsvParser;
-                $this->data = $parserOld->parse($file_data, 'cp1250');
+                $this->set_file_data(iconv('cp1250', 'UTF-8', $this->get_file_data()));
+                $this->data = FioParser::parseCSV($this->get_file_data());
+                // correct data
+                foreach ($this->data as &$row)
+                {
+                    $this->correct_old_listing_row($row);
+                }
             }
-            // correct each data row
-			for ($i = 0; $i < count($this->data->items); $i++)
-			{
-				$this->correct_listing_row($this->data->items[$i]);
-			}
+
 			// ok
 			return TRUE;
 		}
@@ -91,14 +87,14 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
 	}
 
     /**
-     * Correct passed listing row for application needs.
+     * Correct passed listing row from old parser for application needs.
      *
      * @param array $row listing row passed by reference
      * @throws Exception on error in data
      */
-    private function correct_listing_row(&$row)
+    private function correct_new_listing_row(&$row)
     {
-        if ($row['mena'] != self::CURRENCY)
+        if ($row['mena'] != 'CZK')
         {
             throw new Exception(__('Unknown currency %s!', $row['mena']));
         }
@@ -110,28 +106,60 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
         }
     }
 
-    /*
+    /**
+     * Correct passed listing row from old parser for application needs.
+     *
+     * @param array $row listing row passed by reference
+     * @throws Exception on error in data
+     */
+    private function correct_old_listing_row(&$row)
+    {
+        if ($row['mena'] != 'CZK')
+        {
+            throw new Exception(__('Unknown currency %s!', $row['mena']));
+        }
+
+        // convert date
+        if (preg_match('/^[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4}\.$/', $row['datum']) !== FALSE)
+        {
+            $date_arr = explode('.', $row['datum']);
+            $timestamp = mktime(0, 0, 0, $date_arr[1], $date_arr[0], $date_arr[2]);
+            $row['datum'] = date('Y-m-d', $timestamp);
+        }
+
+        // only transfer from Fio to Fio have 'nazev_protiuctu'
+        // for accounts in other banks we have to derive account name
+        if (!$row['nazev_protiuctu'] && $row['identifikace'])
+        {
+            $row['nazev_protiuctu'] = $row['identifikace'];
+        }
+
+        // convert from cents
+        $row['castka'] /= 100;
+    }
+
+	/*
 	 * @Override
 	 */
 	protected function get_header_data()
 	{
+		if (empty($this->data))
+			throw new InvalidArgumentException('Check CSV first');
+
         if (!$this->header_available)
         {
             return NULL;
         }
-        
-		if (empty($this->data))
-        {
-            throw new InvalidArgumentException('Check CSV first');
-        }
 
-		$hd = new Header_Data($this->data->account_nr, $this->data->bank_nr);
+		$fio_ph = FioParser::getListingHeader();
 
-		$hd->currency = self::CURRENCY;
-		$hd->openingBalance = $this->data->opening_balance;
-		$hd->closingBalance = $this->data->closing_balance;
-		$hd->dateStart = $this->data->from;
-		$hd->dateEnd = $this->data->to;
+		$hd = new Header_Data($fio_ph['account_nr'], $fio_ph['bank_nr']);
+
+		$hd->currency = 'CZK';
+		$hd->openingBalance = $fio_ph['opening_balance'];
+		$hd->closingBalance = $fio_ph['closing_balance'];
+		$hd->dateStart = $fio_ph['from'];
+		$hd->dateEnd = $fio_ph['to'];
 
 		return $hd;
 	}
@@ -150,7 +178,7 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
 	 */
 	protected function get_parsed_transactions()
 	{
-		return $this->data->items;
+		return $this->data;
 	}
 
 }

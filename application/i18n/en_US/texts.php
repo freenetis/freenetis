@@ -17,7 +17,6 @@ $lang = array
 	'%s hours ago' => '%s hours ago',
 	'association members'   => 'Association members',
 	'freenetis_version' => 'FreenetIS version',
-	'from2' => 'from',
 	'new member'   => 'New member',
 	'username' => 'Username',
 	'password' => 'Password',

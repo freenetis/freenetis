@@ -46,9 +46,10 @@ ini_set('display_errors', TRUE);
 define('EXT', '.php');
 
 /**
- * Test to make sure that FreenetIS is running on PHP 5.3.1 or newer.
+ * Test to make sure that Kohana is running on PHP 5.1.3 or newer. Once you are
+ * sure that your environment is compatible with Kohana, you can disable this.
  */
-(PHP_VERSION_ID < 50301) and exit('FreenetIS requires PHP 5.3.1 or newer.');
+version_compare(PHP_VERSION, '5.1.3', '<') and exit('Kohana requires PHP 5.1.3 or newer.');
 
 //
 // DO NOT EDIT BELOW THIS LINE, UNLESS YOU FULLY UNDERSTAND THE IMPLICATIONS.
@@ -57,17 +58,16 @@ define('EXT', '.php');
 //
 
 // Tests if system is running in unit testing mode
-define('UNITTEST', empty($_SERVER['SERVER_NAME']) &&
-        strpos(@$_SERVER['SCRIPT_NAME'], 'phpunit') !== FALSE);
+$unittest = (empty($_SERVER['SERVER_NAME']) && strpos(@$_SERVER['SCRIPT_NAME'], 'phpunit'));
 
-// If unit testing change relative address of system and application folders
-if (UNITTEST)
+// If unit testing change relative address of system and appplication folders
+if ($unittest)
 {
-	$kohana_application = __DIR__ . '/' . $kohana_application;
-	$kohana_system = __DIR__ . '/' . $kohana_system;
-
+	$kohana_application = dirname(__FILE__) . '/' . $kohana_application;
+	$kohana_system = dirname(__FILE__) . '/' . $kohana_system;
+	
 	// Define the front controller name and docroot
-	define('DOCROOT', __DIR__ . '/');
+	define('DOCROOT', dirname(__FILE__) . '/');
 	define('KOHANA',  substr(__FILE__, strlen(DOCROOT)));
 }
 else
@@ -87,13 +87,13 @@ unset($kohana_application, $kohana_system);
 (is_dir(APPPATH)) or die
 (
 	'Your <code>$kohana_application</code> directory does not exist. '.
-	'Set a valid <code>$kohana_application</code> in <tt>'.KOHANA.'</tt>.'
+	'Set a valid <code>$kohana_application</code> in <tt>'.KOHANA.'</tt> and refresh the page.'
 );
 
 (is_dir(SYSPATH) AND file_exists(SYSPATH.'/core/'.'Bootstrap'.EXT)) or die
 (
 	'Your <code>$kohana_system</code> directory does not exist. '.
-	'Set a valid <code>$kohana_system</code> in <tt>'.KOHANA.'</tt>.'
+	'Set a valid <code>$kohana_system</code> in <tt>'.KOHANA.'</tt> and refresh the page.'
 );
 
 // Mail to developers
@@ -103,7 +103,7 @@ define('DEVELOPER_EMAIL_ADDRESS', 'bugs@freenetis.org');
 define('AXODOC_URL', 'http://axo.doc.freenetis.org/');
 
 // If unit testing just initilize do not execute
-if (UNITTEST)
+if($unittest)
 {
     require 'tests/BootstrapPHPUnit'.EXT;
 }

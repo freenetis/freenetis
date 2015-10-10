@@ -8,7 +8,6 @@
 <title><?php echo  $title ?> | <?php echo $this->settings->get('title') ?></title>
 <?php echo html::link('media/images/favicon.ico', 'shorcut icon', 'image/x-icon', FALSE); ?>
 <?php echo  html::stylesheet('media/css/installation.css', 'screen') ?>
-<?php echo html::stylesheet('media/css/m.installation.css', 'handheld, screen and (max-device-width: 640px)') ?>
 <style type="text/css"><!--
 	table.form th, table.form td {
 		border-bottom-width: 0px;

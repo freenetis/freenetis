@@ -63,29 +63,17 @@ class Json_Controller extends Controller
 		$origin_account = new Account_Model($origin_account_id);
 		
 		if ($origin_account->id == 0)
-		{
 			Controller::error(RECORD);
-		}
-
+		
 		if (!$this->acl_check_new('Accounts_Controller', 'transfers', $origin_account->member_id))
-		{
 			Controller::error(ACCESS);
-		}
 
 		$id = $this->input->get('id');
-		
-		$accounts = $origin_account->get_some_doubleentry_account_names_grouped(
-				$origin_account_id, $id
-		);
-		
-		$arr_accounts = array();
 
-		foreach ($accounts as $i => $account)
-		{	// hack fliping because of JSON order browser bug
-			$arr_accounts[$i] = array_flip($account);
-		}
+        $account_model = new Account_Model;
+		$accounts = $account_model->select_some_list($origin_account_id, $id);
 
-		echo json_encode($arr_accounts);
+		echo json_encode(array_flip($accounts));
 	}
 	
 	/**
@@ -224,7 +212,7 @@ class Json_Controller extends Controller
 			
 			// first try CGI scripts
 			if (module::e('cgi'))
-			{
+			{	
 				$vars = arr::to_object(array
 				(
 					'GATEWAY_IP_ADDRESS'	=> $gateway->ip_address,
@@ -264,7 +252,7 @@ class Json_Controller extends Controller
 					Log::add_exception($e);
 				}
 			}
-				
+			
 			if (valid::mac_address($mac_address))
 			{
 				die(json_encode(array
@@ -291,46 +279,7 @@ class Json_Controller extends Controller
 			)));
 		}
 	}
-	
-	/**
-	 * Callback AJAX function to filter's whisper for domain names
-	 *
-	 * @author David Raska
-	 */
-	public function dns_zone()
-	{
-		$term = $this->input->get('term');
 
-		$dns_model = new Dns_zone_Model();
-
-		$zones = $dns_model->like('zone', $term)
-				->groupby('zone')
-				->orderby('zone')
-				->find_all()
-				->select_list('id', 'zone');
-
-		echo json_encode(array_values($zones));
-	}
-
-	/**
-	 * Callback AJAX function to filter's whisper for primary DNS server
-	 *
-	 * @author David Raska
-	 */
-	public function primary_dns_server()
-	{
-		$term = $this->input->get('term');
-
-		$ip_model = new Ip_address_Model();
-
-		$ips = $ip_model->like('ip_address', $term)
-				->where('dns', '1')
-				->orderby('ip_address')
-				->find_all()
-				->select_list('id', 'ip_address');
-
-		echo json_encode(array_values($ips));
-	}
 
 	/**
 	 * Callback AJAX function to filter's whisper for organization identifier
@@ -1324,28 +1273,12 @@ class Json_Controller extends Controller
 		{
 			$um = new User_Model($user_id);
 			
-			$result = array();
-			
-			if (Address_points_Controller::is_address_point_server_active())
-			{
-				$result = array(
-					'country_id' => $um->member->address_point->country_id,
-					'town' => $um->member->address_point->town->town,
-					'quarter' => $um->member->address_point->town->quarter,
-					'street' => $um->member->address_point->street->street,
-					'street_number' => $um->member->address_point->street_number,
-					'zip' => $um->member->address_point->town->zip_code,
-				);
-			}
-			else
-			{
-				$result = array(
-					'country_id' => $um->member->address_point->country_id,
-					'town_id' => $um->member->address_point->town_id,
-					'street_id' => $um->member->address_point->street_id,
-					'street_number' => $um->member->address_point->street_number,
-				);
-			}
+			$result = array(
+				'country_id' => $um->member->address_point->country_id,
+				'town_id' => $um->member->address_point->town_id,
+				'street_id' => $um->member->address_point->street_id,
+				'street_number' => $um->member->address_point->street_number,
+			);
 
 			echo json_encode($result);
 		}
@@ -1875,44 +1808,6 @@ class Json_Controller extends Controller
 				'text'	=> __('ARES is probably down')
 			);
 		}
-	}
-	
-	/**
-	 * Performs action of zone_name_check.
-	 *
-	 * @author David Raška
-	 */
-	public function zone_name_check()
-	{
-		$zone = $this->input->get('zone');
-		$zone_id = $this->input->get('zone_id');
-		
-		if (!$zone)
-		{
-			die(json_encode(array('state' => true)));
-		}
-		
-		$dns_zone_model = new Dns_zone_Model();
-		
-		if ($zone_id)
-		{
-			$count = $dns_zone_model->where(array('zone' => $zone, 'id <>' => $zone_id))->count_all();
-		}
-		else
-		{
-			$count = $dns_zone_model->where(array('zone' => $zone))->count_all();
-		}
-		
-		if ($count > 0)
-		{
-			die(json_encode(array
-			(
-				'state'		=> false,
-				'message'	=> __('Zone already exists.')
-			)));
-		}
-		
-		echo json_encode(array('state' => true));
 	}
 	
 	/**

@@ -228,28 +228,6 @@ class Js_Controller extends Controller
 		$this->views['devices_add']->device_id = $device_id;
 	}
 	
-	private function _js_dns_add()
-	{
-		$this->dns_records();
-	}
-	
-	private function _js_dns_edit($zone_id = null)
-	{
-		$this->dns_records();
-		
-		$record_model = new Dns_record_Model();
-		$records = array();
-		$result = $record_model->get_records_in_zone($zone_id);
-		if ($result)
-		{
-			$records = $result->result_array();
-		}
-		
-		$this->views['dns_edit'] = View::factory('js/dns_edit');
-		$this->views['dns_edit']->records = $records;
-		$this->views['dns_edit']->dns_zone_id = $zone_id;
-	}
-	
 	private function _js_ifaces_add($device_id = null, $itype = null,
 			$add_button = FALSE, $connect_type = NULL)
 	{
@@ -340,8 +318,6 @@ class Js_Controller extends Controller
 		}
 		
 		$this->domicile_toogle();
-
-		$this->views['members_add'] = View::factory('js/members_add');
 	}
 	
 	private function _js_members_approve_applicant($applicant_id)
@@ -422,11 +398,6 @@ class Js_Controller extends Controller
 	private function _js_messages_activate()
 	{
 		$this->notification_activate();
-	}
-	
-	private function _js_messages_edit()
-	{
-		$this->views['messages_edit'] = View::factory('js/__pieces/sms_message_counter');
 	}
 	
 	private function _js_messages_auto_settings_add()
@@ -510,11 +481,6 @@ class Js_Controller extends Controller
 		$this->views['settings_system']->modules = $modules;
 	}
 	
-	private function _js_sms_send()
-	{
-		$this->views['sms_send'] = View::factory('js/__pieces/sms_message_counter');
-	}
-	
 	private function _js_transfers_add_from_account($origin_account_id = NULL)
 	{
 		$this->views['transfers_add_from_account'] = View::factory('js/transfers_add_from_account');
@@ -526,8 +492,6 @@ class Js_Controller extends Controller
 		$member_id = NULL;
 		
 		$account = new Account_Model($account_id);
-		$vs_model = new Variable_Symbol_Model();
-		$vss = $vs_model->find_account_variable_symbols($account_id);
 		
 		if ($account->id)
 		{
@@ -542,20 +506,6 @@ class Js_Controller extends Controller
 		$this->views['transfers_payment_calculator']->account_id = $account_id;
 		$this->views['transfers_payment_calculator']->member_id = $member_id;
 		$this->views['transfers_payment_calculator']->can_add = $can_add;
-		
-		if ($vss->count() > 0 && Settings::get('export_header_bank_account') != NULL)
-		{
-			$bank_account = new Bank_account_Model(Settings::get('export_header_bank_account'));
-			
-			$this->views['transfers_payment_calculator']->account_nr = $bank_account->account_nr;
-			$this->views['transfers_payment_calculator']->bank_nr = $bank_account->bank_nr;
-			$this->views['transfers_payment_calculator']->variable_symbol = $vss->current()->variable_symbol;
-			$this->views['transfers_payment_calculator']->show_qr = true;
-		}
-		else
-		{
-			$this->views['transfers_payment_calculator']->show_qr = false;
-		}
 	}
 	
 	private function _js_users_show($user_id = NULL)
@@ -636,15 +586,6 @@ class Js_Controller extends Controller
 				View::factory('js/__pieces/address_point_database');
 		
 		$this->views['__pieces_address_point_database']->url = Settings::get('address_point_url');
-	}
-	
-	/**
-	 * Adds javascript for editing DNS records
-	 */
-	private function dns_records()
-	{
-		$this->views['__pieces_dns_records'] =
-				View::factory('js/__pieces/dns_records')->render();
 	}
 	
 	/**

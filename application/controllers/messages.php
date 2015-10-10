@@ -62,7 +62,7 @@ class Messages_Controller extends Controller
 		
 		$allowed_order_type = array
 		(
-			'id', 'from', 'to', 'extension', 'opening_balance', 'closing_balance'
+			'id', 'message'
 		);
 		
 		if (!in_array(strtolower($order_by), $allowed_order_type))
@@ -137,7 +137,6 @@ class Messages_Controller extends Controller
 				'order_by'					=> $order_by,
 				'order_by_direction'		=> $order_by_direction,
 				'limit_results'				=> $limit_results,
-				'url_array_ofset'			=> 1,
 				'filter'					=> $filter_form
 		));
 		
@@ -500,10 +499,6 @@ class Messages_Controller extends Controller
 				->rules('length[1,760]')
 				->style('width: 100%; max-width: 633px; height: 150px')
 				->value($message->sms_text);
-			
-			$form->input('counter')
-				->style('width:100%; max-width: 633px;')
-				->label('<span></span>');	//use empty span element to prevent adding ":" after empty label
 		}
 		
 		$form->submit('Edit');

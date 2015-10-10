@@ -23,16 +23,7 @@
 <?php echo html::script('media/js/messages_cs', FALSE) ?>
 <?php echo html::script('media/js/php.min', FALSE) ?>
 <script type="text/javascript"><!--
-
-    /**
-     * Status more info expander (status helper)
-     */
-    function status_exception_expander(anchor)
-    {
-        $(anchor).parent().find('.status-message-exception-body').slideDown('slow');
-        $(anchor).hide('slow');
-    }
-
+	
     $(document).ready(function()
 	{
 		$.validator.passwordRating.messages = {
@@ -57,7 +48,7 @@
 		});
 
 	});
-
+	
 //--></script>
 </head>
 
@@ -69,14 +60,13 @@
 	<div class="flags"><?php echo  special::create_language_flags(array('cs' => 'Česky', 'en' => 'English')) ?></div>
 	<div id="main-padd">
 	    <div id="content">
-            <h2><?php echo $title ?></h2><br />
-            <p class="info_text"><?php echo __('Welcome to FreenetIS installation.'); ?>
-                <?php echo __('Please fill in the form with information about your association.'); ?>
-            </p>
-            <?php echo status::render() ?>
-            <br />
-            <?php echo  $form ?>
-            <img src="<?php echo url::base() ?>media/images/icons/animations/ajax-loader-big.gif" alt="Installed" id="inst_done" />
+		<h2><?php echo $title ?></h2><br />
+		<p class="info_text"><?php echo __('Welcome to FreenetIS installation.'); ?>
+			<?php echo __('Please fill in the form with information about your association.'); ?>
+		</p>
+		<br />
+		<?php echo  $form ?>
+		<img src="<?php echo url::base() ?>media/images/icons/animations/ajax-loader-big.gif" alt="Installed" id="inst_done" />
 	    </div>
 		<div class="clear"></div>
 	</div>

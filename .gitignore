@@ -1,3 +1,4 @@
-/upload/
 /.htaccess
 /config.php
+/upload/
+/logs/

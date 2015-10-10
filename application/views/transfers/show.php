@@ -225,10 +225,10 @@ if ($this->acl_check_view('Accounts_Controller', 'transfers')):
 			
 			if (!($this->acl_check_view('Accounts_Controller', 'bank_transfers') ||
 				($ba->member_id == 1)))
-				echo $bt->oba_id;
+				echo $bt->dba_id;
 			else
-				echo empty($bt->oba_id) ? '' : html::anchor('bank_transfers/show_by_bank_account/'.$bt->dba_id, $bt->dba_id)
-				?>
+				echo empty($bt->dba_id) ? '' : html::anchor('bank_transfers/show_by_bank_account/'.$bt->dba_id, $bt->dba_id)
+			?>
 		</td>
 	</tr>	
 	<tr>

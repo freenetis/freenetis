@@ -277,13 +277,13 @@ class Search_Model extends Model
 		
 		return $this->db->query("
 				SELECT m.id, m.name AS value,
-					CONCAT('ID ',m.id,', ',s.street,' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
+					CONCAT('ID ',m.id,', ',IF(s.street IS NULL, '', s.street),' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
 				LEFT JOIN translations t ON e.value LIKE t.original_term AND t.lang = ?
 				JOIN address_points ap ON m.address_point_id = ap.id
-				JOIN streets s ON ap.street_id = s.id
+				LEFT JOIN streets s ON ap.street_id = s.id
 				JOIN towns tw ON ap.town_id = tw.id
 				LEFT JOIN membership_interrupts mi ON m.id = mi.member_id
 				LEFT JOIN members_fees mf ON mi.members_fee_id = mf.id AND (mf.activation_date < CURDATE() AND mf.deactivation_date > CURDATE())
@@ -315,7 +315,7 @@ class Search_Model extends Model
 		
 		return $this->db->query("
 				SELECT m.id, m.id AS value,
-					CONCAT('ID ',m.id,', ',s.street,' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
+					CONCAT('ID ',m.id,', ',IF(s.street IS NULL, '', s.street),' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
@@ -434,7 +434,7 @@ class Search_Model extends Model
 		return $this->db->query("
 				SELECT m.id,
 					CONCAT(town, IF(quarter IS NOT NULL, CONCAT(' ', quarter), '')) AS value,
-					CONCAT('ID ',m.id,', ',s.street,' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
+					CONCAT('ID ',m.id,', ',IF(s.street IS NULL, '', s.street),' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
@@ -502,7 +502,7 @@ class Search_Model extends Model
 		return $this->db->query("
 				SELECT m.id,
 					ap.street_number AS value,
-					CONCAT('ID ',m.id,', ',s.street,' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
+					CONCAT('ID ',m.id,', ',IF(s.street IS NULL, '', s.street),' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
@@ -535,7 +535,7 @@ class Search_Model extends Model
 		
 		return $this->db->query("
 				SELECT m.id, m.organization_identifier AS value,
-					CONCAT('ID ',m.id,', ',s.street,' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
+					CONCAT('ID ',m.id,', ',IF(s.street IS NULL, '', s.street),' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id
@@ -573,7 +573,7 @@ class Search_Model extends Model
 		
 		return $this->db->query("
 				SELECT m.id, m.vat_organization_identifier AS value,
-					CONCAT('ID ',m.id,', ',s.street,' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
+					CONCAT('ID ',m.id,', ',IF(s.street IS NULL, '', s.street),' ',ap.street_number,', ',tw.town,IF(tw.quarter IS NOT NULL,CONCAT('-',tw.quarter),'')) AS `desc`,
 					CONCAT(IFNULL(t.translated_term,e.value),' ',m.name,IF(mf.id IS NOT NULL,?,'')) AS return_value,
 					'members/show/' AS link FROM members m
 				JOIN enum_types e ON m.type = e.id

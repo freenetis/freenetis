@@ -3415,7 +3415,7 @@ class Members_Controller extends Controller
 		
 		if ($this->acl_check_edit('Members_Controller', 'user_id'))
 		{
-			$form->dropdown('user_id')
+			$form->dropdown('added_by_user_id')
 					->label('Added by')
 					->options($arr_engineers)
 					->selected($member->user_id)
@@ -3712,7 +3712,7 @@ class Members_Controller extends Controller
 					}
 
 					if ($this->acl_check_edit('Members_Controller', 'user_id'))
-						$member->user_id = $form_data['user_id'];
+						$member->user_id = $form_data['added_by_user_id'];
 
 					if ($this->acl_check_edit(get_class($this),'comment',$member->id))
 						$member->comment = $form_data['comment'];

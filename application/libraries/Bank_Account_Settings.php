@@ -35,6 +35,10 @@ abstract class Bank_Account_Settings
 	const FIELD_TYPE_BOOL = 'boolean';
 	/** String type */
 	const FIELD_TYPE_STRING = 'string';
+	/** Dropdown type */
+	const FIELD_TYPE_DROPDOWN = 'dropdown';
+	/** Dateselect type */
+	const FIELD_TYPE_DATESELECT = 'dateselect';
 	
 	/** Data of settings */
 	private $data = array();
@@ -65,6 +69,9 @@ abstract class Bank_Account_Settings
 			case Bank_account_Model::TYPE_RAIFFEISENBANK:
 				require_once $cp_dir . 'Raiffeisenbank_Bank_Account_Settings.php';
 				return new Raiffeisenbank_Bank_Account_Settings();
+			case Bank_account_Model::TYPE_TATRABANKA:
+				require_once $cp_dir . 'Tatrabanka_Bank_Account_Settings.php';
+				return new Tatrabanka_Bank_Account_Settings();
 		}
 		
 		// invalid type
@@ -250,6 +257,12 @@ abstract class Bank_Account_Settings
 					break;
 				
 				case self::FIELD_TYPE_BOOL:
+					break;
+
+				case self::FIELD_TYPE_DROPDOWN:
+					break;
+
+				case self::FIELD_TYPE_DATESELECT:
 					break;
 			}
 			

@@ -75,6 +75,14 @@ abstract class Bank_Statement_File_Importer
 			'class'			=> 'Csv_Fio_Bank_Statement_File_Importer',
 			'bank_type'		=> Bank_account_Model::TYPE_FIO,
 			'extensions'	=> array('csv')
+		),
+		/* Tatrabanka - TXT - Obtained from TB B-mail */
+		array
+		(
+			'name'          => 'Tatra bank E-mail importer',
+			'class'         => 'Txt_Tatra_Banka_Statement_File_Importer',
+			'bank_type'     => Bank_account_Model::TYPE_TATRABANKA,
+			'extensions'    => array('txt')
 		)
 	);
 	
@@ -109,7 +117,7 @@ abstract class Bank_Statement_File_Importer
 	{		
 		// get type
 		$type = $settings->get_download_statement_type();
-		
+
 		if (empty($type))
 		{
 			throw new InvalidArgumentException(__('Unset download statement type'));
@@ -126,7 +134,7 @@ abstract class Bank_Statement_File_Importer
 		// obtain driver
 		$driver = self::factory($bank_account, $type);
 		$acc = $bank_account->account_nr . '/' . $bank_account->bank_nr;
-		
+
 		if (!$driver)
 		{
 			$m = __('File importer for bank %s is not available', $acc);
@@ -138,16 +146,26 @@ abstract class Bank_Statement_File_Importer
 		{
 			throw new Exception(__('Cannot prepare for statement download'));
 		}
+
+		// make download
+		$file_data = $driver->do_download($bank_account, $settings, $url);
+
+		if ($file_data === FALSE)
+		{
+			throw new Exception(__('Import download has failed caused by: %s',
+					implode('<br>', $driver->get_errors())));
+		}
 		
 		// import
-		return self::import($bank_account, $url, $type, $send_emails, $send_sms);
+		return self::import_loaded($bank_account, $file_data, $url, $type,
+				$send_emails, $send_sms);
 	}
-	
+
 	/**
 	 * Imports a bank statement placed in a file that is given by the filename
 	 * to bank account that is given by its database model. Throws error
 	 * exceptions with translated error description if any error occures.
-	 * 
+	 *
 	 * @param Bank_account_Model $bank_account Bank account ot which the statement
 	 *										   is imported
 	 * @param string $filename Full path to imported file
@@ -161,9 +179,42 @@ abstract class Bank_Statement_File_Importer
 	public static function import(Bank_account_Model $bank_account,
 			$filename, $ext, $send_emails = TRUE, $send_sms = FALSE)
 	{
+		$fd = @file_get_contents($filename);
+
+		if ($fd == FALSE)
+		{
+			$e = error_get_last();
+			$m = __('Cannot read from input file') . ' "' . $filename . '": '
+					. (isset($e['message']) ? $e['message'] : '');
+			throw new InvalidArgumentException($m);
+		}
+
+		return self::import_loaded($bank_account, $fd, $filename, $ext,
+				$send_emails, $send_sms);
+	}
+	
+	/**
+	 * Imports a bank statement from given loaded file data to bank account
+	 * that is given by its database model. Throws error exceptions with
+	 * translated error description if any error occures.
+	 * 
+	 * @param Bank_account_Model $bank_account Bank account ot which the statement
+	 *										   is imported
+	 * @param string $file_data Content to import
+	 * @param string $filename Full path to imported file (for error messages)
+	 * @param string $ext File extension
+	 * @param boolean $send_emails Send notification of affected members by e-mail
+	 * @param boolean $send_sms Send notification of affected members by sms
+	 * @return Bank_statement_Model Stored statement
+	 * @throws InvalidArgumentException On invalid file or bank account entity
+	 * @throws Exception On any error during parsing or storing of statement
+	 */
+	private static function import_loaded(Bank_account_Model $bank_account,
+			$file_data, $filename, $ext, $send_emails = TRUE, $send_sms = FALSE)
+	{
 		/* obtain driver */
 		$driver = self::factory($bank_account, $ext);
-		
+
 		$acc = $bank_account->account_nr . '/' . $bank_account->bank_nr;
 		
 		if (!$driver)
@@ -176,17 +227,12 @@ abstract class Bank_Statement_File_Importer
 		$driver->inform_affected_member_by_sms = $send_sms;
 		
 		/* set file data */
-		$fd = @file_get_contents($filename);
-		
-		if ($fd == FALSE)
+		if (empty($file_data))
 		{
-			$e = error_get_last();
-			$m = __('Cannot read from input file') . ' "' . $filename . '": '
-					. (isset($e['message']) ? $e['message'] : '');
-			throw new InvalidArgumentException($m);
+			throw new Exception(__('Invalid file data'));
 		}
 		
-		$driver->set_file_data($fd);
+		$driver->set_file_data($file_data);
 		
 		/* check format */
 		if (!$driver->check_file_data_format())
@@ -200,18 +246,18 @@ abstract class Bank_Statement_File_Importer
 		$header_data = $driver->get_header_data();
 		
 		if ($header_data !== NULL)
-        {
-            if (!$header_data ||
-                $header_data->get_bank_id() != $bank_account->bank_nr ||
-                $header_data->get_account_id() != $bank_account->account_nr)
-            {
-                $an = $header_data->get_account_id() . '/' 
-                        . $header_data->get_bank_id();
-                $m = __('Bank account number in listing (%s) header does not ' .
-                        'match bank account %s in database!', array($an, $acc));
-                throw new Exception($m);
-            }
-        } 
+		{
+			if (!$header_data ||
+				$header_data->get_bank_id() != $bank_account->bank_nr ||
+				$header_data->get_account_id() != $bank_account->account_nr)
+			{
+				$an = $header_data->get_account_id() . '/'
+						. $header_data->get_bank_id();
+				$m = __('Bank account number in listing (%s) header does not ' .
+						'match bank account %s in database!', array($an, $acc));
+				throw new Exception($m);
+			}
+		}
 		
 		/* parse file */
 		if (!$driver->parse_file_data())
@@ -519,6 +565,33 @@ abstract class Bank_Statement_File_Importer
 	{
 		return TRUE;
 	}
+
+	/**
+	 * This method enables to download a bank statement. By default it simply
+	 * download file from the specified URL. If other type of download is needed
+	 * that this method should be overriden.
+	 *
+	 * @param Bank_account_Model $bank_account
+	 * @param Bank_Account_Settings $settings
+	 * @param string $url Prepare download URL
+	 * @return string Content of downloaded file or FALSE on error
+	 */
+	protected function do_download(Bank_account_Model $bank_account,
+			Bank_Account_Settings $settings, $url)
+	{
+		$fd = @file_get_contents($url);
+
+		if ($fd == FALSE)
+		{
+			$e = error_get_last();
+			$m = __('Cannot download statement from ') . ' "' . $url . '": '
+					. (isset($e['message']) ? $e['message'] : '');
+			$this->add_error($m);
+			return FALSE;
+		}
+
+		return $fd;
+	}
 	
 	/**
 	 * Checks whether the file content that is stored into a fileData property
@@ -541,9 +614,9 @@ abstract class Bank_Statement_File_Importer
 	 * 
 	 * An error in the format may be add into error stack (addError) that is later
 	 * displayed to user if this function returns FALSE.
-     * 
-     * If bank statement file not providing any header information NULL can
-     * be returned to skip assert for bank account match.
+	 *
+	 * If bank statement file not providing any header information NULL can
+	 * be returned to skip assert for bank account match.
 	 * 
 	 * @return Header_Data|boolean|null
 	 */
@@ -627,7 +700,7 @@ abstract class Bank_Statement_File_Importer
 			return FALSE;
 		}
 	}
-	
+
 }
 
 /**

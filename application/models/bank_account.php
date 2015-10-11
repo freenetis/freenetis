@@ -39,6 +39,8 @@ class Bank_account_Model extends ORM
 	const TYPE_UNICREDIT		= 2;
 	/** Raiffeisenbank */
 	const TYPE_RAIFFEISENBANK	= 3;
+	/** Tatra banka */
+	const TYPE_TATRABANKA    	= 4;
 	
 	/** 
 	 * Type message names
@@ -50,7 +52,8 @@ class Bank_account_Model extends ORM
 		self::TYPE_OTHER			=> '',
 		self::TYPE_FIO				=> 'FIO',
 		self::TYPE_UNICREDIT		=> 'UniCredit',
-		self::TYPE_RAIFFEISENBANK	=> 'Raiffeisebank'
+		self::TYPE_RAIFFEISENBANK	=> 'Raiffeisenbank',
+		self::TYPE_TATRABANKA    	=> 'Tatra banka'
 	);
 	
 	// db relations

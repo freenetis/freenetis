@@ -12,6 +12,7 @@
  */
 
 require_once __DIR__ . '/FioCsvParserUtil.php';
+require_once __DIR__ . '/FioCsvStatement.php';
 
 /**
  * Auxiliary class for parsing CSV bank account listings from czech bank

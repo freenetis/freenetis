@@ -2,20 +2,20 @@
 /*
  * This file is part of open source system FreenetIS
  * and it is release under GPLv3 licence.
- * 
+ *
  * More info about licence can be found:
  * http://www.gnu.org/licenses/gpl-3.0.html
- * 
+ *
  * More info about project can be found:
  * http://www.freenetis.org/
- * 
+ *
  */
 
 /**
  * Bank accounts
- * 
+ *
  * @package Model
- * 
+ *
  * @property integer $id
  * @property string $name
  * @property integer $member_id
@@ -55,14 +55,14 @@ class Bank_account_Model extends ORM
 		self::TYPE_RAIFFEISENBANK	=> 'Raiffeisenbank',
 		self::TYPE_TATRABANKA    	=> 'Tatra banka'
 	);
-	
+
 	// db relations
 	protected $belongs_to = array('member');
 	protected $has_and_belongs_to_many = array('accounts');
-	
+
 	/**
 	 * Get settings driver for managing of bank account settings.
-	 * 
+	 *
 	 * @return BankAccountSettings
 	 * @throws InvalidArgumentException On unsuported type of bank account
 	 */
@@ -75,7 +75,7 @@ class Bank_account_Model extends ORM
 
 	/**
 	 * Contruct of app, shutdown action logs by default
-	 * @param type $id 
+	 * @param type $id
 	 */
 	public function __construct($id = NULL)
 	{
@@ -84,20 +84,20 @@ class Bank_account_Model extends ORM
 		// disable action log
 		$this->set_logger(FALSE);
 	}
-	
+
 	/**
 	 * Types of bank account (key is type, value is name).
-	 * 
+	 *
 	 * @return array
 	 */
 	public static function get_type_names()
 	{
 		return self::$type_name;
 	}
-	
+
 	/**
 	 * Type of bank account type name.
-	 * 
+	 *
 	 * @return string|null
 	 */
 	public static function get_type_name($type)
@@ -106,39 +106,41 @@ class Bank_account_Model extends ORM
 		{
 			return self::$type_name[$type];
 		}
-		
+
 		return NULL;
 	}
 
 	/**
-	 * @author Tomas Dulik
+     * Creates bank account.
+     *
+	 * @author Tomas Dulik, Ondrej Fibich
 	 * @param string $name - name of the bank account
 	 * @param integer $account_nr - bank account number
-	 * @param integer $bank_nr - bank number 
-	 * @param integer $member_id - id of the owner
+	 * @param integer $bank_nr - bank number
+	 * @param integer $member_id - id of the owner [optional]
 	 * @return Bank_account_Model new object containing the new record model
 	 */
-	public static function create($name, $account_nr, $bank_nr, $member_id)
+	public static function create($name, $account_nr, $bank_nr, $member_id = NULL)
 	{
-		$member_id = intval($member_id);
-		
+		$member_id_int = intval($member_id);
+
 		$bank_acc = new Bank_account_model();
-		$bank_acc->member_id = ($member_id) ? $member_id : NULL;
+		$bank_acc->member_id = ($member_id_int) ? $member_id_int : NULL;
 		$bank_acc->name = $name;
 		$bank_acc->account_nr = $account_nr;
-		$bank_acc->bank_nr = $bank_acc;
-		$bank_acc->save();		
+		$bank_acc->bank_nr = $bank_nr;
+		$bank_acc->save_throwable();
 		return $bank_acc;
 	}
-	
+
 	/**
 	 * It gets all bank accounts of association.
-	 * 
+	 *
 	 * @author Jiri Svitak
 	 * @return Mysql_Result
 	 */
 	public function get_assoc_bank_accounts()
-	{	
+	{
 		return $this->db->query("
 				SELECT ba.id, ba.name AS baname, m.name AS mname,
 					CONCAT(ba.account_nr, '/', ba.bank_nr) AS account_number,
@@ -181,9 +183,9 @@ class Bank_account_Model extends ORM
                 $where
 				ORDER BY ".$this->db->escape_column($order_by)." $order_by_direction
 				LIMIT " . intval($limit_from) . ", " . intval($limit_results) . "
-		");	
+		");
 	}
-	
+
 	/**
 	 * It counts bank accounts except bank accounts of association.
 	 * @return integer
@@ -206,9 +208,9 @@ class Bank_account_Model extends ORM
                     WHERE (ba.member_id <> 1 OR ba.member_id IS NULL)
                 ) ba
 				$where"
-		)->current()->total;	
-	}	
-	
+		)->current()->total;
+	}
+
 	/**
 	 * Function gets bank accounts except bank account with origin_id.
 	 * @param $origin_id
@@ -219,14 +221,14 @@ class Bank_account_Model extends ORM
 		return $this->db->query("
 				SELECT *
 				FROM bank_accounts
-				WHERE id <> ?	
+				WHERE id <> ?
 		", array($origin_id));
 	}
-	
+
 	/**
 	 * @author Tomas Dulik
 	 * @param $attribute_id - a value from accounts.account_attribute_id
-	 * @return object containing first related account from the account table having the $type 
+	 * @return object containing first related account from the account table having the $type
 	 */
 	public function get_related_account_by_attribute_id($attribute_id)
 	{
@@ -234,15 +236,15 @@ class Bank_account_Model extends ORM
 		{
 			return FALSE;
 		}
-		
+
 		$result = $this->db->query("
 				SELECT accounts.* FROM accounts
-				JOIN accounts_bank_accounts AS pivot 
+				JOIN accounts_bank_accounts AS pivot
 				ON accounts.id=pivot.account_id AND pivot.bank_account_id=?
 				AND accounts.account_attribute_id=?
 		", array($this->id, $attribute_id));
-		
+
 		return ($result && $result->count()) ? $result->current() : FALSE;
 	}
-	
+
 }

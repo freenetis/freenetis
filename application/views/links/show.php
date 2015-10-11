@@ -78,6 +78,9 @@
 <br />
 <br />
 <?php echo $grid ?>
-				
 
-
+<?php if (!empty($grid_subnet)): ?>
+<br />
+<br />
+<?php echo $grid_subnet ?>
+<?php endif;

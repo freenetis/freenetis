@@ -248,4 +248,15 @@ class condition
 		}
 	}
 	
+	/**
+	 * Checks if user contact is verifiable by sending verify code or link
+	 * 
+	 * @param object $item
+	 * @return boolean
+	 */
+	public static function is_contact_verifiable($item)
+	{
+		return ($item->verify != 1 && $item->type == Contact_Model::TYPE_EMAIL);
+	}
+	
 }

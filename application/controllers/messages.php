@@ -499,6 +499,10 @@ class Messages_Controller extends Controller
 				->rules('length[1,760]')
 				->style('width: 100%; max-width: 633px; height: 150px')
 				->value($message->sms_text);
+			
+			$form->input('counter')
+				->style('width:100%; max-width: 633px;')
+				->label('<span></span>');	//use empty span element to prevent adding ":" after empty label
 		}
 		
 		$form->submit('Edit');

@@ -49,6 +49,8 @@ class Form_Dropdown extends Form_Input {
 		arr::remove('label', $base_data);
 		$add_button = arr::remove('add_button', $base_data);
 		$add_button_title = arr::remove('add_button_title', $base_data);
+		$filter_button = arr::remove('filter_button', $base_data);
+		$filter_button_title = arr::remove('filter_button_title', $base_data);
 
 		$html = form::dropdown($base_data, $options, $selected);
 		
@@ -67,11 +69,26 @@ class Form_Dropdown extends Form_Input {
 			);
 		}
 		
+		if ($filter_button)
+		{
+			$html .= '&nbsp;' . html::anchor(
+				$this->data['filter_button'], html::image(array
+				(
+					'src'	=> 'media/images/icons/filter.png',
+					'id'	=> $this->data['name'] . '_filter_button'
+				)), array
+				(
+					'class'	=> 'popup-filter popup_link isReloadOff loadOnlyOnFirst',
+					'title' => $filter_button_title
+				)
+			);
+		}
+		
 		return $html;
 	}
 
 	/**
-	 * Add button for adding object to drobbox.
+	 * Add button for adding object to drobdown.
 	 * Content of dropdown is automatically update after adding by AJAX.
 	 * 
 	 * @author Ondřej Fibich, Michal Kliment
@@ -98,6 +115,36 @@ class Form_Dropdown extends Form_Input {
 		
 		$this->data['add_button'] = $url;
 		$this->data['add_button_title'] = __('Add '.$controller_name);
+		
+		return $this;
+	}
+	
+	/**
+	 * Add button for filtering objects to drobdown.
+	 * Content of dropdown is automatically update after submit by AJAX.
+	 * 
+	 * @author Michal Kliment
+	 * @param string $controller
+	 * @param string $method
+	 * @param string $args
+	 * @return \Form_Dropdown
+	 */
+	public function filter_button($controller = NULL, $method = 'filter', $args = '')
+	{
+		if (empty($controller))
+		{
+			return;
+		}
+		
+		$url = $controller.'/'.$method;
+		
+		if (!empty($args))
+		{
+			$url .= '/'.$args;
+		}
+		
+		$this->data['filter_button'] = $url;
+		$this->data['filter_button_title'] = __('Filter '.$controller);
 		
 		return $this;
 	}

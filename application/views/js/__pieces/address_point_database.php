@@ -385,6 +385,33 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 		}
 	});
 	
+	
+	$('#user_id').live('change', function()
+	{
+		$.ajax({
+			url: '<?php echo url_lang::base() ?>json/get_user_address',
+			async: false,
+			data: {user_id: $(this).val()},
+			dataType: 'json',
+			success: function(data)
+			{
+				$('#country_id').val(data['country_id']);
+				$('#town').val(data['town']);
+				$('#district').val(data['quarter']);
+				
+				if (data['street'] === '')
+				{
+					$('#street').val(data['number']);
+				}
+				else
+				{
+					$('#street').val(data['street']+' '+data['street_number']);
+				}
+				$('#zip').val(data['zip']).change();
+			}
+		});
+	});
+	
 $(document).ready(function(){
 	$('#street').change();
 	$('#domicile_street').change();

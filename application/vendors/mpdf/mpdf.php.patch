@@ -1,0 +1,14 @@
+Index: mpdf.php
+===================================================================
+--- mpdf.php	(revision 2341)
++++ mpdf.php	(working copy)
+@@ -1724,8 +1724,7 @@
+ 
+ function Error($msg) {
+ 	//Fatal error
+-	header('Content-Type: text/html; charset=utf-8');
+-	die('<B>mPDF error: </B>'.$msg);
++	throw new Exception($msg);
+ }
+ 
+ function Open() {

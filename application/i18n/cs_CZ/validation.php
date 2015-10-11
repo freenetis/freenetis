@@ -38,7 +38,7 @@ $lang = array
 	// Upload errors
 	'user_aborted'  => 'The %s file was aborted during upload.',
 	'invalid_type'  => 'Soubor nemá povolený typ souboru.',
-	'max_size'      => 'The %s file you uploaded was too large. The maximum size allowed is %s.',
+	'max_size'      => 'Soubor %s je příliš velký. Maximální velikost je %s.',
 	'max_width'     => 'The %s file you uploaded was too big. The maximum allowed width is %spx.',
 	'max_height'    => 'The %s file you uploaded was too big. The maximum allowed height is %spx.',
 	'min_width'     => 'The %s file you uploaded was too small. The minimum allowed width is %spx.',

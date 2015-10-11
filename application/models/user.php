@@ -29,6 +29,7 @@
  * @property string $login
  * @property string $password
  * @property string $password_request
+ * @property integer $password_is_onetime
  * @property integer $type
  * @property string $comment
  * @property string $application_password

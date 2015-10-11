@@ -535,7 +535,7 @@ class Connection_Requests_Controller extends Controller
 			$gateway = $ip_address_model->get_gateway_of_subnet($subnet_id);
 			
 			if ($gateway && $gateway->id)
-			{	
+			{
 				$mac_address = '';
 				
 				// first try CGI scripts
@@ -581,7 +581,7 @@ class Connection_Requests_Controller extends Controller
 						status::mwarning($e->getMessage());
 					}
 				}
-				
+
 				$this->session->set('connection_request_mac', $mac_address);
 			}
 		}
@@ -954,10 +954,37 @@ class Connection_Requests_Controller extends Controller
 				NULL => '--- ' . __('Select template') . ' ---'
 			);
 			
-			$templates += ORM::factory('device_template')
+			// find templates for given device type
+			$device_templates = ORM::factory('device_template')
 					->where('enum_type_id', $cr_model->device_type_id)
 					->select_list();
 			
+			// if only one teplate in this type -> set it and redirect (#813)
+			if (count($device_templates) == 1)
+			{
+				try
+				{
+					$cr_model->transaction_start();
+
+					$cr_model->device_template_id = key($device_templates);
+					$cr_model->save_throwable();
+
+					$cr_model->transaction_commit();
+					
+					// hard redirect, no $this->redirect here!
+					url::redirect('devices/add_from_connection_request/' . $cr_model->id);
+				}
+				catch (Exception $e)
+				{
+					$cr_model->transaction_rollback();
+					Log::add_exception($e);
+					status::error('Cannot edit connection request.', $e);
+				}
+			}
+			
+			// add templates
+			$templates += $device_templates;
+				
 			// form
 			$form = new Forge();
 
@@ -983,7 +1010,6 @@ class Connection_Requests_Controller extends Controller
 
 					$cr_model->transaction_commit();
 					
-					status::info('Add device for acception of connection request.');
 					// hard redirect, no $this->redirect here!
 					url::redirect('devices/add_from_connection_request/' . $cr_model->id);
 				}

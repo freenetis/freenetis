@@ -46,6 +46,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 	const TYPE_ROAMING_SMS	= 5;
 	const TYPE_PAY_SERVICE	= 6;
 	const TYPE_INTERNET		= 7;
+	const TYPE_BILL_PAYS		= 8;
 	
 	/*
 	 * Text constants for recognizing type of service
@@ -136,6 +137,11 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 	private static $roaming_internet_service_id_prefixes = array
 	(
 		'Internet Roaming - ',
+	);
+	
+	private static $bill_pays_ids = array
+	(
+		'Uživatel mobilního čísla',
 	);
 	
 	/**
@@ -245,7 +251,11 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 		$phone_list_total_cost_tax = 0.0;
 
 		$phone_list = array();
-
+		$phone_list[] = '999999999999999';
+		
+		$sum = 0.0;
+		$sum_tax = 0.0;
+		
 		while ($xml->read())
 		{
 			if ($xml->nodeType == XMLReader::ELEMENT)
@@ -270,11 +280,6 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 							$key = $meta->str_lists[trim($xml->readString())];
 							$service->service = self::get_type($key);
 							
-							if ($service->service == self::TYPE_UNKNOWN)
-							{
-								throw new Exception(__('Unknown type of service: ').$key);
-							}
-							
 							$service->description = $key;
 							break;
 						case 'event_date':
@@ -284,7 +289,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 							$service->data = $xml->readString();
 							break;
 						case 'cost':
-							$service->price = (float)$xml->readString();
+							$service->cost = (float)$xml->readString();
 							break;
 						case 'discount':
 							$service->discount = (float)$xml->readString();
@@ -343,17 +348,62 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 							break;
 					}
 				}
+				else if ($prev == 'service_detail')
+				{
+					switch ($xml->name)
+					{
+						case 'pA':
+							$service->pa = $xml->readString();
+							break;
+						case 'pGroup':
+							$service->description = $meta->str_lists[trim($xml->readString())];
+							break;
+						case 'pLine':
+							$service->description .= ' - '.$meta->str_lists[trim($xml->readString())];
+							break;
+						case 'service':
+							$key = $meta->str_lists[trim($xml->readString())];
+							$service->service = self::get_type($key);
+							$service->description .= ' - '.$key;
+							break;
+						case 'cost':
+							$service->cost = (float)$xml->readString();
+							break;
+						case 'discount':
+							$service->discount = (float)$xml->readString();
+							break;
+						case 'cost_tax':
+							$service->cost_tax = (float)$xml->readString();
+							break;
+						case 'real_cost':
+							$service->real_cost = (float)$xml->readString();
+							break;
+					}
+				}
 			}
 			else if ($xml->nodeType == XMLReader::END_ELEMENT)
 			{
 				array_pop($xml_path);
 				$end = end($xml_path);
 				
-				if ($xml->name == 'dur' && $end == 'Document')
+				if (($xml->name == 'dur' && $end == 'Document') ||
+					($xml->name == 'service_detail' &&
+						$service->service == self::TYPE_BILL_PAYS &&
+						$service->pa != '999999999999999')
+					)
 				{
-					if (round($service->price, 3) != round($service->real_cost - $service->discount, 3))
+					if (round($service->cost, 3) != round($service->real_cost - $service->discount, 3))
 					{
 						throw new Exception('Cost and Real cost are not equal');
+					}
+					
+					$sum += $service->cost;
+					$sum_tax += $service->cost_tax;
+					
+					if ($service->service == self::TYPE_BILL_PAYS)
+					{
+						debug::vardump($service->description);
+						$service->service = self::TYPE_PAY_SERVICE;
 					}
 					
 					try
@@ -372,6 +422,8 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 
 						$data->add_bill_number($service->pa, $services);
 					}
+					
+					$service = new stdClass();
 				}
 				else if ($xml->name == 'bill_sum')
 				{
@@ -384,11 +436,14 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 		{
 			foreach ($data->bill_numbers as $p => $d)
 				if (!in_array($p, $phone_list))
-					throw new Exception(__("Some phones wasn't finded").$p);
+					throw new Exception(__("Some phones wasn't finded ").$p);
 		}
 		
 		if (round($total_cost) != round($phone_list_total_cost) ||
-			round($total_cost+$total_tax) != round($phone_list_total_cost_tax))
+			round($total_cost+$total_tax) != round($phone_list_total_cost_tax) ||
+			round($total_cost) != round($sum) ||
+			round($total_cost+$total_tax) != round($sum_tax)
+			)
 		{
 			throw new Exception('Sum of costs and total cost are not equal.');
 		}
@@ -412,11 +467,21 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 	 */
 	private static function append_service(Services $services, stdClass $data, stdClass $meta)
 	{
+		if (!isset($data->event_date))
+		{
+			$data->event_date = date('Y-m-d\TH:i:s');
+		}
+		
+		if (!isset($data->pb))
+		{
+			$data->pb = NULL;
+		}
+		
 		switch ($data->service)
 		{
 			case self::TYPE_CALL: 
 				$service = new Call_Service();
-				$service->price = $data->price;
+				$service->price = $data->cost;
 				$service->date_time = DateTime::createFromFormat('Y-m-d\TH:i:s',
 					$data->event_date);
 				
@@ -430,7 +495,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 			
 			case self::TYPE_VPN_CALL:
 				$service = new Vpn_Call_Service();
-				$service->price = $data->price;
+				$service->price = $data->cost;
 				$service->date_time = DateTime::createFromFormat('Y-m-d\TH:i:s',
 					$data->event_date);
 				
@@ -446,7 +511,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 			
 			case self::TYPE_FIXED_CALL:
 				$service = new Fixed_Call_Service();
-				$service->price = $data->price;
+				$service->price = $data->cost;
 				$service->date_time = DateTime::createFromFormat('Y-m-d\TH:i:s',
 					$data->event_date);
 				
@@ -462,7 +527,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 
 			case self::TYPE_SMS:
 				$service = new Sms_Service();
-				$service->price = $data->price;
+				$service->price = $data->cost;
 				$service->date_time = DateTime::createFromFormat('Y-m-d\TH:i:s',
 					$data->event_date);
 				
@@ -476,7 +541,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 			
 			case self::TYPE_ROAMING_SMS:
 				$service = new RoamingSms_Service();
-				$service->price = $data->price;
+				$service->price = $data->cost;
 				$service->date_time = DateTime::createFromFormat('Y-m-d\TH:i:s',
 					$data->event_date);
 				
@@ -487,7 +552,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 			
 			case self::TYPE_PAY_SERVICE:
 				$service = new Pay_Service();
-				$service->price = $data->price;
+				$service->price = $data->cost;
 				$service->date_time = DateTime::createFromFormat('Y-m-d\TH:i:s',
 					$data->event_date);
 				
@@ -499,7 +564,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 
 			case self::TYPE_INTERNET:
 				$service = new Internet_Service();
-				$service->price = $data->price;
+				$service->price = $data->cost;
 				$service->date_time = DateTime::createFromFormat('Y-m-d\TH:i:s',
 					$data->event_date);
 				
@@ -547,6 +612,9 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 		if (in_array($key, self::$internet_service_ids))
 			return self::TYPE_INTERNET;
 		
+		if (in_array($key, self::$bill_pays_ids))
+			return self::TYPE_BILL_PAYS;
+		
 		// call service prefix
 		foreach (self::$call_service_id_prefixes as $p)
 		{
@@ -587,6 +655,7 @@ class Vodafone_Onenet_Xml extends Parser_Phone_Invoice
 				return self::TYPE_INTERNET;
 		}
 		
-		return self::TYPE_UNKNOWN;
+		// else add to payments
+		return self::TYPE_PAY_SERVICE;
 	}
 }

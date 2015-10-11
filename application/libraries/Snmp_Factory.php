@@ -37,6 +37,11 @@ class Snmp_Factory
 	 */
 	public static $DRIVERS = array
 	(
+		'ubnt'		=> array
+		(
+			'version'	=> 1,
+			'class'		=> 'UBNT_Snmp'
+		),
 		'mikrotik'	=> array
 		(
 			'version'	=> 2,

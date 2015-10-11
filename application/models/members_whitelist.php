@@ -23,11 +23,13 @@
  * @property date $until
  * @property bool $permanent
  * @property string $comment
+ * @property integer $user_id
+ * @property User_model $user
  */
 class Members_whitelist_Model extends ORM
 {
 
-	protected $belongs_to = array('member');
+	protected $belongs_to = array('member','user');
 
 	/**
 	 * Gets members whose are whitelisted.
@@ -57,7 +59,8 @@ class Members_whitelist_Model extends ORM
 					m.id, IFNULL(f.translated_term, e.value) AS type,
 					m.name, m.name AS member_name, a.balance,
 					a.id AS aid, a.comments_thread_id AS a_comments_thread_id,
-					IF(mw.permanent > 0, 1, 2) AS whitelisted, a_comment
+					IF(mw.permanent > 0, 1, 2) AS whitelisted, a_comment,
+					CONCAT(u.name,' ',u.surname) AS user_name, u.id AS user_id
 				FROM members m
 				JOIN members_whitelists mw ON mw.member_id = m.id
 				LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
@@ -73,6 +76,7 @@ class Members_whitelist_Model extends ORM
 				LEFT JOIN comments_threads ct ON a.comments_thread_id = ct.id
 				LEFT JOIN enum_types e ON m.type = e.id
 				LEFT JOIN translations f ON e.value = f.original_term AND lang = ?
+				LEFT JOIN users u ON mw.user_id = u.id
 				WHERE mw.since <= CURDATE() AND mw.until >= CURDATE()
 			) m
 			$where
@@ -104,13 +108,15 @@ class Members_whitelist_Model extends ORM
 					SELECT
 						m.id, IFNULL(f.translated_term, e.value) AS type,
 						m.name AS member_name, a.balance,
-						IF(mw.permanent > 0, 1, 2) AS whitelisted
+						IF(mw.permanent > 0, 1, 2) AS whitelisted,
+						CONCAT(u.name,' ',u.surname) AS user_name
 					FROM members m
 					JOIN members_whitelists mw ON mw.member_id = m.id
 					LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
 					LEFT JOIN comments_threads ct ON a.comments_thread_id = ct.id
 					LEFT JOIN enum_types e ON m.type = e.id
 					LEFT JOIN translations f ON e.value = f.original_term AND lang = ?
+					LEFT JOIN users u ON mw.user_id = u.id
 					WHERE mw.since <= CURDATE() AND mw.until >= CURDATE()
 				) m
 				$where
@@ -127,8 +133,11 @@ class Members_whitelist_Model extends ORM
 	public function get_member_whitelists($member_id)
 	{
 		return $this->db->query("
-			SELECT mw.*, IF(mw.since <= CURDATE() AND mw.until >= CURDATE(), 1, 0) AS active
+			SELECT
+				mw.*, IF(mw.since <= CURDATE() AND mw.until >= CURDATE(), 1, 0) AS active,
+				CONCAT(u.name,' ',u.surname) AS user_name, u.id AS user_id
 			FROM members_whitelists mw
+			LEFT JOIN users u ON mw.user_id = u.id
 			WHERE mw.member_id = ?
 			ORDER BY permanent DESC, until DESC, since DESC
 		", $member_id);

@@ -78,6 +78,10 @@ echo implode(' | ', $links);
 		<th><?php echo  __('Service').'&nbsp;'.help::hint('service') ?></th>
 		<td><?php echo  $ip_address->service ? __('Yes') : __('No') ?></td>
 	</tr>
+	<tr>
+		<th><?php echo  __('DNS server').'&nbsp;'.help::hint('dns_server') ?></th>
+		<td><?php echo  $ip_address->dns ? __('Yes') : __('No') ?></td>
+	</tr>
 					
 					
 </table>

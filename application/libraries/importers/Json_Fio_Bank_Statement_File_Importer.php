@@ -1,21 +1,21 @@
-<?php defined('SYSPATH') or die('No direct script access.');
+<?php
 /*
  * This file is part of open source system FreenetIS
  * and it is released under GPLv3 licence.
- * 
+ *
  * More info about licence can be found:
  * http://www.gnu.org/licenses/gpl-3.0.html
- * 
+ *
  * More info about project can be found:
  * http://www.freenetis.org/
- * 
+ *
  */
 
-require dirname(__FILE__) . '/Fio_Bank_Statement_File_Importer.php'; 
+require_once __DIR__ . '/Fio_Bank_Statement_File_Importer.php';
 
 /**
  * FIO importer for statements in JSON format that are obtained from the FIO API.
- * 
+ *
  * @author Ondrej Fibich
  * @since 1.1
  */
@@ -27,14 +27,14 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 	 * @var array
 	 */
 	private $data = NULL;
-	
+
 	/**
 	 * Parsed reprezentation of import (transactions without header).
 	 *
 	 * @var array
 	 */
 	private $parsed_transactions = NULL;
-	
+
 	/*
 	 * @Override
 	 */
@@ -42,14 +42,14 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 	{
 		// check JSON format
 		$json = json_decode($this->get_file_data(), TRUE);
-		
+
 		if (!$json)
 		{
 			$d = mb_substr($this->get_file_data(), 0, 150);
 			$this->add_error(__('Invalid file format (json_decode failed): %s', $d), FALSE);
 			return FALSE; // invalid
 		}
-		
+
 		// check content fields
 		if (!is_array($json) ||
 			!array_key_exists('accountStatement', $json) ||
@@ -62,10 +62,10 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 			$this->add_error(__('Invalid JSON file document structure: %s', $d), FALSE);
 			return FALSE;
 		}
-		
+
 		// stored parsed data
 		$this->data = $json;
-		
+
 		// ok
 		return TRUE;
 	}
@@ -79,7 +79,7 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 				$this->data['accountStatement']['info']['accountId'],
 				$this->data['accountStatement']['info']['bankId']
 		);
-		
+
 		$hd->currency = $this->data['accountStatement']['info']['currency'];
 		$hd->iban = $this->data['accountStatement']['info']['iban'];
 		$hd->bic = $this->data['accountStatement']['info']['bic'];
@@ -90,7 +90,7 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 		$hd->idFrom = $this->data['accountStatement']['info']['idFrom'];
 		$hd->idTo = $this->data['accountStatement']['info']['idTo'];
 		$hd->idLastDownload = $this->data['accountStatement']['info']['idLastDownload'];
-		
+
 		return $hd;
 	}
 
@@ -100,13 +100,13 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 	protected function parse_file_data()
 	{
 		$this->parsed_transactions = array();
-		
+
 		if (empty($this->data['accountStatement']['transactionList']) ||
 			!array_key_exists('transaction', $this->data['accountStatement']['transactionList']))
 		{ // no transactions available
 			return TRUE;
 		}
-		
+
 		foreach ($this->data['accountStatement']['transactionList']['transaction'] as $t)
 		{
 			// array keys corresponds to old Fio CSV parser
@@ -134,7 +134,7 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 				'zprava'			=> $t['column16']['value'],
 			);
 		}
-		
+
 		return TRUE;
 	}
 
@@ -145,5 +145,5 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 	{
 		return $this->parsed_transactions;
 	}
-	
+
 }

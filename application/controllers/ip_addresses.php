@@ -161,6 +161,12 @@ class Ip_addresses_Controller extends Controller
 				->callback('boolean')
 				->class('center');
 		
+		$grid->order_callback_field('dns')
+				->label('DNS server')
+				->help(help::hint('dns_server'))
+				->callback('boolean')
+				->class('center');
+		
 		if (module::e('notification'))
 		{
 			$grid->order_callback_field('whitelisted')
@@ -477,6 +483,12 @@ class Ip_addresses_Controller extends Controller
 				->options(arr::rbool())
 				->selected('0');
 		
+		$this->form->dropdown('dns')
+				->label(__('DNS server'))
+				->help(help::hint('dns_server'))
+				->options(arr::rbool())
+				->selected('0');
+		
 		$this->form->submit('Save');
 		
 		// validate form and save data 
@@ -507,6 +519,7 @@ class Ip_addresses_Controller extends Controller
 					$ip_address->subnet_id = $form_data['subnet_id'];
 					$ip_address->gateway = $form_data['gateway'];
 					$ip_address->service = $form_data['service'];
+					$ip_address->dns = $form_data['dns'];
 					$ip_address->member_id = NULL;
 					$ip_address->save_throwable();
 					
@@ -625,6 +638,17 @@ class Ip_addresses_Controller extends Controller
 				->options(arr::rbool())
 				->selected($ip_address->service);
 		
+		$dns_zone_model = new Dns_zone_Model();
+		$zones_count = count($dns_zone_model->get_zones_of_primary_server($ip_address->id)) +
+						count($dns_zone_model->get_zones_of_secondary_server($ip_address->id));
+		$dns_on = $zones_count > 0;
+		
+		$this->form->dropdown('dns')
+				->label(__('DNS server'))
+				->help(help::hint('dns_server'))
+				->options(arr::rbool())
+				->selected($dns_on || $ip_address->dns);
+		
 		$this->form->submit('Save');
 		
 		// validate form and save data 
@@ -655,6 +679,7 @@ class Ip_addresses_Controller extends Controller
 					$ip_address->subnet_id = $form_data['subnet_id'];
 					$ip_address->gateway = $form_data['gateway'];
 					$ip_address->service = $form_data['service'];
+					$ip_address->dns = ($dns_on ? 1 : $form_data['dns']);
 					$ip_address->member_id = NULL;
 
 					$ip_address->save_throwable();
@@ -698,6 +723,11 @@ class Ip_addresses_Controller extends Controller
 					catch (Exception $e)
 					{
 						status::warning('Error - cannot update allowed subnets of member.');
+					}
+					
+					if ($dns_on && !$form_data['dns'])
+					{
+						status::warning(__('Cannot turn DNS server off.') . ' ' . __('DNS server running on this IP address manages some DNS zones (%d).', $zones_count), FALSE);
 					}
 
 					status::success('IP address has been successfully updated.');
@@ -769,6 +799,15 @@ class Ip_addresses_Controller extends Controller
 		// link back
 		$linkback = Path::instance()->previous();
 		
+		$dns_zone_model = new Dns_zone_Model();
+		$zones_count = count($dns_zone_model->get_zones_of_primary_server($ip_address->id)) +
+						count($dns_zone_model->get_zones_of_secondary_server($ip_address->id));
+		if ($zones_count > 0)
+		{
+			status::warning(__('Error - cant delete ip address.') . ' ' . __('DNS server running on this IP address manages some DNS zones (%d).', $zones_count), FALSE);
+			$this->redirect($linkback);
+		}
+		
 		if (url::slice(url_lang::uri($linkback), 0, 2) == 'ip_addresses/show')
 		{
 			$linkback = 'ip_addresses/show_all';
@@ -795,6 +834,7 @@ class Ip_addresses_Controller extends Controller
 				{
 					$ip_address->member_id = $ip_address->subnet->subnets_owner->member->id;
 					$ip_address->iface_id = NULL;
+					$ip_address->gateway = 0;
 					
 					$ip_address->save_throwable();
 				}

@@ -384,4 +384,107 @@ class Link_Model extends ORM
 			return $this->select_list('id', 'name');
 		}
 	}
+    
+    /**
+     * Gets all subnets that are used on given link/links or this link.
+     * 
+     * @author Ondřej Fibich <ondrej.fibich@gmail.com>
+     * @since 1.2
+     * @param integer|array $link_id link ID, nothing for this link or array
+     *                                of link IDs [optional]
+     * @return Mysql_Result
+     */
+    public function get_subnets_on_link($link_id = NULL)
+	{
+		if ($link_id === NULL && isset($this))
+		{
+			$link_id = $this->id;
+		}
+        
+        if (empty($link_id))
+        {
+            $link_id = array(0);
+        }
+        else if (!is_array($link_id))
+        {
+            $link_id = array($link_id);
+        }
+        
+        $links = implode(',', array_map('intval', $link_id));
+
+		// We must search for subnet in all interfaces that has given link_id
+		// which covers all ethernet, wireless, port and internal interfaces.
+		// For VLAN, Virtual WLAN and bridge interfaces we must also search in 
+		// ifaces_relationships (for bridge in reverse order).
+		return $this->db->query("
+			SELECT s.*, INET_ATON(s.network_address) AS cidr,
+				CONCAT(s.network_address, '/',
+					32-log2((~inet_aton(s.netmask) & 0xffffffff) + 1)) AS cidr_address
+			FROM (
+				(
+					SELECT i.* FROM ifaces i
+					WHERE i.link_id IN (" . $links . ")
+				) UNION (
+					SELECT child_i.*
+					FROM ifaces_relationships ir
+					JOIN ifaces child_i ON ir.iface_id = child_i.id
+					JOIN ifaces parent_i ON ir.parent_iface_id = parent_i.id
+					WHERE child_i.type IN (?, ?) AND
+                        parent_i.link_id IN (" . $links . ")
+				) UNION (
+					SELECT i_bridged.*
+					FROM ifaces_relationships ir
+					JOIN ifaces i_parent ON i_parent.id = ir.parent_iface_id
+					JOIN ifaces i_bridged ON i_bridged.id = ir.iface_id
+					WHERE i_parent.type = ? AND i_parent.id IN (
+						SELECT parent_iface_id FROM ifaces i
+						JOIN ifaces_relationships ir ON ir.iface_id = i.id
+						WHERE i.link_id IN (" . $links . ")
+					)
+				)
+			) AS i
+			JOIN ip_addresses ip ON ip.iface_id = i.id
+			JOIN subnets s ON ip.subnet_id = s.id
+			GROUP BY s.id
+			ORDER BY INET_ATON(s.network_address)
+		", Iface_Model::TYPE_VLAN, Iface_Model::TYPE_VIRTUAL_AP,
+                Iface_Model::TYPE_BRIDGE);
+	}
+    
+    /**
+     * Gets all VLANs that are used on given link/links or this link.
+     * 
+     * @author Ondřej Fibich <ondrej.fibich@gmail.com>
+     * @since 1.2
+     * @param integer|array $link_id link ID, nothing for this link or array
+     *                                of link IDs [optional]
+     * @return Mysql_Result
+     */
+    public function get_vlans_on_link($link_id = NULL)
+	{
+		if ($link_id === NULL && isset($this))
+		{
+			$link_id = $this->id;
+		}
+        
+        if (empty($link_id))
+        {
+            $link_id = array(0);
+        }
+        else if (!is_array($link_id))
+        {
+            $link_id = array($link_id);
+        }
+        
+        $links = implode(',', array_map('intval', $link_id));
+		
+		return $this->db->query("
+			SELECT v.*
+			FROM ifaces i
+			JOIN ifaces_vlans iv ON iv.iface_id = i.id
+			JOIN vlans v ON v.id = iv.vlan_id
+			WHERE i.link_id IN (" . $links . ")
+		");
+	}
+
 }

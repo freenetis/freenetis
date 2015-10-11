@@ -122,7 +122,7 @@ class Address_point_Model extends ORM
 		// street number
 		if ($street_number == 0 || empty($street_number))
 		{
-			$where .= " AND street_number IS NULL ";
+			$where .= " AND (street_number IS NULL OR street_number LIKE '')";
 		}
 		else
 		{

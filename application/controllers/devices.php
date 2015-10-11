@@ -100,6 +100,9 @@ class Devices_Controller extends Controller
 			->type('combo')
 			->callback('json/town_name');
 		
+		$filter_form->add('quarter')
+			->callback('json/quarter_name');
+		
 		$filter_form->add('street')
 			->type('combo')
 			->callback('json/street_name');
@@ -163,7 +166,7 @@ class Devices_Controller extends Controller
 		
 		if ($this->acl_check_new('Devices_Controller', 'devices'))
 		{
-			$grid->add_new_button('devices/add', 'Add new device');
+			$grid->add_new_button('devices/add', __('Add new device'));
 		}
 		
 		if (Settings::get('syslog_ng_mysql_api_enabled'))
@@ -399,7 +402,7 @@ class Devices_Controller extends Controller
 	 * Function shows all devices of user.
 	 */
 	public function show_by_user($user_id = null, $limit_results = 10,
-			$order_by = 'id', $order_by_direction = 'asc', $page_word = 'page',
+			$order_by = 'ip_address', $order_by_direction = 'asc', $page_word = 'page',
 			$page = 1)
 	{
 		// bad parameter
@@ -775,6 +778,7 @@ class Devices_Controller extends Controller
 		$view->content->ifaces = $device->ifaces;
 		$view->content->table_device_engineers = $grid_device_engineers;
 		$view->content->table_device_admins	= $grid_device_admins;
+		$view->content->grids = $grids;
 		$view->content->table_ip_addresses = isset($grids['ip_addresses']) ? $grids['ip_addresses'] : '';
 		$view->content->ifaces = $grids['ifaces'];
 		$view->content->vlan_ifaces = $grids['vlan_ifaces'];
@@ -2227,6 +2231,7 @@ class Devices_Controller extends Controller
 		$uid = ORM::factory('member')->get_main_user($connection_request->member_id);
 		
 		// redirect
+		status::info('Add device for acception of connection request.');
 		url::redirect('devices/add/' . $uid . '/' . $connection_request->id);
 	}
         
@@ -2272,7 +2277,10 @@ class Devices_Controller extends Controller
 		}
 		
 		// users
-		$arr_users = ORM::factory('user')->select_list_grouped();
+		$arr_users = array
+		(
+			NULL => '----- '.__('select user').' -----'
+		) + ORM::factory('user')->select_list_grouped();
 		
 		// types
 		$arr_types = ORM::factory('enum_type')->get_values(Enum_type_Model::DEVICE_TYPE_ID);
@@ -2333,7 +2341,8 @@ class Devices_Controller extends Controller
 				->options($arr_users)
 				->rules('required')
 				->selected($device->user_id)
-				->style('width: 200px');
+				->style('width: 200px')
+				->filter_button('users');
 		
 		$group_device->dropdown('type')
 				->label('Type')
@@ -3253,7 +3262,7 @@ class Devices_Controller extends Controller
 	 * @return array			Grids
 	 * @TODO bridges and special interfaces
 	 */
-	private function create_device_grids($device)
+	private function create_device_grids($device, $only_grids = NULL)
 	{
 		$grids = array();
 		$iface_model = new Iface_Model();
@@ -3261,547 +3270,660 @@ class Devices_Controller extends Controller
 		
 		/** IP ADDRESSES ******************************************************/
 		
-		$grids['ip_addresses'] = '';
-		
-		if ($this->acl_check_view('Ip_addresses_Controller', 'ip_address', $member_id))
-		{
-			$ip_address_model = new Ip_address_Model();
-			$ips = $ip_address_model->get_ip_addresses_of_device($device->id);
+		if (is_null($only_grids) || in_array('ip_addresses', $only_grids))
+		{		
+			$grids['ip_addresses'] = '';
 
-			$grids['ip_addresses'] = new Grid('devices', null, array
-			(
-				'use_paginator'	   			=> false,
-				'use_selector'	   			=> false,
-				'total_items'				=> count($ips)
-			));
-
-			if ($this->acl_check_new('Ip_addresses_Controller', 'ip_address', $member_id))
+			if ($this->acl_check_view('Ip_addresses_Controller', 'ip_address', $member_id))
 			{
-				$grids['ip_addresses']->add_new_button(
-						'ip_addresses/add/'.$device->id, 'Add new ip address', array
-						(
-							'title' => __('Add new ip address'),
-							'class' => 'popup_link'
-						)
-				);
-			}
+				$ip_address_model = new Ip_address_Model();
+				$ips = $ip_address_model->get_ip_addresses_of_device($device->id);
 
-			$grids['ip_addresses']->callback_field('ip_address')
-					->label('IP address')
-					->callback('callback::ip_address_field', TRUE, FALSE, FALSE);
+				$grids['ip_addresses'] = new Grid('devices', null, array
+				(
+					'use_paginator'	   			=> false,
+					'use_selector'	   			=> false,
+					'total_items'				=> count($ips)
+				));
 
-			if ($this->acl_check_new('Subnets_Controller', 'subnet', $member_id))
-			{
-				$grids['ip_addresses']->link_field('subnet_id')
-						->link('subnets/show', 'subnet_name')
-						->label('Subnet');
-			}
+				if ($this->acl_check_new('Ip_addresses_Controller', 'ip_address', $member_id))
+				{
+					$grids['ip_addresses']->add_new_button(
+							'ip_addresses/add/'.$device->id, 'Add new ip address', array
+							(
+								'title' => __('Add new ip address'),
+								'class' => 'popup_link'
+							)
+					);
+				}
 
-			if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
-			{
-				$grids['ip_addresses']->link_field('iface_id')
-						->link('ifaces/show', 'iface_name')
-						->label('Interface');
-			}
+				if ($device->is_router() &&
+						$this->acl_check_view(
+								'Devices_Controller', 'devices', $member_id
+						) && module::e('snmp'))
+				{
+					$grids['ip_addresses']->add_new_button(
+							'devices/show_arp_table/'.$device->id, 'Show ARP table'
+					);
+				}
 
-			$actions = $grids['ip_addresses']->grouped_action_field();
+				$grids['ip_addresses']->callback_field('ip_address')
+						->label('IP address')
+						->callback('callback::ip_address_field', TRUE, FALSE, FALSE);
 
-			$actions->add_action('id')
-					->icon_action('show')
-					->url('ip_addresses/show')
-					->class('popup_link');
+				if ($this->acl_check_new('Subnets_Controller', 'subnet', $member_id))
+				{
+					$grids['ip_addresses']->link_field('subnet_id')
+							->link('subnets/show', 'subnet_name')
+							->label('Subnet');
+				}
 
-			if ($this->acl_check_edit('Ip_addresses_Controller', 'ip_address', $member_id))
-			{
+				if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+				{
+					$grids['ip_addresses']->link_field('iface_id')
+							->link('ifaces/show', 'iface_name')
+							->label('Interface');
+				}
+
+				$actions = $grids['ip_addresses']->grouped_action_field();
+
 				$actions->add_action('id')
-						->icon_action('edit')
-						->url('ip_addresses/edit')
+						->icon_action('show')
+						->url('ip_addresses/show')
 						->class('popup_link');
-			}
 
-			if ($this->acl_check_delete('Ip_addresses_Controller', 'ip_address', $member_id))
+				if ($this->acl_check_edit('Ip_addresses_Controller', 'ip_address', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('edit')
+							->url('ip_addresses/edit')
+							->class('popup_link');
+				}
+
+				if ($this->acl_check_delete('Ip_addresses_Controller', 'ip_address', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('delete')
+							->url('ip_addresses/delete')
+							->class('delete_link');
+				}
+
+				$grids['ip_addresses']->datasource($ips);
+			}
+		}
+		
+		if (is_null($only_grids) || in_array('dhcp_servers', $only_grids))
+		{
+			if ($device->is_router())
 			{
-				$actions->add_action('id')
-						->icon_action('delete')
-						->url('ip_addresses/delete')
-						->class('delete_link');
+				$grids['dhcp_servers'] = '';
+				
+				$subnet_model = new Subnet_Model();
+				
+				$subnets = $subnet_model->get_all_subnets_by_device($device->id, TRUE, TRUE);
+				
+				$grids['dhcp_servers'] = new Grid('devices', null, array
+				(
+					'use_paginator'	   			=> false,
+					'use_selector'	   			=> false,
+					'total_items'				=> count($subnets)
+				));
+				
+				if ($this->acl_check_view(
+						'Devices_Controller', 'devices', $member_id
+					) && module::e('snmp'))
+				{
+					$grids['dhcp_servers']->add_new_button(
+						'devices/show_dhcp_leases/' . $device->id, 'Show DHCP leases'
+					);
+				}
+			
+				if ($this->acl_check_new(
+						'Subnets_Controller', 'subnet', $member_id
+					))
+				{
+					$grids['dhcp_servers']->link_field('subnet_id')
+							->link('subnets/show', 'subnet_name')
+							->label('Subnet');
+				}
+				
+				if ($this->acl_check_new(
+						'Ifaces_Controller', 'iface', $member_id
+					))
+				{
+					$grids['dhcp_servers']->link_field('iface_id')
+							->link('ifaces/show', 'iface_name')
+							->label('Interface');
+				}
+				
+				$grids['dhcp_servers']->datasource($subnets);
 			}
-
-			$grids['ip_addresses']->datasource($ips);
 		}
 		
 		/** INTERFACES ********************************************************/
 		
-		// interfaces of device (all) //////////////////////////////////////////
-		$ifaces = $iface_model->get_all_ifaces_of_device($device->id);
-				
-		// grid
-		$grids['ifaces'] = new Grid('devices', null, array
-		(
-			'use_paginator'	   			=> false,
-			'use_selector'	   			=> false,
-			'total_items'				=> count($ifaces)
-		));
-		
-		if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+		if (is_null($only_grids) || in_array('ifaces', $only_grids))
 		{
-			$grids['ifaces']->add_new_button(
-					'ifaces/add/' . $device->id, 'Add new interface'
+			// interfaces of device (all) //////////////////////////////////////////
+			$ifaces = $iface_model->get_all_ifaces_of_device($device->id);
+
+			// grid
+			$grids['ifaces'] = new Grid('devices', null, array
+			(
+				'use_paginator'	   			=> false,
+				'use_selector'	   			=> false,
+				'total_items'				=> count($ifaces)
+			));
+
+			if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+			{
+				$grids['ifaces']->add_new_button(
+						'ifaces/add/' . $device->id, 'Add new interface'
+				);
+			}
+
+			$grids['ifaces']->callback_field('type')
+					->callback('callback::iface_type_field')
+					->class('center');
+
+			$grids['ifaces']->field('name');
+
+			$grids['ifaces']->callback_field('mac')
+					->callback('callback::not_empty')
+					->label('MAC')
+					->class('center');
+
+			$grids['ifaces']->callback_field('connected_to_device')
+					->callback('callback::connected_to_device')
+					->class('center');
+
+			$actions = $grids['ifaces']->grouped_action_field();
+
+			if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+			{
+				$actions->add_action('id')
+						->icon_action('show')
+						->url('ifaces/show')
+						->class('popup_link');
+			}
+
+			if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
+			{
+				$actions->add_action('id')
+						->icon_action('edit')
+						->url('ifaces/edit');
+			}
+
+			if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
+			{
+				$actions->add_action('id')
+						->icon_action('delete')
+						->url('ifaces/delete')
+						->class('delete_link');
+			}
+
+			$grids['ifaces']->datasource($ifaces);
+		}
+		
+		if (is_null($only_grids) || in_array('internal_ifaces', $only_grids))
+		{
+			// internal interfaces of device ///////////////////////////////////////
+			$internal_ifaces = $iface_model->get_all_ifaces_of_device(
+					$device->id, Iface_Model::TYPE_INTERNAL
 			);
-		}
-		
-		$grids['ifaces']->callback_field('type')
-				->callback('callback::iface_type_field')
-				->class('center');
-		
-		$grids['ifaces']->field('name');
-		
-		$grids['ifaces']->callback_field('mac')
-				->callback('callback::not_empty')
-				->label('MAC')
-				->class('center');
-		
-		$grids['ifaces']->callback_field('connected_to_device')
-				->callback('callback::connected_to_device')
-				->class('center');
-		
-		$actions = $grids['ifaces']->grouped_action_field();
-		
-		if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
-		{
-			$actions->add_action('id')
-					->icon_action('show')
-					->url('ifaces/show')
-					->class('popup_link');
-		}
-			
-		if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
-		{
-			$actions->add_action('id')
-					->icon_action('edit')
-					->url('ifaces/edit');
-		}
-		
-		if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
-		{
-			$actions->add_action('id')
-					->icon_action('delete')
-					->url('ifaces/delete')
-					->class('delete_link');
-		}
-		
-		$grids['ifaces']->datasource($ifaces);
-		
-		// internal interfaces of device ///////////////////////////////////////
-		$internal_ifaces = $iface_model->get_all_ifaces_of_device(
-				$device->id, Iface_Model::TYPE_INTERNAL
-		);
-		
-		if (!count($internal_ifaces))
-		{
-			$grids['internal_ifaces'] = '';
-		}
-		else
-		{
-			// grid
-			$grids['internal_ifaces'] = new Grid('devices', null, array
-			(
-				'use_paginator'	   			=> false,
-				'use_selector'	   			=> false,
-				'total_items'				=> count($internal_ifaces)
-			));
 
-			if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+			if (!count($internal_ifaces))
 			{
-				$grids['internal_ifaces']->add_new_button(
-						'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_INTERNAL,
-						'Add new internal interface'
-				);
+				$grids['internal_ifaces'] = '';
 			}
-
-			$grids['internal_ifaces']->field('name');
-
-			$grids['internal_ifaces']->field('mac')
-					->label('MAC');
-
-			$actions = $grids['internal_ifaces']->grouped_action_field();
-
-			if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+			else
 			{
-				$actions->add_action('id')
-						->icon_action('show')
-						->url('ifaces/show')
-						->class('popup_link');
-			}
+				// grid
+				$grids['internal_ifaces'] = new Grid('devices', null, array
+				(
+					'use_paginator'	   			=> false,
+					'use_selector'	   			=> false,
+					'total_items'				=> count($internal_ifaces)
+				));
 
-			if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('edit')
-						->url('ifaces/edit');
-			}
-
-			if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('delete')
-						->url('ifaces/delete')
-						->class('delete_link');
-			}
-
-			$grids['internal_ifaces']->datasource($internal_ifaces);
-		}
-
-		// ethernet interfaces of device ///////////////////////////////////////
-		$ethernet_ifaces = $iface_model->get_all_ifaces_of_device(
-				$device->id, Iface_Model::TYPE_ETHERNET
-		);
-
-		if (!count($ethernet_ifaces))
-		{
-			$grids['ethernet_ifaces'] = '';
-		}
-		else
-		{
-			// grid
-			$grids['ethernet_ifaces'] = new Grid('devices', null, array
-			(
-				'use_paginator'	   			=> false,
-				'use_selector'	   			=> false,
-				'total_items'				=> count($ethernet_ifaces)
-			));
-
-			if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
-			{
-				$grids['ethernet_ifaces']->add_new_button(
-						'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_ETHERNET,
-						'Add new ethernet interface'
-				);
-			}
-
-			$grids['ethernet_ifaces']->field('name');
-
-			$grids['ethernet_ifaces']->field('mac')
-					->label('MAC');
-
-			$grids['ethernet_ifaces']->callback_field('connected_to_device')
-					->callback('callback::connected_to_device');
-
-			$actions = $grids['ethernet_ifaces']->grouped_action_field();
-
-			if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('show')
-						->url('ifaces/show')
-						->class('popup_link');
-			}
-
-			if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('edit')
-						->url('ifaces/edit');
-			}
-
-			if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('delete')
-						->url('ifaces/delete')
-						->class('delete_link');
-			}
-
-			$grids['ethernet_ifaces']->datasource($ethernet_ifaces);
-		}
-		
-		// wireless interfaces of device ///////////////////////////////////////
-		$wireless_ifaces = $iface_model->get_all_wireless_ifaces_of_device($device->id);
-		
-		if (!count($wireless_ifaces))
-		{
-			$grids['wireless_ifaces'] = '';
-		}
-		else
-		{
-			// grid
-			$grids['wireless_ifaces'] = new Grid(url_lang::base().'devices', null, array
-			(
-				'use_paginator'	   			=> false,
-				'use_selector'	   			=> false,
-				'total_items'				=> count($wireless_ifaces)
-			));
-
-			if ($this->acl_check_new('Ifaces_Controller','iface',$member_id))
-			{
-				$grids['wireless_ifaces']->add_new_button(
-						'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_WIRELESS,
-						'Add new wireless interface'
-				);
-			}
-
-			$grids['wireless_ifaces']->callback_field('wireless_mode')
-					->callback('callback::wireless_mode')
-					->label('Mode');
-
-			$grids['wireless_ifaces']->field('name')
-					->label('Name');
-
-			$grids['wireless_ifaces']->field('wireless_ssid')
-					->label('SSID');
-
-			$grids['wireless_ifaces']->field('mac')
-					->label('MAC');
-
-			$grids['wireless_ifaces']->callback_field('connected_to_device')
-					->callback('callback::connected_to_device');
-
-			$actions = $grids['wireless_ifaces']->grouped_action_field();
-
-			if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('show')
-						->url('ifaces/show')
-						->class('popup_link');
-			}
-
-			if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('edit')
-						->url('ifaces/edit');
-			}
-
-			if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('delete')
-						->url('ifaces/delete')
-						->class('delete_link');
-			}
-
-			$grids['wireless_ifaces']->datasource($wireless_ifaces);
-		}
-
-		// vlans ///////////////////////////////////////////////////////////////
-		$vlan_ifaces = $iface_model->get_all_vlan_ifaces_of_device($device->id);
-
-		if (!count($vlan_ifaces))
-		{
-			$grids['vlan_ifaces'] = '';
-		}
-		else
-		{
-			$grids['vlan_ifaces'] = new Grid('devices', null, array
-			(
-				'use_paginator'	   			=> false,
-				'use_selector'	   			=> false,
-				'total_items'				=> count($vlan_ifaces)
-			));
-
-			if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
-			{
-				$grids['vlan_ifaces']->add_new_button(
-						'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_VLAN,
-						'Add new VLAN interface'
-				);
-			}
-
-			$grids['vlan_ifaces']->field('name');
-
-			$grids['vlan_ifaces']->link_field('vlan_id')
-					->link('vlans/show', 'name')
-					->label('VLAN name');
-
-			$grids['vlan_ifaces']->field('tag_802_1q')
-					->label('tag_802_1q')
-					->class('center');
-
-			$grids['vlan_ifaces']->link_field('iface_id')
-					->link('ifaces/show', 'iface_name')
-					->label('Interface');
-
-			$actions = $grids['vlan_ifaces']->grouped_action_field();
-
-			if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('show')
-						->url('ifaces/show')
-						->class('popup_link');
-			}
-
-			if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('edit')
-						->url('ifaces/edit');
-			}
-
-			if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('delete')
-						->url('ifaces/delete')
-						->class('delete_link');
-			}
-
-			$grids['vlan_ifaces']->datasource($vlan_ifaces);
-		}
-		
-		// ports of device /////////////////////////////////////////////////////
-		$ports = $iface_model->get_all_ifaces_of_device(
-				$device->id, Iface_Model::TYPE_PORT
-		);
-		
-		if (!count($ports))
-		{
-			$grids['ports'] = '';
-		}
-		else
-		{
-			$grids['ports'] = new Grid('devices', null, array
-			(
-				'use_paginator'	   			=> false,
-				'use_selector'	   			=> false,
-				'total_items'				=> count($ports)
-			)); 
-
-			if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
-			{
-				$grids['ports']->add_new_button(
-						'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_PORT,
-						'Add new port', array('title' => __('Add new port'))
-				);
-			}
-			
-			if ($this->acl_check_edit('Devices_Controller', 'ports_vlans_settings', $member_id))
-			{
-				$grids['ports']->add_new_button(
-							'devices/ports_vlans_settings/'.$device->id,
-							'Ports and VLANs settings', array
-							(
-								'title' => __('Ports and VLANs settings')
-							)
+				if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+				{
+					$grids['internal_ifaces']->add_new_button(
+							'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_INTERNAL,
+							'Add new internal interface'
 					);
+				}
+
+				$grids['internal_ifaces']->field('name');
+
+				$grids['internal_ifaces']->field('mac')
+						->label('MAC');
+
+				$actions = $grids['internal_ifaces']->grouped_action_field();
+
+				if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('show')
+							->url('ifaces/show')
+							->class('popup_link');
+				}
+
+				if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('edit')
+							->url('ifaces/edit');
+				}
+
+				if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('delete')
+							->url('ifaces/delete')
+							->class('delete_link');
+				}
+
+				$grids['internal_ifaces']->datasource($internal_ifaces);
 			}
-			
-			$grids['ports']->callback_field('medium')
-					->callback('callback::link_medium_icon_field')
-					->label('Medium')
-					->class('center');
-
-			$grids['ports']->field('number')
-					->label('Number')
-					->class('center');
-
-			$grids['ports']->field('name')
-					->label('Name')
-					->class('center');
-
-			$grids['ports']->callback_field('mode')
-					->callback('callback::port_mode_field');
-			
-			$grids['ports']->callback_field('port_vlan')
-					->callback('callback::port_vlan_field')
-					->label('Port VLAN')
-					->class('center');
-
-			$grids['ports']->callback_field('bitrate')
-					->callback('callback::bitrate_field', FALSE)
-					->class('center');
-
-			$grids['ports']->callback_field('connected_to_device')
-					->callback('callback::connected_to_device');
-
-			$actions = $grids['ports']->grouped_action_field();
-
-			if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('show')
-						->url('ifaces/show')
-						->class('popup_link');
-			}
-
-			if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('edit')
-						->url('ifaces/edit');
-			}
-
-			if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
-			{
-				$actions->add_action('id')
-						->icon_action('delete')
-						->url('ifaces/delete')
-						->class('delete_link');
-			}
-
-			$grids['ports']->datasource($ports);
 		}
 		
-		// bridge interfaces /////////////////////////////////////////////////////
-		$bridges = $iface_model->get_all_ifaces_of_device(
-				$device->id, Iface_Model::TYPE_BRIDGE
-		);
-		
-		if (!count($bridges))
+		if (is_null($only_grids) || in_array('ethernet_ifaces', $only_grids))
 		{
-			$grids['bridge_ifaces'] = '';
+			// ethernet interfaces of device ///////////////////////////////////////
+			$ethernet_ifaces = $iface_model->get_all_ifaces_of_device(
+					$device->id, Iface_Model::TYPE_ETHERNET
+			);
+
+			if (!count($ethernet_ifaces))
+			{
+				$grids['ethernet_ifaces'] = '';
+			}
+			else
+			{
+				// grid
+				$grids['ethernet_ifaces'] = new Grid('devices', null, array
+				(
+					'use_paginator'	   			=> false,
+					'use_selector'	   			=> false,
+					'total_items'				=> count($ethernet_ifaces)
+				));
+
+				if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+				{
+					$grids['ethernet_ifaces']->add_new_button(
+							'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_ETHERNET,
+							'Add new ethernet interface'
+					);
+				}
+
+				$grids['ethernet_ifaces']->field('name');
+
+				$grids['ethernet_ifaces']->field('mac')
+						->label('MAC');
+
+				$grids['ethernet_ifaces']->callback_field('connected_to_device')
+						->callback('callback::connected_to_device');
+
+				$actions = $grids['ethernet_ifaces']->grouped_action_field();
+
+				if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('show')
+							->url('ifaces/show')
+							->class('popup_link');
+				}
+
+				if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('edit')
+							->url('ifaces/edit');
+				}
+
+				if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('delete')
+							->url('ifaces/delete')
+							->class('delete_link');
+				}
+
+				$grids['ethernet_ifaces']->datasource($ethernet_ifaces);
+			}
 		}
-		else
+		
+		if (is_null($only_grids) || in_array('wireless_ifaces', $only_grids))
 		{
-			$grids['bridge_ifaces'] = new Grid('devices', null, array
-			(
-				'use_paginator'	   			=> false,
-				'use_selector'	   			=> false,
-				'total_items'				=> count($bridges)
-			)); 
+			// wireless interfaces of device ///////////////////////////////////////
+			$wireless_ifaces = $iface_model->get_all_wireless_ifaces_of_device($device->id);
 
-			if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+			if (!count($wireless_ifaces))
 			{
-				$grids['bridge_ifaces']->add_new_button(
-						'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_BRIDGE,
-						'Add new bridge interface', array('title' => __('Add new bridge interface'))
-				);
+				$grids['wireless_ifaces'] = '';
 			}
-
-			$grids['bridge_ifaces']->field('name')
-					->label('Name')
-					->class('center');
-			
-			$grids['bridge_ifaces']->field('mac')
-					->label('MAC');
-
-			$actions = $grids['bridge_ifaces']->grouped_action_field();
-
-			if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+			else
 			{
-				$actions->add_action('id')
-						->icon_action('show')
-						->url('ifaces/show')
-						->class('popup_link');
-			}
+				// grid
+				$grids['wireless_ifaces'] = new Grid(url_lang::base().'devices', null, array
+				(
+					'use_paginator'	   			=> false,
+					'use_selector'	   			=> false,
+					'total_items'				=> count($wireless_ifaces)
+				));
 
-			if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
+				if ($this->acl_check_new('Ifaces_Controller','iface',$member_id))
+				{
+					$grids['wireless_ifaces']->add_new_button(
+							'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_WIRELESS,
+							'Add new wireless interface'
+					);
+				}
+				
+				if ($this->acl_check_view(
+						'Devices_Controller', 'devices', $member_id
+					) && module::e('snmp'))
+				{
+					$grids['wireless_ifaces']->add_new_button(
+						'devices/show_wireless_info/'.$device->id,
+						'Show wireless info'
+					);
+				}
+
+				$grids['wireless_ifaces']->callback_field('wireless_mode')
+						->callback('callback::wireless_mode')
+						->label('Mode');
+
+				$grids['wireless_ifaces']->field('name')
+						->label('Name');
+
+				$grids['wireless_ifaces']->field('wireless_ssid')
+						->label('SSID');
+
+				$grids['wireless_ifaces']->field('mac')
+						->label('MAC');
+
+				$grids['wireless_ifaces']->callback_field('connected_to_device')
+						->callback('callback::connected_to_device');
+
+				$actions = $grids['wireless_ifaces']->grouped_action_field();
+
+				if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('show')
+							->url('ifaces/show')
+							->class('popup_link');
+				}
+
+				if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('edit')
+							->url('ifaces/edit');
+				}
+
+				if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('delete')
+							->url('ifaces/delete')
+							->class('delete_link');
+				}
+
+				$grids['wireless_ifaces']->datasource($wireless_ifaces);
+			}
+		}
+		
+		if (is_null($only_grids) || in_array('vlan_ifaces', $only_grids))
+		{
+			// vlans ///////////////////////////////////////////////////////////////
+			$vlan_ifaces = $iface_model->get_all_vlan_ifaces_of_device($device->id);
+
+			if (!count($vlan_ifaces))
 			{
-				$actions->add_action('id')
-						->icon_action('edit')
-						->url('ifaces/edit');
+				$grids['vlan_ifaces'] = '';
 			}
-
-			if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
+			else
 			{
-				$actions->add_action('id')
-						->icon_action('delete')
-						->url('ifaces/delete')
-						->class('delete_link');
-			}
+				$grids['vlan_ifaces'] = new Grid('devices', null, array
+				(
+					'use_paginator'	   			=> false,
+					'use_selector'	   			=> false,
+					'total_items'				=> count($vlan_ifaces)
+				));
 
-			$grids['bridge_ifaces']->datasource($bridges);
+				if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+				{
+					$grids['vlan_ifaces']->add_new_button(
+							'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_VLAN,
+							'Add new VLAN interface'
+					);
+				}
+
+				$grids['vlan_ifaces']->field('name');
+
+				$grids['vlan_ifaces']->link_field('vlan_id')
+						->link('vlans/show', 'name')
+						->label('VLAN name');
+
+				$grids['vlan_ifaces']->field('tag_802_1q')
+						->label('tag_802_1q')
+						->class('center');
+
+				$grids['vlan_ifaces']->link_field('iface_id')
+						->link('ifaces/show', 'iface_name')
+						->label('Interface');
+
+				$actions = $grids['vlan_ifaces']->grouped_action_field();
+
+				if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('show')
+							->url('ifaces/show')
+							->class('popup_link');
+				}
+
+				if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('edit')
+							->url('ifaces/edit');
+				}
+
+				if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('delete')
+							->url('ifaces/delete')
+							->class('delete_link');
+				}
+
+				$grids['vlan_ifaces']->datasource($vlan_ifaces);
+			}
+		}
+		
+		if (is_null($only_grids) || in_array('ports', $only_grids))
+		{
+			// ports of device /////////////////////////////////////////////////////
+			$ports = $iface_model->get_all_ifaces_of_device(
+					$device->id, Iface_Model::TYPE_PORT
+			);
+
+			if (!count($ports))
+			{
+				$grids['ports'] = '';
+			}
+			else
+			{
+				$grids['ports'] = new Grid('devices', null, array
+				(
+					'use_paginator'	   			=> false,
+					'use_selector'	   			=> false,
+					'total_items'				=> count($ports)
+				)); 
+
+				if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+				{
+					$grids['ports']->add_new_button(
+							'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_PORT,
+							'Add new port', array('title' => __('Add new port'))
+					);
+				}
+
+				if ($this->acl_check_edit('Devices_Controller', 'ports_vlans_settings', $member_id))
+				{
+					$grids['ports']->add_new_button(
+								'devices/ports_vlans_settings/'.$device->id,
+								'Ports and VLANs settings', array
+								(
+									'title' => __('Ports and VLANs settings')
+								)
+						);
+				}
+				
+				if ($this->acl_check_view(
+						'Devices_Controller', 'devices', $member_id
+					) && module::e('snmp'))
+				{
+					$grids['ports']->add_new_button(
+						'devices/show_port_states/'.$device->id,
+						'Show port states',
+						array('class' => 'popup_link')
+					);
+				}
+
+				if ($this->acl_check_view(
+						'Devices_Controller', 'devices', $member_id
+					) && module::e('snmp'))
+				{
+					$grids['ports']->add_new_button(
+						'devices/show_mac_table/'.$device->id,
+						'Show MAC table'
+					);
+				}
+
+				$grids['ports']->callback_field('medium')
+						->callback('callback::link_medium_icon_field')
+						->label('Medium')
+						->class('center');
+
+				$grids['ports']->field('number')
+						->label('Number')
+						->class('center');
+
+				$grids['ports']->field('name')
+						->label('Name')
+						->class('center');
+
+				$grids['ports']->callback_field('mode')
+						->callback('callback::port_mode_field');
+
+				$grids['ports']->callback_field('port_vlan')
+						->callback('callback::port_vlan_field')
+						->label('Port VLAN')
+						->class('center');
+
+				$grids['ports']->callback_field('bitrate')
+						->callback('callback::bitrate_field', FALSE)
+						->class('center');
+
+				$grids['ports']->callback_field('connected_to_device')
+						->callback('callback::connected_to_device');
+
+				$actions = $grids['ports']->grouped_action_field();
+
+				if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('show')
+							->url('ifaces/show')
+							->class('popup_link');
+				}
+
+				if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('edit')
+							->url('ifaces/edit');
+				}
+
+				if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('delete')
+							->url('ifaces/delete')
+							->class('delete_link');
+				}
+
+				$grids['ports']->datasource($ports);
+			}
+		}
+		
+		if (is_null($only_grids) || in_array('bridge_ifaces', $only_grids))
+		{
+			// bridge interfaces /////////////////////////////////////////////////////
+			$bridges = $iface_model->get_all_ifaces_of_device(
+					$device->id, Iface_Model::TYPE_BRIDGE
+			);
+
+			if (!count($bridges))
+			{
+				$grids['bridge_ifaces'] = '';
+			}
+			else
+			{
+				$grids['bridge_ifaces'] = new Grid('devices', null, array
+				(
+					'use_paginator'	   			=> false,
+					'use_selector'	   			=> false,
+					'total_items'				=> count($bridges)
+				)); 
+
+				if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+				{
+					$grids['bridge_ifaces']->add_new_button(
+							'ifaces/add/'.$device->id.'/'.Iface_Model::TYPE_BRIDGE,
+							'Add new bridge interface', array('title' => __('Add new bridge interface'))
+					);
+				}
+
+				$grids['bridge_ifaces']->field('name')
+						->label('Name')
+						->class('center');
+
+				$grids['bridge_ifaces']->field('mac')
+						->label('MAC');
+
+				$actions = $grids['bridge_ifaces']->grouped_action_field();
+
+				if ($this->acl_check_view('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('show')
+							->url('ifaces/show')
+							->class('popup_link');
+				}
+
+				if ($this->acl_check_edit('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('edit')
+							->url('ifaces/edit');
+				}
+
+				if ($this->acl_check_delete('Ifaces_Controller', 'iface', $member_id))
+				{
+					$actions->add_action('id')
+							->icon_action('delete')
+							->url('ifaces/delete')
+							->class('delete_link');
+				}
+
+				$grids['bridge_ifaces']->datasource($bridges);
+			}
 		}
 		
 		// here @TODO bridges and special interfaces
@@ -3850,6 +3972,10 @@ class Devices_Controller extends Controller
 		$filter_form->add('town')
 			->type('select')
 			->values(array_unique(ORM::factory('town')->select_list('id', 'town')));
+		
+		$filter_form->add('quarter')
+			->table('t')
+			->callback('json/quarter_name');
 		
 		$filter_form->add('street')
 			->type('select')
@@ -4216,6 +4342,1033 @@ class Devices_Controller extends Controller
 			$view->content->ports = $ports;
 		}
 		
+		$view->render(TRUE);
+	}
+	
+	/**
+	 * Shows ARP table from device from SNMP protocol
+	 * 
+	 * @author Michal Kliment
+	 * @param type $device_id
+	 */
+	public function show_arp_table($device_id = NULL)
+	{
+		// SNMP is not enabled
+		if (!module::e('snmp'))
+			Controller::error (RECORD);
+		
+		// bad parameter
+		if (!$device_id)
+			Controller::warning (PARAMETER);
+		
+		$device = new Device_Model($device_id);
+		
+		// record doesn't exist
+		if (!$device->id)
+			Controller::error (RECORD);
+		
+		// access control
+		if (!$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+			Controller::error(ACCESS);
+		
+		$service_ip_address = $device->get_service_ip_address();
+		
+		// service IP address doesn't exist
+		if ($service_ip_address == '')
+			Controller::error (RECORD);
+		
+		$iface_model = new Iface_Model();
+		$ip_address_model = new Ip_address_Model();
+		$subnet_model = new Subnet_Model();
+		
+		$subnets = $subnet_model->get_all_subnets_by_device($device->id);
+		
+		$subnets_ifaces = $arr_subnets = array();
+		foreach ($subnets as $subnet)
+		{
+			$arr_subnets[$subnet->subnet_id] = $subnet->subnet_name;
+			$subnets_ifaces[$subnet->subnet_id] = $subnet;
+		}
+		
+		asort($arr_subnets);
+		
+		$filter_form = new Filter_form();
+		
+		$filter_form->add('ip_address')
+			->type('network_address');
+		
+		$filter_form->add('subnet_id')
+			->type('select')
+			->label('Subnet')
+			->values($arr_subnets);
+		
+		$filter_form->add('mac_address')
+			->label('MAC address')
+			->callback('json/iface_mac');
+		
+		$filter_form->add('device_name')
+			->callback('json/device_name');
+		
+		$filter_form->add('member_name')
+			->callback('json/member_name');
+		
+		$filter_form->add('device_iface_id')
+			->type('select')
+			->values(
+				arr::from_objects(
+					$iface_model->get_all_ifaces_of_device(
+						$device->id
+					)
+				))
+			->label('Interface');
+		
+		try
+		{
+			$snmp = Snmp_Factory::factoryForDevice($service_ip_address);
+			
+			// load whole ARP table from SNMP
+			$items = $snmp->getArpTable();
+		}
+		catch (Exception $e)
+		{
+			Controller::error(RECORD);
+		}
+		
+		foreach ($items as $i => $item)
+		{
+			$item->id = NULL;
+			$item->iface_id = NULL;			
+			$item->device_iface_id = NULL;
+			$item->device_iface_name = NULL;
+			$item->device_id = NULL;
+			$item->device_name = NULL;
+			$item->member_id = NULL;
+			$item->member_name = NULL;
+			$item->subnet_id = NULL;
+			$item->subnet_name = NULL;
+			
+			// try find iface in database
+			$iface = $iface_model
+				->where('mac', $item->mac_address)
+				->find();
+			
+			if ($iface->id)
+			{
+				$item->iface_id = $iface->id;
+				$item->device_id = $iface->device_id;
+				$item->device_name = $iface->device->name;
+			}
+			
+			// try find iface of device in database
+			$device_iface = $iface_model
+				->where(array
+				(
+				    'name'	=> $item->iface_name,
+				    'device_id'	=> $device->id
+				))
+				->find();
+			
+			if ($device_iface->id)
+			{
+				$item->device_iface_id = $device_iface->id;
+				$item->device_iface_name = $device_iface->name;
+			}
+			
+			// try find IP address in database
+			$ip_address = $ip_address_model
+				->where('ip_address', $item->ip_address)
+				->find();
+			
+			if ($ip_address->id)
+			{
+				$item->id = $ip_address->id;
+				$item->member_id = $ip_address->iface->device->user->member_id;
+				$item->member_name = $ip_address->iface->device->user->member->name;
+			}
+			
+			$subnet = $subnet_model->get_subnet_of_ip_address(
+				$item->ip_address
+			);
+			
+			if ($subnet)
+			{
+				$item->subnet_id = $subnet->id;
+				$item->subnet_name = $subnet->name;
+			}
+			
+			// evaluate item against filter form
+			if ($filter_form->evaluate($item))
+			{
+				$items[$i] = $item;
+			}
+			else
+			{
+				unset ($items[$i]);
+			}
+		}
+		
+		$grid = new Grid('devices', null, array
+		(
+			'use_paginator'	   			=> false,
+			'use_selector'	   			=> false,
+			'total_items'				=> count($items),
+			'filter'				=> $filter_form
+		));
+		
+		$grid->field('ip_address');
+		
+		$grid->link_field('subnet_id')
+			->link('subnets/show', 'subnet_name')
+			->label('Subnet')
+			->class('popup_link');
+		
+		$grid->link_field('iface_id')
+			->link('ifaces/show', 'mac_address')
+			->label('MAC address')
+			->class('popup_link');
+		
+		$grid->link_field('device_id')
+			->link('devices/show', 'device_name')
+			->label('Device')
+			->class('popup_link');
+		
+		$grid->link_field('member_id')
+			->link('members/show', 'member_name')
+			->label('Member')
+			->class('popup_link');
+		
+		$grid->link_field('device_iface_id')
+			->link('ifaces/show', 'device_iface_name')
+			->label('Interface')
+			->class('popup_link');
+		
+		$actions = $grid->grouped_action_field();
+		
+		$actions->add_action()
+			->icon_action('show')
+			->url('ip_addresses/show')
+			->label('Show IP address')
+			->class('popup_link');
+		
+		$grid->datasource($items);
+		
+		$title = __('ARP table on device').' '.$device->name;
+		
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view('Members_Controller', 'members'))
+				->disable_translation()
+				->link('members/show/' . $device->user->member->id,
+						'ID ' . $device->user->member->id . ' - ' . $device->user->member->name,
+						$this->acl_check_view('Members_Controller', 'members', $device->user->member->id))
+				->enable_translation()
+				->link('users/show_by_member/' . $device->user->member_id, 'Users',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->disable_translation()
+				->link('users/show/' . $device->user->id, 
+						$device->user->name . ' ' . $device->user->surname . ' (' . $device->user->login . ')',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->enable_translation()
+				->link('devices/show_by_user/' . $device->user->id, 'Devices',
+						$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+				->disable_translation()
+				->link('devices/show/' . $device->id . '#device_' . $device_id . '_link',
+						$device->name,
+						$this->acl_check_edit('Devices_Controller', 'devices', $device->user->member_id))
+				->enable_translation()
+				->text('Show ARP table');
+		
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $title;
+		$view->content = new View('show_all');
+		$view->content->headline = $title;
+		$view->content->table = $grid;
+		$view->render(TRUE);
+	}
+	
+	/**
+	 * Shows DHCP leases from SNMP protocol
+	 * 
+	 * @author Michal Kliment
+	 * @param type $device_id
+	 */
+	public function show_dhcp_leases ($device_id = NULL)
+	{
+		// SNMP is not enabled
+		if (!module::e('snmp'))
+			Controller::error (RECORD);
+		
+		// bad parameter
+		if (!$device_id)
+			Controller::warning(PARAMETER);
+		
+		$device = new Device_Model($device_id);
+		
+		// record doesn't exist
+		if (!$device->id)
+			Controller::error(RECORD);
+		
+		// access control
+		if (!$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+			Controller::error(ACCESS);
+		
+		$service_ip_address = $device->get_service_ip_address();
+		
+		// service IP address doesn't exist
+		if ($service_ip_address == '')
+			Controller::error (RECORD);
+		
+		$ip_address_model = new Ip_address_Model();
+		$iface_model = new Iface_Model();
+		$subnet_model = new Subnet_Model();
+		
+		$subnets = $subnet_model->get_all_subnets_by_device($device->id);
+		
+		$subnets_ifaces = $arr_subnets = array();
+		foreach ($subnets as $subnet)
+		{
+			$arr_subnets[$subnet->subnet_id] = $subnet->subnet_name;
+			$subnets_ifaces[$subnet->subnet_id] = $subnet;
+		}
+		
+		asort($arr_subnets);
+		
+		$filter_form = new Filter_form();
+		
+		$filter_form->add('ip_address')
+			->type('network_address');
+		
+		$filter_form->add('subnet_id')
+			->type('select')
+			->label('Subnet')
+			->values($arr_subnets);
+		
+		$filter_form->add('mac_address')
+			->label('MAC address')
+			->callback('json/iface_mac');
+		
+		$filter_form->add('member_name')
+			->callback('json/member_name');
+		
+		$filter_form->add('device_iface_id')
+			->type('select')
+			->values(
+				arr::from_objects(
+					$iface_model->get_all_ifaces_of_device(
+						$device->id
+					)
+				))
+			->label('Interface');
+		
+		try
+		{
+			$snmp = Snmp_Factory::factoryForDevice($service_ip_address);
+		
+			// load DHCP leases from SNMP
+			$items = $snmp->getDHCPLeases();
+		}
+		catch (Exception $e)
+		{
+			Controller::error(RECORD);
+		}
+		
+		foreach ($items as $i => $item)
+		{
+			$item->id = NULL;
+			$item->member_id = NULL;
+			$item->member_name = NULL;
+			$item->iface_id = NULL;
+			$item->subnet_id = NULL;
+			$item->subnet_name = NULL;
+			$item->device_iface_id = NULL;
+			$item->device_iface_name = NULL;
+				
+			// try find IP address in database
+			$ip_address = $ip_address_model
+				->where('ip_address', $item->ip_address)
+				->find();
+			
+			// try find iface in database
+			$iface = $iface_model
+				->where('mac', $item->mac_address)
+				->find();
+			
+			$subnet = $subnet_model->get_subnet_of_ip_address($item->ip_address);
+			
+			if ($ip_address->id)
+			{
+				$item->id = $ip_address->id;
+				$item->member_id = $ip_address->iface->device->user->member_id;
+				$item->member_name = $ip_address->iface->device->user->member->name;
+			}
+			
+			if ($iface->id)
+			{
+				$item->iface_id = $iface->id;
+			}
+			
+			if ($subnet)
+			{
+				$item->subnet_id = $subnet->id;
+				$item->subnet_name = $subnet->name;
+				
+				if (array_key_exists($subnet->id, $subnets_ifaces))
+				{
+					$item->device_iface_id = $subnets_ifaces[$subnet->id]->iface_id;
+					$item->device_iface_name = $subnets_ifaces[$subnet->id]->iface_name;
+				}
+			}
+			
+			// evaluate item against filter form
+			if ($filter_form->evaluate($item))
+			{
+				$items[$i] = $item;
+			}
+			else
+			{
+				unset ($items[$i]);
+			}
+		}
+		
+		$grid = new Grid('devices', null, array
+		(
+			'use_paginator'	   			=> false,
+			'use_selector'	   			=> false,
+			'total_items'				=> count($items),
+			'filter'				=> $filter_form
+		));
+		
+		$grid->field('ip_address');
+		
+		$grid->link_field('subnet_id')
+			->link('subnets/show', 'subnet_name')
+			->label('Subnet')
+			->class('popup_link');
+		
+		$grid->link_field('iface_id')
+			->link('ifaces/show', 'mac_address')
+			->label('MAC address')
+			->class('popup_link');
+		
+		$grid->link_field('member_id')
+			->link('members/show', 'member_name')
+			->label('Member')
+			->class('popup_link');
+		
+		$grid->link_field('device_iface_id')
+			->link('ifaces/show', 'device_iface_name')
+			->label('Interface')
+			->class('popup_link');
+		
+		$actions = $grid->grouped_action_field();
+		
+		$actions->add_action()
+			->icon_action('show')
+			->url('ip_addresses/show')
+			->class('popup_link');
+		
+		$grid->datasource($items);
+		
+		$title = __('List of all DHCP leases on device').' '.$device->name;
+		
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view('Members_Controller', 'members'))
+				->disable_translation()
+				->link('members/show/' . $device->user->member->id,
+						'ID ' . $device->user->member->id . ' - ' . $device->user->member->name,
+						$this->acl_check_view('Members_Controller', 'members', $device->user->member->id))
+				->enable_translation()
+				->link('users/show_by_member/' . $device->user->member_id, 'Users',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->disable_translation()
+				->link('users/show/' . $device->user->id, 
+						$device->user->name . ' ' . $device->user->surname . ' (' . $device->user->login . ')',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->enable_translation()
+				->link('devices/show_by_user/' . $device->user->id, 'Devices',
+						$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+				->disable_translation()
+				->link('devices/show/' . $device->id . '#device_' . $device_id . '_link',
+						$device->name,
+						$this->acl_check_edit('Devices_Controller', 'devices', $device->user->member_id))
+				->enable_translation()
+				->text('Show DHCP leases');
+		
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $title;
+		$view->content = new View('show_all');
+		$view->content->headline = $title;
+		$view->content->table = $grid;
+		$view->render(TRUE);
+	}
+	
+	/**
+	 * Shows wireless info from SNMP protocol
+	 * 
+	 * @author Michal Kliment
+	 * @param type $device_id
+	 */
+	public function show_wireless_info($device_id = NULL)
+	{
+		// SNMP is not enabled
+		if (!module::e('snmp'))
+			Controller::error (RECORD);
+		
+		// bad parameter
+		if (!$device_id)
+			Controller::warning (PARAMETER);
+		
+		$device = new Device_Model($device_id);
+		
+		// record doesn't exist
+		if (!$device->id)
+			Controller::error(RECORD);
+		
+		// access control
+		if (!$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+			Controller::error(ACCESS);
+		
+		$service_ip_address = $device->get_service_ip_address();
+		
+		// service IP address doesn't exist
+		if ($service_ip_address == '')
+			Controller::error (RECORD);
+		
+		$iface_model = new Iface_Model();
+		
+		$filter_form = new Filter_form();
+		
+		$filter_form->add('mac_address')
+			->label('MAC address')
+			->callback('json/iface_mac');
+		
+		$filter_form->add('device_name')
+			->callback('json/device_name');
+		
+		$filter_form->add('member_name')
+			->callback('json/member_name');
+		
+		$filter_form->add('signal')
+			->type('number');
+		
+		$filter_form->add('ip_address')
+			->type('network_address');
+		
+		$filter_form->add('subnet_name')
+			->callback('json/subnet_name');
+		
+		$filter_form->add('iface_id')
+			->label('Interface')
+			->type('select')
+			->values(
+				arr::from_objects(
+					$iface_model->get_all_ifaces_of_device(
+						$device->id,
+						Iface_Model::TYPE_WIRELESS
+					)
+				)
+			);
+		
+		$device_model = new Device_Model();
+		
+		try
+		{
+			$snmp = Snmp_Factory::factoryForDevice($service_ip_address);
+		
+			// load wireless info from SNMP
+			$items = $snmp->getWirelessInfo();
+		}
+		catch (Exception $e)
+		{
+			Controller::error(RECORD);
+		}
+		
+		$devices = $ip_addresses = array();
+		foreach ($items as $i => $item)
+		{			
+			// try find iface of device in database
+			$device_iface = $iface_model
+				->where(array
+				(
+				    'name' => $item->iface_name,
+				    'device_id' => $device->id
+				))
+				->find();
+			
+			$item->iface_id = $device_iface->id;
+			
+			// try find iface in database
+			$iface = $iface_model
+				->where('mac', $item->mac_address)
+				->find();
+			
+			if ($iface->id)
+			{
+				$item->id = $iface->id;
+				$item->device_id = $iface->device_id;
+				$item->device_name = $iface->device->name;
+				$item->member_id = $iface->device->user->member_id;
+				$item->member_name = $iface->device->user->member->name;
+				
+				$ip_address  = $device_model->get_service_ip_address($iface->device_id, FALSE);
+				
+				$item->ip_address_id = $ip_address ? $ip_address->id : NULL;
+				$item->ip_address = $ip_address ? $ip_address->ip_address : NULL;
+				$item->subnet_id = $ip_address ? $ip_address->subnet_id : NULL;
+				$item->subnet_name = $ip_address ? $ip_address->subnet_name : NULL;
+				
+			}
+			else
+			{
+				$item->id = NULL;
+				$item->device_id = NULL;
+				$item->device_name = NULL;
+				$item->member_id = NULL;
+				$item->member_name = NULL;
+				$item->ip_address_id = NULL;
+				$item->ip_address = NULL;
+				$item->subnet_id = NULL;
+				$item->subnet_name = NULL;
+			}
+			
+			// evaluate item against filter form
+			if ($filter_form->evaluate($item))
+			{
+				$items[$i]		= $item;
+				$devices[$i]		= $item->device_id;
+				$ip_addresses[$i]	= ip2long($item->ip_address);
+			}
+			else
+			{
+				unset ($items[$i]);
+			}
+		}
+		
+		array_multisort($ip_addresses, $devices, $items);
+		
+		$grid = new Grid('devices', null, array
+		(
+			'use_paginator'	   			=> false,
+			'use_selector'	   			=> false,
+			'total_items'				=> count($items),
+			'filter'				=> $filter_form
+		));
+		
+		$grid->field('mac_address');
+		
+		$grid->callback_field('device_id')
+			->label('Device name')
+			->callback('device_field');
+		
+		$grid->callback_field('member_id')
+			->label('Member name')
+			->callback('member_field');
+		
+		$grid->field('signal')
+			->class('center');
+		
+		$grid->link_field('ip_address_id')
+			->link('ip_addresses/show', 'ip_address')
+			->label('IP address')
+			->class('popup_link');
+		
+		$grid->link_field('subnet_id')
+			->link('subnets/show', 'subnet_name')
+			->label('Subnet')
+			->class('popup_link');
+		
+		$grid->callback_field('rate')
+			->callback('rate_field')
+			->label('Bitrate')
+			->class('center');
+		
+		$grid->link_field('iface_id')
+			->link('ifaces/show', 'iface_name')
+			->label('Interface')
+			->class('popup_link');
+		
+		$actions = $grid->grouped_action_field();
+		
+		$actions->add_action()
+			->icon_action('show')
+			->url('ifaces/show')
+			->class('popup_link');
+		
+		$grid->datasource($items);
+		
+		$title = __('Show wireless info of device').' '.$device->name;
+		
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view('Members_Controller', 'members'))
+				->disable_translation()
+				->link('members/show/' . $device->user->member->id,
+						'ID ' . $device->user->member->id . ' - ' . $device->user->member->name,
+						$this->acl_check_view('Members_Controller', 'members', $device->user->member->id))
+				->enable_translation()
+				->link('users/show_by_member/' . $device->user->member_id, 'Users',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->disable_translation()
+				->link('users/show/' . $device->user->id, 
+						$device->user->name . ' ' . $device->user->surname . ' (' . $device->user->login . ')',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->enable_translation()
+				->link('devices/show_by_user/' . $device->user->id, 'Devices',
+						$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+				->disable_translation()
+				->link('devices/show/' . $device->id . '#device_' . $device_id . '_link',
+						$device->name,
+						$this->acl_check_edit('Devices_Controller', 'devices', $device->user->member_id))
+				->enable_translation()
+				->text('Show wireless info');
+		
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $title;
+		$view->content = new View('show_all');
+		$view->content->headline = $title;
+		$view->content->table = $grid;
+		$view->render(TRUE);
+	}
+	
+	/**
+	 * Shows current state (up/down) of ports from SNMP protocol
+	 * 
+	 * @author Michal Kliment
+	 * @param type $device_id
+	 */
+	public function show_port_states($device_id = NULL)
+	{
+		// SNMP is not enabled
+		if (!module::e('snmp'))
+			Controller::error (RECORD);
+		
+		// bad parameter
+		if (!$device_id)
+			Controller::warning (PARAMETER);
+		
+		$device = new Device_Model($device_id);
+		
+		// record doesn't exist
+		if (!$device->id)
+			Controller::error (RECORD);
+		
+		// access control
+		if (!$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+			Controller::error(ACCESS);
+		
+		$iface_model = new Iface_Model();
+		
+		$service_ip_address = $device->get_service_ip_address();
+		
+		// wrong IP address
+		if ($service_ip_address == "")
+			Controller::error(RECORD);
+		
+		try
+		{
+			$snmp = Snmp_Factory::factoryForDevice($service_ip_address);
+			
+			// load port states from SNMP
+			$states = $snmp->getPortStates();
+		}
+		catch (Exception $e)
+		{
+			Controller::error(RECORD);
+		}
+		
+		// device doesn't have any port
+		if (!count($states))
+		{
+			Controller::error(RECORD);
+		}
+		
+		$ports = array();
+		foreach ($states as $port_nr => $state)
+		{
+			// try find port in database
+			$port = $iface_model
+				->where(array
+				(
+				    'number'	=> $port_nr,
+				    'type'	=> Iface_Model::TYPE_PORT,
+				    'device_id'	=> $device->id
+				))
+				->find();
+			
+			if ($port->id)
+			{
+				if ($port->link->medium == Link_Model::MEDIUM_SINGLE_FIBER
+				|| $port->link->medium == Link_Model::MEDIUM_MULTI_FIBER)
+				{
+					$type = 'sfp';
+				}
+				else
+					$type = 'tp';
+				
+				$ports[$port_nr] = array
+				(
+				    'id'	=> $port->id,
+				    'name'	=> $port->name,
+				    'state'	=> $state ? 'up' : 'down',
+				    'type'	=> $type
+				);
+			}
+		}
+		
+		$rows = 2;
+		$cols = ceil(count($ports) / $rows);
+		
+		$title = __('Port states of device').' '.$device->name;
+		
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view('Members_Controller', 'members'))
+				->disable_translation()
+				->link('members/show/' . $device->user->member->id,
+						'ID ' . $device->user->member->id . ' - ' . $device->user->member->name,
+						$this->acl_check_view('Members_Controller', 'members', $device->user->member->id))
+				->enable_translation()
+				->link('users/show_by_member/' . $device->user->member_id, 'Users',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->disable_translation()
+				->link('users/show/' . $device->user->id, 
+						$device->user->name . ' ' . $device->user->surname . ' (' . $device->user->login . ')',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->enable_translation()
+				->link('devices/show_by_user/' . $device->user->id, 'Devices',
+						$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+				->disable_translation()
+				->link('devices/show/' . $device->id . '#device_' . $device_id . '_link',
+						$device->name,
+						$this->acl_check_edit('Devices_Controller', 'devices', $device->user->member_id))
+				->enable_translation()
+				->text('Show port states');
+		
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $title;
+		$view->content = new View('devices/show_port_states');
+		$view->content->headline = $title;
+		$view->content->ports = $ports;
+		$view->content->rows = $rows;
+		$view->content->cols = $cols;
+		$view->render(TRUE);
+	}
+	
+	/**
+	 * Shows MAC table from device from SNMP protocol
+	 * 
+	 * @author Michal Kliment
+	 * @param type $device_id
+	 */
+	public function show_mac_table($device_id = NULL)
+	{
+		// SNMP is not enabled
+		if (!module::e('snmp'))
+			Controller::error (RECORD);
+		
+		// bad parameter
+		if (!$device_id)
+			Controller::warning (PARAMETER);
+		
+		$device = new Device_Model($device_id);
+		
+		// record doesn't exist
+		if (!$device->id)
+			Controller::error (RECORD);
+		
+		// access control
+		if (!$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+			Controller::error(ACCESS);
+		
+		// get IP address of device
+		$service_ip_address = $device->get_service_ip_address();
+		
+		// IP address not found
+		if ($service_ip_address == '')
+			Controller::error(RECORD);
+		
+		$iface_model = new Iface_Model();
+		$ip_address_model = new Ip_address_Model();
+		
+		$filter_form = new Filter_form();
+		
+		$filter_form->add('mac_address')
+			->label('MAC address')
+			->callback('json/iface_mac');
+		
+		$filter_form->add('ip_address')
+			->type('network_address');
+		
+		$filter_form->add('device_name')
+			->callback('json/device_name');
+		
+		$filter_form->add('member_name')
+			->callback('json/member_name');
+		
+		$filter_form->add('port_nr')
+			->type('number')
+			->label('Port number');
+		
+		try
+		{
+			$snmp = Snmp_Factory::factoryForDevice($service_ip_address);
+		
+			// load MAC table from SNMP
+			$items = $snmp->getMacTable();
+		}
+		catch (Exception $e)
+		{
+			Controller::error(RECORD);
+		}
+		
+		$ports = $ip_addresses = array();
+		foreach ($items as $i => $item)
+		{
+			$item->id = NULL;
+			$item->ip_address_id = NULL;
+			$item->ip_address = NULL;
+			$item->device_id = NULL;
+			$item->device_name = NULL;
+			$item->member_id = NULL;
+			$item->member_name = NULL;
+			$item->iface_id = NULL;
+			
+			// try find iface in database
+			$iface = $iface_model
+				->where('mac', $item->mac_address)
+				->find();
+			
+			if ($iface->id)
+			{
+				$item->id = $iface->id;
+				
+				$ip_address = $device->get_service_ip_address($iface->device_id, FALSE);
+				
+				if ($ip_address)
+				{
+					$item->ip_address_id = $ip_address->id;
+					$item->ip_address = $ip_address->ip_address;
+				}
+				
+				$item->device_id = $iface->device_id;
+				$item->device_name = $iface->device->name;
+				
+				$item->member_id = $iface->device->user->member_id;
+				$item->member_name = $iface->device->user->member->name;
+			}
+			
+			// try find iface of device in database
+			$device_iface = $iface_model
+				->where(array
+				(
+				    'number'	=> $item->port_nr,
+				    'device_id'	=> $device->id
+				))
+				->find();
+			
+			if ($device_iface->id)
+			{
+				$item->iface_id = $device_iface->id;
+			}
+			
+			// evaluate item against filter form
+			if ($filter_form->evaluate($item))
+			{
+				$items[$i] = $item;
+				$ports[$i] = $item->port_nr;
+				$ip_addresses[$i] = ip2long($item->ip_address);
+			}
+			else
+			{
+				unset ($items[$i]);
+			}
+		}
+		
+		array_multisort($ports, $ip_addresses, $items);
+		
+		$grid = new Grid('devices', null, array
+		(
+			'use_paginator'	   			=> false,
+			'use_selector'	   			=> false,
+			'total_items'				=> count($items),
+			'filter'				=> $filter_form
+		));
+		
+		$grid->field('mac_address')
+			->label('MAC address');
+		
+		$grid->link_field('ip_address_id')
+			->link('ip_addresses/show', 'ip_address')
+			->label('IP address')
+			->class('popup_link');
+		
+		$grid->link_field('device_id')
+			->link('devices/show', 'device_name')
+			->label('Device')
+			->class('popup_link');
+		
+		$grid->link_field('member_id')
+			->link('members/show', 'member_name')
+			->label('Member')
+			->class('popup_link');
+		
+		$grid->link_field('iface_id')
+			->link('ifaces/show', 'port_nr')
+			->label('Port number')
+			->class('popup_link');
+		
+		$actions = $grid->grouped_action_field();
+		
+		$actions->add_action()
+			->icon_action('show')
+			->url('ifaces/show')
+			->label('Show interface')
+			->class('popup_link');
+		
+		$grid->datasource($items);
+		
+		$title = __('MAC table on device').' '.$device->name;
+		
+		// breadcrumbs navigation
+		$breadcrumbs = breadcrumbs::add()
+				->link('members/show_all', 'Members',
+						$this->acl_check_view('Members_Controller', 'members'))
+				->disable_translation()
+				->link('members/show/' . $device->user->member->id,
+						'ID ' . $device->user->member->id . ' - ' . $device->user->member->name,
+						$this->acl_check_view('Members_Controller', 'members', $device->user->member->id))
+				->enable_translation()
+				->link('users/show_by_member/' . $device->user->member_id, 'Users',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->disable_translation()
+				->link('users/show/' . $device->user->id, 
+						$device->user->name . ' ' . $device->user->surname . ' (' . $device->user->login . ')',
+						$this->acl_check_view('Users_Controller', 'users', $device->user->member_id))
+				->enable_translation()
+				->link('devices/show_by_user/' . $device->user->id, 'Devices',
+						$this->acl_check_view('Devices_Controller', 'devices', $device->user->member_id))
+				->disable_translation()
+				->link('devices/show/' . $device->id . '#device_' . $device_id . '_link',
+						$device->name,
+						$this->acl_check_edit('Devices_Controller', 'devices', $device->user->member_id))
+				->enable_translation()
+				->text('Show MAC table');
+		
+		$view = new View('main');
+		$view->breadcrumbs = $breadcrumbs->html();
+		$view->title = $title;
+		$view->content = new View('show_all');
+		$view->content->headline = $title;
+		$view->content->table = $grid;
 		$view->render(TRUE);
 	}
 }

@@ -281,37 +281,39 @@ mysql_close($link);
 <meta http-equiv="Cache-Control" content="no-cache" />
 <meta http-equiv="pragma" content="no-cache" />
 <meta http-equiv="expires" content="-1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<meta name="format-detection" content="telephone=no" />
 <title>FreenetIS</title>
 <link href="../media/images/favicon.ico" rel="shorcut icon" type="image/x-icon" />
 <link href="../media/css/style.css" rel="stylesheet" type="text/css" />
-<style type="text/css">
-#content-padd h2 {margin: 10px 0px;}
-#content-padd h3 {margin: 10px 0px;}
-#content-padd li {margin-left: 20px;}
-#content-padd a {font-weight: bold;}
-td {width: 100px;}
-a.cancel_link	{
-	color: red;
-	font-size: 14px;
+<style type="text/css"><!--
+	#footer-padd {text-align:center;}
+	#content-padd h2 {margin: 10px 0px;}
+	#content-padd h3 {margin: 10px 0px;}
+	#content-padd li {margin-left: 20px;}
+	#content-padd a {font-weight: bold;}
+	td {width: 100px;}
+	a.cancel_link {color: red; font-size: 14px;}
+	h1 {position:absolute; top:24px; left:18px; background:url(<?php echo $logo ?>);
+		width:212px; height:49px; background-repeat:no-repeat;}
+--></style>
+<style type="text/css" media="handheld, screen and (max-device-width: 640px)"><!--
+@media only screen and (max-device-width : 640px) {
+	#content {margin-left: 0;}
+	#main {width: auto; background-image: none; min-width: 0;}
+	#header, #content-padd, #content {width: 100%; min-width: 0;}
+	#content {float: none}
+	#content-padd {margin-right: 20px; width: auto;}
+	#header .map {display: none}
+	#menu {width: 100%; background-color: #f0f0f0}
 }
-</style>
-<style type="text/css" media="handheld, screen and (max-device-width: 640px)">
-#content-padd {margin-right: 20px;width: auto;}
-</style>
+--></style>
 </head>
 <body>
 <div id="main">
 	<div id="header">
-		<h1 style="position:absolute;
-			top:24px;
-			left:18px;
-			background:url(<?php echo $logo ?>);
-			width:212px;
-			height:49px;
-			background-repeat:no-repeat;
-		"></h1>
+		<h1></h1>
 		<div class="status">
-
 		</div>
 		<div class="map"></div>
 	</div>
@@ -329,7 +331,7 @@ a.cancel_link	{
 		<div class="clear"></div>
 	</div>
 	<div id="footer">
-		<div id="footer-padd" style="text-align:center;">
+		<div id="footer-padd">
 			<?php echo $footer ?>
 		</div>
 	</div>

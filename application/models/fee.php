@@ -2,20 +2,20 @@
 /*
  * This file is part of open source system FreenetIS
  * and it is release under GPLv3 licence.
- * 
+ *
  * More info about licence can be found:
  * http://www.gnu.org/licenses/gpl-3.0.html
- * 
+ *
  * More info about project can be found:
  * http://www.freenetis.org/
- * 
+ *
  */
 
 /**
  * Defines fees
- * 
+ *
  * @package Model
- * 
+ *
  * @property integer $id
  * @property boolean $readonly
  * @property double $fee
@@ -29,11 +29,65 @@
  */
 class Fee_Model extends ORM
 {
-	/** special type constants */
-	const MEMBERSHIP_INTERRUPT = 1;
-
 	protected $belongs_to = array('type' => 'enum_type');
 	protected $has_many = array('members_fees');
+
+	// special type constants
+	const MEMBERSHIP_INTERRUPT = 1;
+    /** Fee-free regular member */
+    const FEE_FREE_REGULAR_MEMBER = 2;
+    /** Non-member */
+    const NON_MEMBER = 3;
+    /** Honorary member */
+    const HONORARY_MEMBER = 4;
+
+    /**
+     * Special types name.
+     *
+     * @var array
+     */
+    public static $SPECIAL_TYPE_NAMES = array
+    (
+        self::MEMBERSHIP_INTERRUPT      => 'Membership interrupt',
+        self::FEE_FREE_REGULAR_MEMBER   => 'Fee-free regular member',
+        self::NON_MEMBER                => 'Non-member',
+        self::HONORARY_MEMBER           => 'Honorary member'
+    );
+
+    /**
+     * Gets all special type names.
+     *
+     * @param boolean $translate Translate? [optional]
+     * @return special type names
+     */
+    public static function get_special_type_names($translate = TRUE)
+    {
+        if ($translate)
+        {
+            return array_map('__', self::$SPECIAL_TYPE_NAMES);
+        }
+        return self::$SPECIAL_TYPE_NAMES;
+    }
+
+    /**
+     * Gets special type name.
+     *
+     * @param integer $stype constant
+     * @param boolean $translate Translate? [optional]
+     * @return special type name of null on unknown constant
+     */
+    public static function get_special_type_name($stype, $translate = TRUE)
+    {
+        if (array_key_exists($stype, self::$SPECIAL_TYPE_NAMES))
+        {
+            if ($translate)
+            {
+                return __(self::$SPECIAL_TYPE_NAMES[$stype]);
+            }
+            return self::$SPECIAL_TYPE_NAMES[$stype];
+        }
+        return NULL;
+    }
 
 	/**
 	 * Returns all fees with translated type names
@@ -51,13 +105,13 @@ class Fee_Model extends ORM
 		{
 			$order_by_direction = 'asc';
 		}
-		
+
 		if ($limit_results !== NULL &&
 			is_numeric($limit_results))
 		{
 			$limit = "LIMIT ". intval($limit_from) . ", " . intval($limit_results);
 		}
-		
+
 		return $this->db->query("
 				SELECT fees.id, fees.readonly, fees.special_type_id, fees.type_id,
 					fees.fee, fees.from, fees.to, fees.name,
@@ -76,7 +130,7 @@ class Fee_Model extends ORM
 
 	/**
 	 * Funkce vrací poplatek typu $type, který byl platný k datu $datetime
-	 * 
+	 *
 	 * @author Tomas Dulik
 	 * @param $datetime datum a čas, SQL typ DATETIME
 	 * @param $type - textový typ z tabulky enum_types, např. "transfer fee"
@@ -190,7 +244,7 @@ class Fee_Model extends ORM
 
 		return 0;
 	}
-	
+
 	/**
 	 * Returns regular member fee name of member in date
 	 *
@@ -210,13 +264,13 @@ class Fee_Model extends ORM
 
 		return NULL;
 	}
-	
+
 	/**
 	 * Gets transfer fee by date
-	 * 
+	 *
 	 * @author Michal Kliment
 	 * @param string $date
-	 * @return integer 
+	 * @return integer
 	 */
 	public function get_transfer_fee_by_date($date)
 	{

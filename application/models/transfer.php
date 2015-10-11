@@ -265,6 +265,29 @@ class Transfer_Model extends ORM
 				LIMIT ".intval($limit_from).", ".intval($limit_results)."
 		");
 	}
+
+	/**
+	 * Function gets all money transfers of double-entry account.
+	 * @param $account_id
+	 * @param $limit_from
+	 * @param $limit_results
+	 * @param $order_by
+	 * @param $order_by_direction
+	 * @return Mysql_Result
+	 */
+	public function sum_transfers_to_id($account_id = null, $toid)
+	{
+		$account_id = intval($account_id);
+
+		// query
+		return $this->db->query("
+				SELECT
+					SUM(IF(t.destination_id = $account_id, t.amount, 0)) -
+					SUM(IF(t.origin_id = $account_id, t.amount, 0)) AS amount
+				FROM transfers t
+				WHERE t.id <= ?
+		", $toid, $toid)->current()->amount;
+	}
 	
 	/**
 	 * Function gets all money transfers of double-entry account.
@@ -362,8 +385,13 @@ class Transfer_Model extends ORM
 	 * @param $transfer_id
 	 * @return Mysql_Result
 	 */
-	public function get_dependent_transfers($transfer_id)
+	public function get_dependent_transfers($transfer_id = NULL)
 	{
+        if ($transfer_id === NULL)
+        {
+            $transfer_id = $this->id;
+        }
+
 		return $this->db->query("
 				SELECT dt.*
 				FROM transfers t

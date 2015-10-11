@@ -484,12 +484,20 @@ class Users_Controller extends Controller
 		
 		$form->group('Additional information');
 		
+		$empty_birthday = Settings::get('users_birthday_empty_enabled');
+		$min_age = Settings::get('members_age_min_limit');
+
 		$form->date('birthday')
-				->label('Birthday')
-				->years(date('Y')-100, date('Y'))
-				->rules('required')
-				->value(strtotime($user->birthday));
-		
+			->label('Birthday')
+			->years(date('Y') - 100, date('Y'))
+			->value($user->birthday === NULL ? '' : strtotime($user->birthday));
+
+		if ($empty_birthday == 0)
+		{
+			$form->inputs['birthday']
+				->rules('required');
+		}
+
 		if ($this->acl_check_edit(get_class($this), 'comment', $user->member_id))
 		{
 			$form->textarea('comment')
@@ -512,7 +520,7 @@ class Users_Controller extends Controller
 			{
 				$user_data->login = $form_data['username'];
 			}
-			$user_data->birthday = date("Y-m-d",$form_data['birthday']);
+			$user_data->birthday = (empty($form_data['birthday']) ? NULL : date("Y-m-d",$form_data['birthday']));
 			$user_data->pre_title = $form_data['pre_title'];
 			$user_data->name = $form_data['name'];
 			$user_data->middle_name = $form_data['middle_name'];
@@ -817,10 +825,23 @@ class Users_Controller extends Controller
 
 		$form->group('Additional information');
 
+		$empty_birthday = Settings::get('users_birthday_empty_enabled');
+		$min_age = Settings::get('members_age_min_limit');
+
 		$form->date('birthday')
-				->label('Birthday')
-				->years(date('Y')-100, date('Y'))
+			->label('Birthday')
+			->years(date('Y') - 100, date('Y'));
+
+		if ($empty_birthday == 0)
+		{
+			$form->inputs['birthday']
 				->rules('required');
+		}
+		else
+		{
+			$form->inputs['birthday']
+				->value('');
+		}
 
 		if ($this->acl_check_new(get_class($this),'comment',$member_id))
 		{
@@ -838,7 +859,7 @@ class Users_Controller extends Controller
 			$form_data = $form->as_array();
 
 			$user_data = new User_Model;
-			$user_data->birthday = date("Y-m-d",$form_data['birthday']);
+			$user_data->birthday = (empty($form_data['birthday']) ? NULL : date("Y-m-d",$form_data['birthday']));
 			$user_data->login = $form_data['username'];
 			$user_data->password = sha1($form_data['password']);
 			$user_data->pre_title = $form_data['pre_title'];
@@ -1052,6 +1073,52 @@ class Users_Controller extends Controller
 			$view->render(TRUE);
 		}
 	} // end of change password function
+
+	/**
+	 * Function generates onetime password of user.
+	 *
+	 * @param integer $user_id
+	 */
+	public function generate_password($user_id = null)
+	{
+		if (!isset($user_id))
+			Controller::warning(PARAMETER);
+
+		$user = new User_Model($user_id);
+
+		if (!$user->id)
+			Controller::error(RECORD);
+
+		// access control
+		if (!$this->acl_check_edit(get_class($this), 'password', $user->member_id) ||
+			($user->is_user_in_aro_group($user->id, Aro_group_Model::ADMINS) &&
+				$user->id != $this->user_id
+			))
+			Controller::error(ACCESS);
+
+		try
+		{
+			$user->transaction_start();
+
+			$raw_password = security::generate_password(6);
+
+			$user->password_is_onetime = 1;
+			$user->password = sha1($raw_password);
+
+			$user->save_throwable();
+
+			$user->transaction_commit();
+
+			status::success('Password has been successfully changed.'.'<br />'.__('Generated password of user is: %s', $raw_password), FALSE);
+		}
+		catch (Exception $e)
+		{
+			$user->transaction_rollback();
+			status::error('Error - cant change password.');
+		}
+
+		url::redirect(Path::instance()->previous());
+	} // end of generate password function
 
 	/**
 	 * Function changes application password of user.

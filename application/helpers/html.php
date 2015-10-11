@@ -91,7 +91,7 @@ class html {
 			
 			$site_url_modified = $site_url;
 			
-			if (strpos($site_url_modified, Path::QSNAME . '=') === FALSE)
+			if (strpos($site_url_modified, url::base()) !== FALSE && strpos($site_url_modified, Path::QSNAME . '=') === FALSE)
 			{
 				$qs_var = Path::QSNAME . '=' . urlencode(url_lang::current());
 				

@@ -52,6 +52,11 @@ class server
 	{
 		return $_SERVER['REMOTE_ADDR'];
 	}
+	
+	public static function content_length()
+	{
+		return @$_SERVER['CONTENT_LENGTH'];
+	}
 
 	public static function http_referer()
 	{

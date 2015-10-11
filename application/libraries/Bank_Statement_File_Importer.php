@@ -133,7 +133,7 @@ abstract class Bank_Statement_File_Importer
 		}
 
 		// obtain driver
-		$driver = self::factory($bank_account, $type);
+		$driver = self::factory($bank_account, $type, $user_id);
 		$acc = $bank_account->account_nr . '/' . $bank_account->bank_nr;
 
 		if (!$driver)
@@ -159,7 +159,7 @@ abstract class Bank_Statement_File_Importer
 		
 		// import
 		return self::import_loaded($bank_account, $file_data, $url, $type,
-				$send_emails, $send_sms);
+				$user_id, $send_emails, $send_sms);
 	}
 
 	/**
@@ -192,7 +192,7 @@ abstract class Bank_Statement_File_Importer
 		}
 
 		return self::import_loaded($bank_account, $fd, $filename, $ext,
-				$send_emails, $send_sms);
+				$user_id, $send_emails, $send_sms);
 	}
 	
 	/**
@@ -205,6 +205,7 @@ abstract class Bank_Statement_File_Importer
 	 * @param string $file_data Content to import
 	 * @param string $filename Full path to imported file (for error messages)
 	 * @param string $ext File extension
+     * @param integer $user_id ID of calle user
 	 * @param boolean $send_emails Send notification of affected members by e-mail
 	 * @param boolean $send_sms Send notification of affected members by sms
 	 * @return Bank_statement_Model Stored statement
@@ -212,10 +213,11 @@ abstract class Bank_Statement_File_Importer
 	 * @throws Exception On any error during parsing or storing of statement
 	 */
 	private static function import_loaded(Bank_account_Model $bank_account,
-			$file_data, $filename, $ext, $send_emails = TRUE, $send_sms = FALSE)
+			$file_data, $filename, $ext, $user_id, $send_emails = TRUE,
+			$send_sms = FALSE)
 	{
 		/* obtain driver */
-		$driver = self::factory($bank_account, $ext);
+		$driver = self::factory($bank_account, $ext, $user_id);
 
 		$acc = $bank_account->account_nr . '/' . $bank_account->bank_nr;
 

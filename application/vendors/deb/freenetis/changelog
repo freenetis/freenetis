@@ -1,3 +1,16 @@
+freenetis (1.1.13) stable; urgency=low
+  * Improved setting PHP info formatting on PHP 5.6 and higher
+  * Fix escaping of '<' in SMS notification message
+  * Fix error in member edit form - change of engineer changes address as well
+  * Fix ordering of notification messages for ID and name column
+  * Fix bug in fulltext search for members without street
+  * Fix destination account showing if origin account is empty in transfer show
+  * Fix creating of rule for auto import of back statements when notification
+    module disabled
+  * Adds Tatra banka bank type
+  * Adds e-mail import for Tatra banka statements with auto-import rules
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Sun, 11 Oct 2015 09:24:58 +0200
+
 freenetis (1.1.12) stable; urgency=hight
   * Support for new lbilling NFX VoIP API
   * Fix hybrid method issue on PHP 5.6 (Jessie)

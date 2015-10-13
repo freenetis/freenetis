@@ -74,6 +74,9 @@ rm -rf usr/share/${NAME}/doc
 rm -rf usr/share/${NAME}/tests
 # remove .svn
 rm -rf `find usr/share/${NAME} -type d -name .svn`
+# remove .git
+rm -rf usr/share/${NAME}/.git
+rm -rf usr/share/${NAME}/.gitignore
 
 # change permissions
 find usr/share/${NAME} -type d -exec chmod 0755 {} \;

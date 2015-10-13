@@ -1,3 +1,8 @@
+freenetis (1.1.14) stable; urgency=hight
+  * Fix DEB postinst script for Jessie
+  * Remove GIT files from DEB
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Wed, 14 Oct 2015 00:00:06 +0200
+
 freenetis (1.1.13) stable; urgency=low
   * Improved setting PHP info formatting on PHP 5.6 and higher
   * Fix escaping of '<' in SMS notification message

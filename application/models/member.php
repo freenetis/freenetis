@@ -1411,8 +1411,7 @@ class Member_Model extends ORM
 			$member_id = $this->id;
 		
 		$mw = new Members_whitelist_Model();
-		
-		return $mw->get_member_whitelists($member_id)->count() > 0;
+		return $mw->is_whitelisted_now($member_id);
 	}
 	
 	/**

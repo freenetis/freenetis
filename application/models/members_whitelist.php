@@ -133,6 +133,22 @@ class Members_whitelist_Model extends ORM
 			ORDER BY permanent DESC, until DESC, since DESC
 		", $member_id);
 	}
+
+	/**
+	 * Checks whether a member with the specified ID is whitelisted right now.
+	 *
+	 * @param int $member_id
+	 * @return boolean
+	 */
+	public function is_whitelisted_now($member_id)
+	{
+		return $this->db->query("
+			SELECT COUNT(mw.id) AS count
+			FROM members_whitelists mw
+			WHERE mw.member_id = ? AND mw.since <= CURDATE()
+				AND mw.until >= CURDATE()
+		", $member_id)->current()->count > 0;
+	}
 	
 	/**
 	 * Checks if the given interval is unique in users whitelists

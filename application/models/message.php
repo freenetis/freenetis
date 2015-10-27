@@ -949,8 +949,7 @@ class Message_Model extends ORM
 		$email_count = 0;
 		
 		// if default email ans subject prefix is set
-		if (!Settings::get('email_default_email') ||
-			!Settings::get('email_subject_prefix'))
+		if (!Settings::get('email_default_email'))
 		{
 			throw new Exception('Email not configured properly');
 		}
@@ -987,8 +986,12 @@ class Message_Model extends ORM
 				}
 
 				// subject
-				$subject = Settings::get('email_subject_prefix')
-						 . ': ' . __($message->name);
+				$subject = __($message->name);
+				$email_subject_prefix = Settings::get('email_subject_prefix');
+				if ($email_subject_prefix)
+				{
+					$subject = $email_subject_prefix . ':' . $subject;
+				}
 
 				// add Email to queue				
 				$eq_model->clear();

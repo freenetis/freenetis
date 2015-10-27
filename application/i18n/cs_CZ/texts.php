@@ -287,6 +287,7 @@ $lang = array
 	'api account' => 'API účet',
 	'api accounts' => 'API účty',
 	'append interface to link' => 'Přidat k linkce rozhraní',
+	'append notification message name to e-mail message subject' => 'Přidávat název upozorňovací zprávy do předmětu e-mailové zprávy',
 	'applicant' => 'Čekatel na členství',
 	'applicant connected from' => 'Čekatel připojen od',
 	'applicant e-mail is not required' => 'E-mail zájemce není povinný',

@@ -995,11 +995,22 @@ class Message_Model extends ORM
 				}
 
 				// subject
-				$subject = __($message->name);
+				$subject = '';
+				if (Settings::get('notification_email_message_name_in_subject'))
+				{
+					$subject = __($message->name);
+				}
 				$email_subject_prefix = Settings::get('email_subject_prefix');
 				if ($email_subject_prefix)
 				{
-					$subject = $email_subject_prefix . ':' . $subject;
+					if ($subject)
+					{
+						$subject = $email_subject_prefix . ':' . $subject;
+					}
+					else
+					{
+						$subject = $email_subject_prefix;
+					}
 				}
 
 				// add Email to queue				

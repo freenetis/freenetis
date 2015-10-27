@@ -173,6 +173,9 @@ class Settings
 		
 		// notificatuion is enabled by default
 		'notification_enabled'				=> TRUE,
+		// allows to enable/disable putting notification message as the e-mail
+		// message subject suffix
+		'notification_email_message_name_in_subject' => TRUE,
 		
 		// password check also for MD5 algorithm (not only fo SHA1)
 		// this is here because of posibility of transformation from old data

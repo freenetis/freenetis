@@ -1930,6 +1930,10 @@ class Settings_Controller extends Controller
 		$this->form->input('email_subject_prefix')
 				->label(__('E-mail subject prefix').':')
 				->value(Settings::get('email_subject_prefix'));
+
+		$this->form->checkbox('notification_email_message_name_in_subject')
+				->label(__('Append notification message name to e-mail message subject'))
+				->checked(Settings::get('notification_email_message_name_in_subject'));
 		
 		$this->form->submit('submit')->value(__('Save'));
 		

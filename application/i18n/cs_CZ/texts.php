@@ -273,6 +273,7 @@ $lang = array
 	'answer to this message' => 'Odpovědet na tuto zprávu',
 	'any' => 'Jakékoliv',
 	'append interface to link' => 'Přidat k linkce rozhraní',
+	'append notification message name to e-mail message subject' => 'Přidávat název upozorňovací zprávy do předmětu e-mailové zprávy',
 	'applicant' => 'Čekatel na členství',
 	'applicant for membership' => 'Zájemce o členství',
 	'applicant for membership cannot be approved' => 'Zájemce o členství nemůže být povolen',

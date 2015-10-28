@@ -1,3 +1,9 @@
+freenetis (1.1.15) stable; urgency=hight
+  * Fix reactivation of notification messages for members with old whitelist
+  * Fix allowing of empty e-mail suffix in the e-mail notification
+  * Allow to disable notification message name in e-mail notification subject
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Wed, 28 Oct 2015 20:54:54 +0100
+
 freenetis (1.1.14) stable; urgency=hight
   * Fix DEB postinst script for Jessie
   * Remove GIT files from DEB

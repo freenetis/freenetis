@@ -4960,6 +4960,11 @@ class Members_Controller extends Controller
 				->label('Login name')
 				->table('u')
 				->callback('json/user_login');
+
+		$filter_form->add('login')
+				->label('Added by (login)')
+				->table('ua')
+				->callback('json/user_login');
 		
 		return $filter_form;
 	}

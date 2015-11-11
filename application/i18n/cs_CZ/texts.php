@@ -196,6 +196,7 @@ $lang = array
 	'add work' => 'Přidat práci',
 	'added' => 'Přidáno',
 	'added by' => 'Přidal',
+	'added by (login)' => 'Přidal (přihl. jméno)',
 	'additional demolition of membership fees' => 'Dodatečné stržení členských příspěvků',
 	'additional payment for member fees before membership' => 'Doplatek členských přispěvků v době kdy nebyl uživatel členem',
 	'another contact information' => 'Další kontaktní informace',

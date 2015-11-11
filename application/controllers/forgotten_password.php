@@ -122,8 +122,9 @@ class Forgotten_password_Controller extends Controller
 
 				$e_message = '<html><body>';
 				$e_message .= __('Hello').' ';
-				$e_message .= $user->get_full_name_with_login().',<br /><br />';
-				$e_message .= __('Someone from the IP address %s, probably you, requested to change your password', server::remote_addr()).'. ';
+				$e_message .= $user->get_full_name().',<br /><br />';
+				$e_message .= __('Someone from the IP address %s, probably you, requested to change the password for account with login %s',
+						array(server::remote_addr(), '<b>' . $user->login . '</b>')).'. ';
 				$e_message .= __('New password can be changed at the following link').':<br /><br />';
 				$e_message .= html::anchor('forgotten_password?request='.$hash);
 				$e_message .= '<br /><br />'.url_lang::lang('mail.welcome').'<br />';

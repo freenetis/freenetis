@@ -284,7 +284,8 @@ class Member_Model extends ORM
 							m.organization_identifier, m.vat_organization_identifier,
 							m.comment, m.entrance_date, m.leaving_date,
 							m.entrance_fee, m.speed_class_id, m.notification_by_redirection,
-							m.notification_by_email, m.notification_by_sms
+							m.notification_by_email, m.notification_by_sms,
+							m.user_id AS added_by_user_id
 						FROM members m
 						LEFT JOIN enum_types e ON m.type = e.id
 						LEFT JOIN translations t ON e.value = t.original_term AND lang = ?
@@ -297,6 +298,7 @@ class Member_Model extends ORM
 						) mi ON mi.member_id = m.id
 					) AS m
 					LEFT JOIN users u ON u.member_id = m.id
+					LEFT JOIN users ua ON ua.id = m.added_by_user_id
 					LEFT JOIN address_points ap ON m.address_point_id = ap.id
 					LEFT JOIN streets s ON ap.street_id = s.id
 					LEFT JOIN towns t ON ap.town_id = t.id
@@ -501,7 +503,8 @@ class Member_Model extends ORM
 								IF(mi.id IS NOT NULL, 1, 0) AS membership_interrupt,
 								m.organization_identifier, m.vat_organization_identifier,
 								m.comment, m.entrance_date, m.leaving_date,
-								m.entrance_fee, m.speed_class_id
+								m.entrance_fee, m.speed_class_id,
+								m.user_id AS added_by_user_id
 							FROM members m
 							LEFT JOIN enum_types e ON m.type = e.id
 							LEFT JOIN translations t ON e.value = t.original_term AND lang = ?
@@ -514,6 +517,7 @@ class Member_Model extends ORM
 							) mi ON mi.member_id = m.id
 						) AS m
 						LEFT JOIN users u ON u.member_id = m.id
+						LEFT JOIN users ua ON ua.id = m.added_by_user_id
 						LEFT JOIN address_points ap ON m.address_point_id = ap.id
 						LEFT JOIN streets s ON ap.street_id = s.id
 						LEFT JOIN towns t ON ap.town_id = t.id

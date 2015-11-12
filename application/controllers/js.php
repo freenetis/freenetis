@@ -282,17 +282,21 @@ class Js_Controller extends Controller
 		// load users for autocomplete
 		$um = new User_Model();
 		
-		$user_list = $um
-				->select_list('login', "CONCAT(surname, ' ', COALESCE(name,''), ' - ', login)", 'surname');
-		
 		$result = array();
-		
-		foreach ($user_list AS $login => $user)
+
+		if ($this->acl_check_view('Users_Controller', 'users'))
 		{
-			$result[] = array(
-				'login' => $login,
-				'value' => $user
-			);
+			$user_list = $um->select_list('login',
+					"CONCAT(surname, ' ', COALESCE(name,''), ' - ', login)",
+					'surname');
+
+			foreach ($user_list AS $login => $user)
+			{
+				$result[] = array(
+					'login' => $login,
+					'value' => $user
+				);
+			}
 		}
 
 		$this->views['mail_write_message'] = View::factory('js/mail_write_message');

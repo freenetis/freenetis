@@ -2610,6 +2610,7 @@ $lang = array
 	'subnets on link' => 'Podsítě linky',
 	'subnets to qos' => 'Podsítě pro QoS',
 	'subnets with dhcp' => 'Podsítě s DHCP',
+	'subtotal' => 'Mezisoučet',
 	'suffix' => 'Přípona',
 	'suffix has to start with slash character, has to end with slash character and contains only a-z, 0-9, - and /' => 'Přípona musí začínat lomítkem, musí končit lomítkem a obsahovat pouze znaky a-z, 0-9, - a /',
 	'suggest amount' => 'Navrhovaná částka',

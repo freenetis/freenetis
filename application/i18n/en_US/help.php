@@ -14,6 +14,7 @@
 $lang = array
 (
 	'access_to_system' => 'Determinate if user has capability for loging ti Freenetis a can use services of Radius server, which is joined to Freenetis, for example VPN, active parts of net, calling from VoIP.',
+	'account_subtotal' => 'Subtotal determining the balance of the account after the inclusion of this transfer.',
 	'accounting_system' => 'The chart of accounts is the main assistant for the accounting associations. Shows the amount of money in the account from the perspective of the accounting curriculum. By default, this is the amount for the entire operation of the association, but can filter transfers the selected period, such as from the date 01/01/2009 to date 12/31/2009.',
 	'action_logs_active' => 'Actions log is tool for detectins end user actions on data in system.',
 	'activate_redirection_to_member' => 'Allows you to manually activate the selected redirection to all IP addresses of member. Whether a member can redirect itself to cancel or not, is given by the properties of the selected message. Manual interference forwarding can be carried out in the table.',

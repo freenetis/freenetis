@@ -20,6 +20,7 @@ $lang = array
 (
 	'99&#37 chance you won\'t need to change this value' => '99&#37 šance, že nebudete chtít měnit tuto hodnotu.',
 	'access_to_system' => 'Určuje, zda-li má uživatel možnost přihlásit se do systému Freenetis a zda má možnost využívat služeb Radius serveru napojeného na Freenetis, tedy například VPN, aktivní prvky sítě, volání z VoIP účtu atd.',
+	'account_subtotal' => 'Mezisoučet určující stav účtu po započtení tohoto převodu.',
 	'accounting_system' => 'Účetní osnova je hlavní pomocník pro účetního sdružení. Zobrazuje sumu peněz na účtu z pohledu účetní osnovy. Ve výchozím stavu je to částka za celou dobu fungování sdružení, lze ovšem vyfiltrovat převody za zvolené období, např. od data 2009-01-01 do data 2009-12-31.',
 	'acl' => 'Jedná se o seznam definovaných přístupových pravidel. Ke každému pravidlu jsou přiřazeny ACO objekty (operace), ARO skupiny (skupiny uživatelů) a AXO objekty (objekty, nad kterými se konají operace).',
 	'aco' => 'ACO objekt označuje operace, které lze provádět.',

@@ -448,7 +448,8 @@ class Transfers_Controller extends Controller
 				->callback('callback::amount_field');
 
 		$transfers_grid->callback_field('id')
-				->label('Current credit')
+				->label('Subtotal')
+				->help(help::hint('account_subtotal'))
 				->callback('callback::amount_after_transfer_field', $account_id);
 		
 		$transfers_grid->order_field('text')

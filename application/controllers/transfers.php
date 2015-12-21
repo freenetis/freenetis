@@ -667,19 +667,6 @@ class Transfers_Controller extends Controller
 		// array with only one origin account
 		$arr_orig_accounts[$oa->id] = $oa->name . ' (' . $oa->id . ', '
                 . $oa->account_attribute_id . ', ' . $oa->member_id . ')';
-		// account attributes for types of accounts
-		$aa_model = new Account_attribute_Model();
-		$account_attributes = $aa_model->get_account_attributes();
-		
-		foreach ($account_attributes as $aattr)
-		{
-			$arr_attributes[$aattr->id] = $aattr->id . ' ' . $aattr->name;
-		}
-		
-		$arr_attributes = arr::merge(array
-		(
-			NULL => '----- ' . __('Select account type') . ' -----'
-		), $arr_attributes);
 		
 		// form
 		$form = new Forge('transfers/add_from_account/' . $origin_account_id);
@@ -695,10 +682,6 @@ class Transfers_Controller extends Controller
 		
 		// destination account
 		$form->group('Destination account');
-		
-		$form->dropdown('account_type')
-				->options($arr_attributes)
-				->style('width:450px');
 		
 		$form->dropdown('aname')
 				->label('Destination account (name, ID, type, member ID)')

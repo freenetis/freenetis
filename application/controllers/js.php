@@ -518,12 +518,6 @@ class Js_Controller extends Controller
 	{
 		$this->views['sms_send'] = View::factory('js/__pieces/sms_message_counter');
 	}
-	
-	private function _js_transfers_add_from_account($origin_account_id = NULL)
-	{
-		$this->views['transfers_add_from_account'] = View::factory('js/transfers_add_from_account');
-		$this->views['transfers_add_from_account']->origin_account_id = $origin_account_id;
-	}
 
 	private function _js_transfers_payment_calculator($account_id = NULL)
 	{

@@ -1,0 +1,17 @@
+stages:
+  - test
+  - deploy
+
+deb_package_check:
+  script: "~/ci-scripts/freenetis/freenetis/deb_package_check.sh"
+  stage: test
+
+deb_package_deploy_develop_tag:
+  script: "~/ci-scripts/freenetis/freenetis/deb_package_deploy_develop.sh"
+  stage: deploy
+  tags:
+    - repository
+  only:
+    - /^1[.]2[.]0[~](alpha|beta|rc)[0-9]+$/
+  except:
+    - branches

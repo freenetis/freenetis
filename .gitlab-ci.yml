@@ -12,6 +12,6 @@ deb_package_deploy_develop_tag:
   tags:
     - repository
   only:
-    - /^1[.]2[.]0[~](alpha|beta|rc)[0-9]+$/
+    - /^1[.]2[.]0[~_](alpha|beta|rc)[0-9]+$/
   except:
     - branches

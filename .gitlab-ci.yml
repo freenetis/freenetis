@@ -5,12 +5,18 @@ stages:
 deb_package_check:
   script: "~/ci-scripts/freenetis/freenetis/deb_package_check.sh"
   stage: test
+  tags:
+    - deb_check
+  only:
+    - tags
+    - master
+    - develop
 
 deb_package_deploy_develop_tag:
   script: "~/ci-scripts/freenetis/freenetis/deb_package_deploy_develop.sh"
   stage: deploy
   tags:
-    - repository
+    - deb_repository
   only:
     - /^1[.]2[.]0[~_](alpha|beta|rc)[0-9]+$/
   except:

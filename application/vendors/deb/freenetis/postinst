@@ -22,8 +22,8 @@ fi
 # load configure file
 . $CONFIGFILE || true
 
-# Version 1.1 is located in /usr/share/freenetis but previous versions were 
-# located in /var/www/freeenetis, we try to use old config files if they are 
+# Version 1.1 is located in /usr/share/freenetis but previous versions were
+# located in /var/www/freeenetis, we try to use old config files if they are
 # exists. The old configuration must not replace new configuration!
 
 OLD_PATH=/var/www/freenetis
@@ -181,8 +181,8 @@ else
 
 	if [ "$PROTOCOL" = "https" ]; then
 		echo "        SSLEngine on" >> $A2CF
-		echo "        SSLProtocol all -SSLv2" >> $A2CF
-		echo "        SSLCipherSuite ALLADHEXPORTSSLv2:RC4+RSA:+HIGH:+MEDIUM" >> $A2CF
+		echo "        SSLProtocol all -SSLv2 -SSLv3" >> $A2CF
+		echo "        SSLCipherSuite \"EECDH+ECDSA+AESGCM EECDH+aRSA+AESGCM EECDH+ECDSA+SHA384 EECDH+ECDSA+SHA256 EECDH+aRSA+SHA384 EECDH+aRSA+SHA256 EECDH+aRSA+RC4 EECDH EDH+aRSA RC4 !aNULL !eNULL !LOW !3DES !MD5 !EXP !PSK !SRP !DSS !RC4\"" >> $A2CF
 
 		if [ -f "$SSL_CERTIFICATE_FILE" ]; then
 			echo "        SSLCertificateFile $SSL_CERTIFICATE_FILE" >> $A2CF
@@ -211,7 +211,7 @@ else
 		echo "        ServerName ${SERVERNAME}" >> $A2CF
 		echo "        ServerAlias www.${SERVERNAME}" >> $A2CF
 		echo "        KeepAlive Off" >> $A2CF
-		echo "        RewriteEngine On" >> $A2CF 
+		echo "        RewriteEngine On" >> $A2CF
 		echo "        RewriteRule ^/(.*) https://${SERVERNAME}/\$1 [L,R=301]" >> $A2CF
 		echo "</VirtualHost>" >> $A2CF
 	fi

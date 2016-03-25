@@ -819,6 +819,14 @@ class Work_reports_Controller extends Controller
 				$vote_model = new Vote_Model();
 				
 				$vote_model->transaction_start();
+
+				// check if not already paid off
+				$work_report_model->reload(); // need to reload in transaction
+				if ($work_report_model->transfer_id)
+				{
+					throw new Exception('This work report is already paied off,'
+							. ' you cannot vote anymore');
+				}
 				
 				$work_ids	= $_POST['ids'];
 				$votes		= $_POST['vote'];

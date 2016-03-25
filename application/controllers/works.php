@@ -323,7 +323,11 @@ class Works_Controller extends Controller
 					{
 						if ($new_vote != '' && $new_vote == $vote->vote)
 							continue;
-						
+
+						// skip for already paied work
+						if ($vote->transfer_id)
+							continue;
+
 						// new vote is not empty and different to old, change old
 						if ($new_vote != '')
 						{

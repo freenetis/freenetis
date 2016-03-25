@@ -1,3 +1,9 @@
+freenetis (1.1.17) stable; urgency=low
+  * Support for new gateway of Klikniavolej.cz SMS driver
+  * Better HTTPS encryption settings in DEB package
+  * Fixes in work reports approval
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Fri, 25 Mar 2016 13:51:37 +0100
+
 freenetis (1.1.16) stable; urgency=low
   * Adds "added by" filter to members table
   * Improves forgotten password mail message text

@@ -834,6 +834,15 @@ class Work_reports_Controller extends Controller
 				
 				$approval_template_item_model = new Approval_template_item_Model();
 
+				// re-get all works in transaction
+				$works = ORM::factory('job')
+						->get_all_works_by_job_report_id($work_report->id);
+				$all_works = array();
+				foreach ($works as $work)
+				{
+					$all_works[$work->id] = $work;
+				}
+
 				// finding aro group of logged user
 				$aro_group = $approval_template_item_model
 					->get_aro_group_by_approval_template_id_and_user_id(
@@ -852,70 +861,69 @@ class Work_reports_Controller extends Controller
 					Vote_Model::STATE_APPROVED	=> array()
 				);
 				
-				$added_votes_count = 0;
+				$new_votes_count = 0;
 				
 				// voting user
 				$user = new User_Model($this->user_id);
 				
 				$work_model = new Job_Model();
 				
-				foreach ($work_ids as $work_id)
+				foreach ($all_works as $work_id => $work)
 				{
-					// user cannot vote about work
-					if (!in_array($work_id, $works_to_vote))
-						continue;
-
-					$work = $work_model->where('id', $work_id)->find();
-
-					if (!$work || !$work->id)
-						continue;
-					
-					// delete old vote
-					$vote_model->remove_vote(
-						$this->user_id,
-						Vote_Model::WORK,
-						$work->id
-					);
-					
-					$vote		= $votes[$work->id];
-					$comment	= $comments[$work->id];
-
-					// new vote is not empty
-					if ($vote != '')
+					// voted and can vote?
+					if (in_array($work->id, $works_to_vote) &&
+							in_array($work->id, $work_ids))
 					{
-						// cannot agree/disagree own work
-						if ($vote != Vote_Model::ABSTAIN && $work->user_id == $this->user_id)
-						{
-							throw new Exception('Cannot agree/disagree own work.');
-						}
+						$work = new Job_Model($work->id);
 
-						// add new vote
-						Vote_Model::insert(
+						// delete old vote
+						$vote_model->remove_vote(
 							$this->user_id,
 							Vote_Model::WORK,
-							$work->id,
-							$vote,
-							$comment,
-							$aro_group->id
+							$work->id
 						);
-						
-						$added_votes_count++;
-					}
+
+						$vote		= $votes[$work->id];
+						$comment	= $comments[$work->id];
+
+						// new vote is not empty
+						if ($vote != '')
+						{
+							// cannot agree/disagree own work
+							if ($vote != Vote_Model::ABSTAIN &&
+									$work->user_id == $this->user_id)
+							{
+								throw new Exception('Cannot agree/disagree own work.');
+							}
+
+							// add new vote
+							Vote_Model::insert(
+								$this->user_id,
+								Vote_Model::WORK,
+								$work->id,
+								$vote,
+								$comment,
+								$aro_group->id
+							);
+
+							$new_votes_count++;
+						}
 					
-					// set up state of work
-					$work->state = Vote_Model::get_state($work);
+						// set up state of work
+						$work->state = Vote_Model::get_state($work);
+					
+						$work->save_throwable();
+					}
 					
 					// work is approved
 					if ($work->state == Vote_Model::STATE_APPROVED)
-							$amount += $work->suggest_amount;
+						$amount += $work->suggest_amount;
 					
 					$states[$work->state][] = $work->id;
-					
-					$work->save_throwable();
 				}
 				
 				// any vote has been added
-				if ($added_votes_count)
+				if ($new_votes_count)
 				{
 					// send message about adding vote to all watchers		
 					$subject	= mail_message::format('work_report_vote_add_subject');
@@ -942,7 +950,8 @@ class Work_reports_Controller extends Controller
 					if (count($states[Vote_Model::STATE_APPROVED]))
 					{
 						// send money
-						if (Settings::get('finance_enabled') && $work_report_model->payment_type == Job_report_Model::PAYMENT_BY_CREDIT)
+						if (Settings::get('finance_enabled') &&
+								$work_report_model->payment_type == Job_report_Model::PAYMENT_BY_CREDIT)
 						{
 							$transfer_id = Transfer_Model::insert_transfer_for_work_approve(
 									$work_report_model->user->member_id, $amount

@@ -819,6 +819,14 @@ class Work_reports_Controller extends Controller
 				$vote_model = new Vote_Model();
 				
 				$vote_model->transaction_start();
+
+				// check if not already paid off
+				$work_report_model->reload(); // need to reload in transaction
+				if ($work_report_model->transfer_id)
+				{
+					throw new Exception('This work report is already paied off,'
+							. ' you cannot vote anymore');
+				}
 				
 				$work_ids	= $_POST['ids'];
 				$votes		= $_POST['vote'];
@@ -844,7 +852,7 @@ class Work_reports_Controller extends Controller
 					Vote_Model::STATE_APPROVED	=> array()
 				);
 				
-				$votes_count = 0;
+				$added_votes_count = 0;
 				
 				// voting user
 				$user = new User_Model($this->user_id);
@@ -891,7 +899,7 @@ class Work_reports_Controller extends Controller
 							$aro_group->id
 						);
 						
-						$votes_count++;
+						$added_votes_count++;
 					}
 					
 					// set up state of work
@@ -907,7 +915,7 @@ class Work_reports_Controller extends Controller
 				}
 				
 				// any vote has been added
-				if ($votes_count)
+				if ($added_votes_count)
 				{
 					// send message about adding vote to all watchers		
 					$subject	= mail_message::format('work_report_vote_add_subject');

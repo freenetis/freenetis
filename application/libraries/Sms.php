@@ -59,7 +59,7 @@ abstract class Sms
 			'name'				=> 'KlikniaVolej.cz',
 			'class'				=> 'Klikniavolej',
 			'description'		=> 'SMS',
-			'hostname'			=> 'kavremote.mobil.cz:80',
+			'hostname'			=> 'api.klikniavolej.cz:80',
 			'help'				=> 'sms_driver_klikniavolej',
 			'test_mode_enabled'	=> TRUE,
 		),

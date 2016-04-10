@@ -723,6 +723,13 @@ class Member_Model extends ORM
 							LEFT JOIN users u ON d.user_id = u.id
 							GROUP BY c.id, IFNULL(u.member_id, c.member_id)
 						) cl ON cl.member_id = m.id
+						LEFT JOIN
+						(
+							SELECT m2.id AS mw_member_id, IF(mw.member_id IS NULL, 0, 2 - mw.permanent) AS whitelisted
+							FROM members m2
+							LEFT JOIN members_whitelists mw ON mw.member_id = m2.id
+								AND mw.since <= CURDATE() AND mw.until >= CURDATE()
+						) ip ON ip.mw_member_id = m.id
 						$filter_sql
 					) AS q
 					GROUP BY q.id

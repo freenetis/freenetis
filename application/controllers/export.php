@@ -67,6 +67,8 @@ class Export_Controller extends Controller
 				$encoding = $form_data['encoding'];
 			}
 
+			$error = NULL;
+
 			// each content has specific query
 			switch ($content)
 			{
@@ -89,7 +91,7 @@ class Export_Controller extends Controller
 					}
 					catch (Exception $e)
 					{
-						$items = array();
+						$error = $e;
 					}
 					
 					$filename = __('Members') . '.csv';
@@ -115,7 +117,7 @@ class Export_Controller extends Controller
 					}
 					catch (Exception $e)
 					{
-						$items = array();
+						$error = $e;
 					}
 
 					$filename = __('E-mails') . '.csv';
@@ -188,10 +190,10 @@ class Export_Controller extends Controller
 					break;
 			}
 
-			// empty result?
-			if (!count($items))
+			// empty result or error?
+			if ($error || !count($items))
 			{
-				status::error('Invalid data - no data available');
+				status::error('Invalid data - no data available', $error);
 			}
 			else
 			{

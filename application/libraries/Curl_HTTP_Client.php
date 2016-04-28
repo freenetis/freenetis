@@ -50,7 +50,7 @@ class Curl_HTTP_Client
 	 * @param boolean debug
 	 * @access public
 	 */
-	function Curl_HTTP_Client($debug = false)
+	function __construct($debug = false)
 	{
 		$this->debug = $debug;
 		$this->init();

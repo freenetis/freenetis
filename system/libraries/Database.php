@@ -104,9 +104,7 @@ class Database {
 			// Reset the connection array to the database config
 			$this->config['connection'] = $db;
 
-			if (Config::get('db_type') != '')
-				$this->config['connection']['type'] = Config::get('db_type');
-
+			$this->config['connection']['type'] = 'mysqli';
 			$this->config['connection']['user'] = Config::get('db_user');
 			$this->config['connection']['pass'] = Config::get('db_password');
 			$this->config['connection']['host'] = Config::get('db_host');

@@ -151,29 +151,27 @@ class Notifications_Controller extends Controller
 			// params			
 			$comment = $form_data['comment'];
 			$user_id = $this->user_id;
-			$redirection = $email = $sms = array();
+			$redirections = $emails = $smss = array();
 
 			if (isset($form_data['redirection']) && module::e('redirection'))
 			{
-				$redirection = $_POST['redirection'];
+				$redirections = array($member->id => intval($form_data['redirection']));
 			}
 
 			if (isset($form_data['email']) && module::e('email'))
 			{
-				$email = $form_data['email'];
+				$emails = array($member->id => intval($form_data['email']));
 			}
 
 			if (isset($form_data['sms']) && module::e('sms'))
 			{
-				$sms = $form_data['sms'];
+				$smss = array($member->id => intval($form_data['sms']));
 			}
 
 			// notify
 			$stats = Notifications_Controller::notify_from_form(
 					$message, $user_id, $comment,
-					array($member->id => $redirection),
-					array($member->id => $email),
-					array($member->id => $sms)
+					$redirections, $emails, $smss
 			);
 			// info messages
 			$info_messages = notification::build_stats_string(

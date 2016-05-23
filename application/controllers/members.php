@@ -269,7 +269,7 @@ class Members_Controller extends Controller
 					->label('Show member');
 		}
 		
-		if (Settings::get('finance_enabled') && $this->acl_check_edit(get_class($this), 'members'))
+		if (Settings::get('finance_enabled') && $this->acl_check_view('Accounts_Controller', 'transfers'))
 		{
 			$actions->add_action('aid')
 					->icon_action('money')

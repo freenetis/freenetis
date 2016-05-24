@@ -1,3 +1,9 @@
+freenetis (1.1.18) stable; urgency=low
+  * Fix members export to CSV with whitelist filter
+  * Activation of notification for a single member when redirection disabled
+  * Fix access right in member grid for account show
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Tue, 24 May 2016 22:44:09 +0200
+
 freenetis (1.1.17) stable; urgency=low
   * Support for new gateway of Klikniavolej.cz SMS driver
   * Better HTTPS encryption settings in DEB package

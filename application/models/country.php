@@ -154,7 +154,7 @@ class Country_Model extends ORM
 		{
 			if (is_array($countries) && count($countries) > 0)
 			{
-				$countries = array_map('mysql_real_escape_string', $countries);
+				$countries = array_map('intval', $countries);
 
 				$in = implode(', ', $countries);
 

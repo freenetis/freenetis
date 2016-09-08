@@ -1,3 +1,9 @@
+freenetis (1.1.19) stable; urgency=low
+  * Fix some issues in PHP 7.0
+  * Fix issue in system setting during country saving
+  * Improves Tatra banka importer
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 08 Sep 2016 23:49:04 +0200
+
 freenetis (1.1.18) stable; urgency=low
   * Fix members export to CSV with whitelist filter
   * Activation of notification for a single member when redirection disabled

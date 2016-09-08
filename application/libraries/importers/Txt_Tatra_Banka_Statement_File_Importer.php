@@ -180,7 +180,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 		}
 
 		$hostname = $settings->get_download_statement_url();
-		$inbox = @imap_open($hostname, $settings->imap_name, $settings->imap_password, OP_READONLY);
+		$inbox = @imap_open($hostname, $settings->imap_name, $settings->imap_password);
 
 		$all_mails = array();
 
@@ -225,7 +225,8 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 					break;
 				}
 
-				$body = imap_fetchbody($inbox,$email_number, 1);
+				// fetch body with FT_PEEK disable setting message read
+				$body = imap_fetchbody($inbox, $email_number, 1, FT_PEEK);
 
 				$body = $this->decode_body($body, $struct);
 
@@ -253,6 +254,11 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 				if (!$data || !$vs || !$ss || !$cs)
 				{
 					continue;
+				}
+				else
+				{
+					// make message read, we want to mark it as imported
+					@imap_fetchbody($inbox, $email_number, 1);
 				}
 
 				array_unshift($all_mails, $body);

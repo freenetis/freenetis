@@ -105,7 +105,7 @@ class Form_Group extends Forge {
 		return $this;
 	}
 
-	public function html()
+	public function html($template = 'forge_template', $custom = false)
 	{
 		// No Sir, we don't want any html today thank you
 		return;

@@ -1614,7 +1614,7 @@ class callback
 	 * @param object $item
 	 * @param string $name
 	 */
-	public function message_auto_setting_type($item, $name)
+	public static function message_auto_setting_type($item, $name)
 	{
 		echo strtolower(Messages_automatical_activation_Model::get_type_message($item->$name));
 	}
@@ -1625,7 +1625,7 @@ class callback
 	 * @param object $item
 	 * @param string $name
 	 */
-	public function message_auto_setting_attribute($item, $name)
+	public static function message_auto_setting_attribute($item, $name)
 	{
 		$ats = Messages_automatical_activation_Model::get_type_attributes($item->type);
 		$attrs = explode('/', $item->attribute);

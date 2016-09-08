@@ -42,11 +42,6 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 		// Date, account, amount
 		$match_data = preg_match_all(self::REGEX_DATA, $emails, $data);
 
-		// Variable, specific, constant symbol
-		$match_vs = preg_match_all(self::REGEX_VS, $emails, $vs);
-		$match_ss = preg_match_all(self::REGEX_SS, $emails, $ss);
-		$match_cs = preg_match_all(self::REGEX_CS, $emails, $cs);
-
 		$accounts = array();
 
 		foreach ($data[2] as $e)
@@ -59,10 +54,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 			$this->add_error(__('E-mails contains more than one destination account: %s', implode(', ', array_unique($accounts))), FALSE);
 		}
 
-		return $match_data == $match_vs &&
-				$match_vs == $match_ss &&
-				$match_ss == $match_cs &&
-				count(array_unique($accounts)) <= 1;
+		return $match_data && count(array_unique($accounts)) <= 1;
 	}
 
 	protected function get_header_data()
@@ -142,7 +134,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 				$email,
 				$msg);
 
-			if (!$match_data || !$match_vs || !$match_ss || !$match_cs)
+			if (!$match_data)
 			{
 				continue;
 			}
@@ -157,9 +149,9 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 				'counter_account'=>	trim(@$ca[2]),
 				'counter_bank'	=>	trim(@$ca[1]),
 				'currency'	=>	$data[6],
-				'vs'		=>	$vs[1],
-				'ss'		=>	$ss[1],
-				'ks'		=>	$cs[1],
+				'vs'		=>	@$vs[1],
+				'ss'		=>	@$ss[1],
+				'ks'		=>	@$cs[1],
 				'message'	=>	trim(@$msg[1])
 			);
 		}
@@ -180,7 +172,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 		}
 
 		$hostname = $settings->get_download_statement_url();
-		$inbox = @imap_open($hostname, $settings->imap_name, $settings->imap_password, OP_READONLY);
+		$inbox = @imap_open($hostname, $settings->imap_name, $settings->imap_password);
 
 		$all_mails = array();
 
@@ -225,7 +217,8 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 					break;
 				}
 
-				$body = imap_fetchbody($inbox,$email_number, 1);
+				// fetch body with FT_PEEK disable setting message read
+				$body = imap_fetchbody($inbox, $email_number, 1, FT_PEEK);
 
 				$body = $this->decode_body($body, $struct);
 
@@ -238,21 +231,14 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 					$body,
 					$data);
 
-				preg_match(self::REGEX_VS,
-					$body,
-					$vs);
-
-				preg_match(self::REGEX_SS,
-					$body,
-					$ss);
-
-				preg_match(self::REGEX_CS,
-					$body,
-					$cs);
-
-				if (!$data || !$vs || !$ss || !$cs)
+				if (!$data)
 				{
 					continue;
+				}
+				else
+				{
+					// make message read, we want to mark it as imported
+					@imap_fetchbody($inbox, $email_number, 1);
 				}
 
 				array_unshift($all_mails, $body);

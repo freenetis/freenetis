@@ -54,7 +54,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 			$this->add_error(__('E-mails contains more than one destination account: %s', implode(', ', array_unique($accounts))), FALSE);
 		}
 
-		return $match_data && count(array_unique($accounts)) <= 1;
+		return count(array_unique($accounts)) <= 1;
 	}
 
 	protected function get_header_data()

@@ -258,6 +258,26 @@ class Ip_address_Model extends ORM
 			JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
 		");
 	}
+
+	/**
+	 * Same as previous method, but return unallowed ip addresses for a specific
+	 * message type
+	 *
+	 * @author Ondrej Fibich
+	 * @see Web_interface_Controller#unallowed_ip_addresses
+	 * @param int $type message type constant
+	 * @return type
+	 */
+	public function get_unallowed_ip_addresses_by_type($type)
+	{
+		return $this->db->query("
+			SELECT DISTINCT ip.ip_address
+			FROM ip_addresses ip
+			JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
+			JOIN messages m ON m.id = mip.message_id
+			WHERE m.type = ?
+		", $type);
+	}
 	
 	/**
 	 * Function gets all ip address of interfaces of devices of users of given member.

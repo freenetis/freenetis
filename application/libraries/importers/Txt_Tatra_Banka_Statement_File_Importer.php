@@ -30,7 +30,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 	const REGEX_SS = "@SS ?(\d*)@";
 	const REGEX_CS = "@KS ?(\d*)@";
 	// Current balance
-	const REGEX_BALANCE = "@aktualny zostatok:[^0-9]*(\d+,\d{2}) (.+)@";
+	const REGEX_BALANCE = "@aktualny zostatok:[^0-9]*((\d+[ ]?)\d+,\d{2}) (.+)@";
 	// Message
 	const REGEX_MSG = "@Informacia pre prijemcu: (.*)@";
 
@@ -90,7 +90,7 @@ class Txt_Tatra_Banka_Statement_File_Importer extends Tatra_Banka_Statement_File
 
 		$hd->from = DateTime::createFromFormat('j.n.Y G:i', $mO[1])->format('Y-m-d H:i:s');
 		$hd->to = DateTime::createFromFormat('j.n.Y G:i', $mN[1])->format('Y-m-d H:i:s');
-		$hd->closingBalance = floatval(str_replace(',', '.', $mC[1]));
+		$hd->closingBalance = floatval(str_replace(array(' ', ','), array('', '.'), $mC[1]));
 
 		return $hd;
 	}

@@ -118,10 +118,13 @@ class Web_interface_Controller extends Controller
 	
 	/**
 	 * Prints all unallowed ip addresses, otherwise same as previous method
-	 * 
-	 * @author Michal Kliments
+	 *
+	 * @param int $message_type message type to filter only IP redirected with
+	 *                          the specified type or NULL for all types
+	 * @author Michal Kliment
+	 * @author Ondřej Fibich
 	 */
-	public function unallowed_ip_addresses()
+	public function unallowed_ip_addresses($message_type = NULL)
 	{
 		// if gateway set uped - anly allow to access this page from it
 		// also if redirection is not enabled
@@ -131,8 +134,17 @@ class Web_interface_Controller extends Controller
 			@header('HTTP/1.0 403 Forbidden');
 			die();
 		}
-		
-		$ip_adresses = ORM::factory('ip_address')->get_unallowed_ip_addresses();
+
+		$ipm = new Ip_address_Model();
+		$mt_num = intval($message_type);
+		if ($message_type != NULL && $mt_num >= 0)
+		{
+			$ip_adresses = $ipm->get_unallowed_ip_addresses_by_type($mt_num);
+		}
+		else
+		{
+			$ip_adresses = $ipm->get_unallowed_ip_addresses();
+		}
 		
 		$items = array();
 		

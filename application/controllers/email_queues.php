@@ -52,7 +52,7 @@ class Email_queues_Controller extends Controller
 	 * @param integer $page 
 	 */
 	public function show_all_unsent(
-			$limit_results = 50, $order_by = 'access_time',
+			$limit_results = 50, $order_by = 'id',
 			$order_by_direction = 'DESC', $page_word = null, $page = 1)
 	{
 		// access check
@@ -96,7 +96,7 @@ class Email_queues_Controller extends Controller
 		
 		// order by check
 		if (!in_array(strtolower($order_by), $allowed_order_type))
-			$order_by = 'access_time';
+			$order_by = 'id';
 		
 		// order by direction check
 		if (strtolower($order_by_direction) != 'asc')
@@ -221,7 +221,7 @@ class Email_queues_Controller extends Controller
 	 * @param integer $page 
 	 */
 	public function show_all_sent(
-			$limit_results = 50, $order_by = 'access_time',
+			$limit_results = 50, $order_by = 'id',
 			$order_by_direction = 'DESC', $page_word = null, $page = 1)
 	{
 		// access check
@@ -265,7 +265,7 @@ class Email_queues_Controller extends Controller
 		
 		// order by check
 		if (!in_array(strtolower($order_by), $allowed_order_type))
-			$order_by = 'access_time';
+			$order_by = 'id';
 		
 		// order by direction check
 		if (strtolower($order_by_direction) != 'asc')

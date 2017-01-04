@@ -2731,7 +2731,7 @@ class Members_Controller extends Controller
 					}
 					else
 					{ // delete gps
-						$address_point->gps = '';
+						$address_point->gps = NULL;
 						$address_point->save_throwable();
 					}
 
@@ -2949,7 +2949,7 @@ class Members_Controller extends Controller
 							}
 							else
 							{ // delete gps
-								$address_point->gps = '';
+								$address_point->gps = NULL;
 								$address_point->save_throwable();
 							}
 							// add domicicle
@@ -3587,7 +3587,7 @@ class Members_Controller extends Controller
 						}
 						else
 						{ // delete gps
-							$address_point->gps = '';
+							$address_point->gps = NULL;
 							$address_point->save();
 						}
 
@@ -3654,7 +3654,7 @@ class Members_Controller extends Controller
 							}
 							else
 							{ // delete gps
-								$address_point->gps = '';
+								$address_point->gps = NULL;
 								$address_point->save();
 							}
 						}

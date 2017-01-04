@@ -1354,7 +1354,7 @@ class Devices_Controller extends Controller
 						}
 						else
 						{ // delete gps
-							$ap->gps = '';
+							$ap->gps = NULL;
 							$ap->save_throwable();
 						}
 
@@ -2149,7 +2149,7 @@ class Devices_Controller extends Controller
 					}
 					else
 					{ // delete gps
-						$ap->gps = '';
+						$ap->gps = NULL;
 						$ap->save_throwable();
 					}
 
@@ -2635,7 +2635,7 @@ class Devices_Controller extends Controller
 					}
 					else
 					{ // delete gps
-						$ap->gps = '';
+						$ap->gps = NULL;
 						$ap->save_throwable();
 					}
 

@@ -1,3 +1,4 @@
+<<<<<<< develop
 <?php defined('SYSPATH') or die('No direct script access.');
 /*
  * This file is part of open source system FreenetIS
@@ -353,7 +354,7 @@ class Registration_Controller extends Controller
 					}
 					else
 					{ // delete gps
-						$address_point->gps = '';
+						$address_point->gps = NULL;
 						$address_point->save_throwable();
 					}
 

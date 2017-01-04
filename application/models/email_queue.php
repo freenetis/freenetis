@@ -327,13 +327,13 @@ class Email_queue_Model	extends ORM
 				LEFT JOIN contacts tc ON eq.to = tc.value AND tc.type = ?
 				LEFT JOIN users_contacts tuc ON tc.id = tuc.contact_id
 				LEFT JOIN users tu ON tuc.user_id = tu.id
-				
+				WHERE eq.state <> ?
 			) eq
 			$where
 		", array
 		(
-			self::STATE_OK,
-			Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL
+			Contact_Model::TYPE_EMAIL, Contact_Model::TYPE_EMAIL,
+			self::STATE_OK
 		))->current()->count;
 	}
 	

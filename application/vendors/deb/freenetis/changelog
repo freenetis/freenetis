@@ -1,3 +1,11 @@
+freenetis (1.1.20) stable; urgency=low
+  * Web interface: unallowed_ip_addresses improved: filter by message type added
+  * Improves performance of email queue
+  * Fix Tatra banka importer for total balance higher than 999
+  * Fix Tatra banka importer when no new payment received via e-mail listing
+  * GPS position of address points is now stored compatibly with MySQL 5.7
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 02 Feb 2017 17:48:22 +0100
+
 freenetis (1.1.19) stable; urgency=low
   * Fix some issues in PHP 7.0
   * Fix issue in system setting during country saving

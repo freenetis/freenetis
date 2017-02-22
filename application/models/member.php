@@ -677,7 +677,8 @@ class Member_Model extends ORM
 								m.name,
 								m.address_point_id,
 								registration,
-							type, entrance_fee,
+								type, entrance_fee,
+								speed_class_id,
 								IF(mi.id IS NOT NULL, 1, 0) AS membership_interrupt,
 								m.comment,	m.entrance_date, m.leaving_date,
 								organization_identifier, vat_organization_identifier

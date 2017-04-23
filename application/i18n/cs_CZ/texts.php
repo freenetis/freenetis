@@ -647,6 +647,7 @@ $lang = array
 	'connected to' => 'Připojeno k',
 	'connected to device' => 'Připojeno k zařízení',
 	'connected to interface' => 'Připojeno k rozhraní',
+	'connection encryption' => 'Šifrování spojení',
 	'connecting place' => 'Přípojné místo',
 	'connection request' => 'Žádost o připojení',
 	'connection owner' => 'Vlastník připojení',

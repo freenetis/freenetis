@@ -110,6 +110,8 @@ class Settings
 		'email_driver'						=> 'native',
 		// default email port
 		'email_port'						=> 25,
+		// default email connection encryption
+		'email_encryption'					=> 'none',
 		// default value for prefix of subject of notification
 		// e-mails to members
 		'email_subject_prefix'				=> 'FreenetIS',

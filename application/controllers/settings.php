@@ -1170,6 +1170,16 @@ class Settings_Controller extends Controller
 				->value(Settings::get('email_port'))
 				->help(__('For SMTP settings only.'));
 
+		$this->form->dropdown('email_encryption')
+				->label('Connection encryption')
+				->options(array
+				(
+					'none'	=> __('none'),
+					'tsl'	=> __('TSL'),
+					'ssl'	=> __('SSL')
+				))->selected(Settings::get('email_encryption'))
+				->help(__('For SMTP settings only.'));
+
 		$this->form->input('email_username')
 				->label('User name')
 				->value(Settings::get('email_username'))

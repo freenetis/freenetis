@@ -36,11 +36,24 @@ class email {
 		switch ($email_driver)
 		{
 			case 'smtp':
+
+				$conn_encryption = null;
+
+				switch (Settings::get('email_encryption')) {
+					case 'tsl':
+						$conn_encryption = Swift_Connection_SMTP::ENC_TLS;
+						break;
+					case 'ssl':
+						$conn_encryption = Swift_Connection_SMTP::ENC_SSL;
+						break;
+				}
+
 				// Create a SMTP connection
 				$connection = new Swift_Connection_SMTP
 				(
 					Settings::get('email_hostname'),
-					Settings::get('email_port')
+					Settings::get('email_port'),
+					$conn_encryption
 				);
 
 				// Do authentication, if part of the DSN

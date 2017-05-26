@@ -398,7 +398,9 @@ class Users_Controller extends Controller
 			status::warning('User cannot be deleted, he has some dependent items in database.');
 			url::redirect($linkback);	
 		}
-		
+
+		$user_model->delete_watchers($user_id);
+
 		if ($user_model->delete())
 		{
 			status::success('User has been successfully deleted.');
@@ -853,6 +855,7 @@ class Users_Controller extends Controller
 			$user_data->type = User_Model::USER;
 			$user_data->member_id = $member_id;
 			$user_data->application_password = security::generate_password();
+			$user_data->settings = '';
 			$saved = $user_data->save();
 
 			// insert users access rights

@@ -660,7 +660,9 @@ class User_Model extends ORM
 	 * @param integer $user_id
 	 */
 	public function delete_depends_items($user_id)
-	{		
+	{
+		$this->delete_watchers($user_id);
+
 		$this->db->query("
 				DELETE FROM devices
 				WHERE user_id = ?
@@ -688,6 +690,19 @@ class User_Model extends ORM
 		
 		$this->db->query("
 				DELETE FROM phone_invoice_users
+				WHERE user_id = ?
+		", $user_id);
+	}
+
+	/**
+	 * Function searches for user watchers and delete them.
+	 *
+	 * @param integer $user_id
+	 */
+	public function delete_watchers($user_id)
+	{
+		$this->db->query("
+				DELETE FROM watchers
 				WHERE user_id = ?
 		", $user_id);
 	}

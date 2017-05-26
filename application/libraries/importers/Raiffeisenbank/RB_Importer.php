@@ -92,13 +92,10 @@ class RB_Importer
 		static $suppliers, $operating, $member_fees, $cash;
 		static $first_pass = true;
 
-		$this->stats = new stdClass();
-		$this->stats->linenr++;
-
 		if ($first_pass)
 		{   // dostavame prvni radek vypisu?
 			$this->stats = new RB_Statistics();
-			$this->time_now = date("Y-m-d H:i:s");
+			self::$time_now = date("Y-m-d H:i:s");
 			$member_model = new Member_Model(); // vytvorime vsechny instance, ktere potrebujeme i pro dalsi radky
 			$acc_model = new Account_Model();
 			$bank_acc_model = new Bank_account_Model();
@@ -252,6 +249,10 @@ class RB_Importer
 			}
 
 			$first_pass = FALSE;
+		}
+		else
+		{
+			$this->stats->linenr++;
 		}
 
 		if (!empty($data->fee))

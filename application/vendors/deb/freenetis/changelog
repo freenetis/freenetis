@@ -1,3 +1,10 @@
+freenetis (1.1.21) stable; urgency=low
+  * Add support for SMTP servers with encryption
+  * Fix RB importer in PHP 5.6 >=
+  * Fix removing of user with set watchers
+  * Fix member export with speed class filter set
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Fri, 26 May 2017 05:59:28 +0200
+
 freenetis (1.1.20) stable; urgency=low
   * Web interface: unallowed_ip_addresses improved: filter by message type added
   * Improves performance of email queue

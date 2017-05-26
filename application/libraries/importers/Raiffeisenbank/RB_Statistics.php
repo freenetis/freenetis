@@ -11,5 +11,23 @@
  *
  */
 
-class RB_Statistics {}
-?>
+class RB_Statistics
+{
+	public $linenr = 0;
+	public $bank_fees = 0;
+	public $bank_fees_nr = 0;
+	public $interests = 0;
+	public $interests_nr = 0;
+	public $unidentified_transfers = 0;
+	public $new_bank_accounts = 0;
+	public $time_deposits = 0;
+	public $time_deposits_nr = 0;
+	public $cash_drawn = 0;
+	public $cash_drawn_nr = 0;
+	public $invoices = 0;
+	public $invoices_nr = 0;
+	public $time_deposits_drawn = 0;
+	public $time_deposits_drawn_nr = 0;
+	public $member_fees = 0;
+	public $member_fees_nr = 0;
+}

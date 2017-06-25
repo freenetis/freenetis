@@ -79,7 +79,7 @@ class HttpUtil {
      * @param int $status
      * @return null|string
      */
-    public function status_message($status) {
+    public static function status_message($status) {
         if (array_key_exists($status, self::$messages)) {
             return self::$messages[$status];
         }

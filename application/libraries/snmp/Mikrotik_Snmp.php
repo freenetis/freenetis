@@ -88,7 +88,7 @@ class Mikrotik_Snmp extends Abstract_Snmp
 		$this->stopErrorHandler();
 		
 		// parse result
-		$regex = '/Hex-STRING: (([0-9a-fA-F]{2}\s){5}[0-9a-fA-F]{2})/';
+		$regex = '/Hex-STRING: .*(([0-9a-fA-F]{2}\s){5}[0-9a-fA-F]{2})/';
 		$matches = array();
 		
 		// try find MAC address in ARP table
@@ -141,7 +141,7 @@ class Mikrotik_Snmp extends Abstract_Snmp
 		}
 		
 		// parse result
-		$regex = '/Hex-STRING: (([0-9a-fA-F]{2}\s){5}[0-9a-fA-F]{2})/';
+		$regex = '/Hex-STRING: .*(([0-9a-fA-F]{2}\s){5}[0-9a-fA-F]{2})/';
 		$matches = array();
 		
 		if (preg_match($regex, $row, $matches) > 0)

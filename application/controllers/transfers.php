@@ -541,7 +541,9 @@ class Transfers_Controller extends Controller
 		if ($account->member->type != Member_Model::TYPE_APPLICANT &&
 			$account->member->type != Member_Model::TYPE_FORMER)
 		{
-			$view->content->expiration_date = Members_Controller::get_expiration_date($account);
+			$view->content->expiration_info = $this->services
+					->injectMemberExpirationCalc()
+					->get_expiration_info($account);
 		}
 		
 		$view->content->transfers_grid = $transfers_grid;

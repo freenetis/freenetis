@@ -70,6 +70,7 @@ abstract class AbstractItCase extends PHPUnit_Framework_TestCase
         {
             self::reset_url_settings_to_current();
         });
+		unlink($lck_file);
         // get DB connection
         self::$connection = Database::instance();
     }

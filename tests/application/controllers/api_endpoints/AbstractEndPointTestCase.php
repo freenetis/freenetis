@@ -46,11 +46,35 @@ abstract class AbstractEndPointTestCase extends AbstractItCase
     protected $api_account;
 
     /**
-     * Defines authentification type that is used for connecting to API.
+     * Defines authentication type that is used for connecting to API.
      *
      * @var string
      */
     protected $auth_method;
+
+	/**
+	 * Holds state of settings "api_enabled" during test.
+	 *
+	 * @var bool
+	 */
+	private static $old_api_enabled = TRUE;
+
+	/**
+	 * Enable API and save old state before tests.
+	 */
+	public static function setUpBeforeClass() {
+		parent::setUpBeforeClass();
+		self::$old_api_enabled = module::e('api');
+		Settings::set('api_enabled', TRUE);
+	}
+
+	/**
+	 * Restore old API state after all tests done.
+	 */
+	public static function tearDownAfterClass() {
+		parent::tearDownAfterClass();
+		Settings::set('api_enabled', self::$old_api_enabled);
+	}
 
     /**
      * Prepare base path and add API account.

@@ -405,9 +405,9 @@ INSERT INTO `aco_map` (`acl_id`, `value`) VALUES
 TRUNCATE TABLE `address_points`;
 INSERT INTO `address_points` (`id`, `name`, `country_id`, `town_id`, `street_id`, `street_number`, `gps`) VALUES
 (1, NULL, 55, 1, 1, '594', NULL),
-(2, NULL, 55, 1, 2, '784', ''),
-(3, NULL, 55, 2, NULL, '78', ''),
-(4, NULL, 55, 3, 3, '454/8a', '');
+(2, NULL, 55, 1, 2, '784', NULL),
+(3, NULL, 55, 2, NULL, '78', NULL),
+(4, NULL, 55, 3, 3, '454/8a', NULL);
 
 TRUNCATE TABLE `allowed_subnets`;
 TRUNCATE TABLE `allowed_subnets_counts`;
@@ -1530,9 +1530,6 @@ INSERT INTO `members_fees` (`id`, `fee_id`, `member_id`, `activation_date`, `dea
 (3, 3, 1, '2004-01-15', '9999-12-31', 1, ''),
 (4, 4, 1, '2004-01-15', '9999-12-31', 1, '');
 
-TRUNCATE TABLE `members_traffics_daily`;
-TRUNCATE TABLE `members_traffics_monthly`;
-TRUNCATE TABLE `members_traffics_yearly`;
 TRUNCATE TABLE `members_whitelists`;
 INSERT INTO `members_whitelists` (`id`, `member_id`, `permanent`, `since`, `until`, `comment`) VALUES
 (1, 1, 1, '2015-01-15', '9999-12-31', NULL);

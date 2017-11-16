@@ -26,27 +26,30 @@ use Device_Model;
  */
 class ExpirationCalcService extends \AbstractService
 {
+
 	/**
 	 * @var Transfer_Model
 	 */
 	protected $transfer_model;
+
 	/**
 	 * @var Fee_Model
 	 */
 	protected $fee_model;
+
 	/**
 	 * @var Device_Model
 	 */
 	protected $device_model;
 
-    /**
-     * Creates service.
-     *
-     * @param \ServiceFactory $factory
-     */
-    public function __construct(\ServiceFactory $factory)
+	/**
+	 * Creates service.
+	 *
+	 * @param \ServiceFactory $factory
+	 */
+	public function __construct(\ServiceFactory $factory)
 	{
-        parent::__construct($factory);
+		parent::__construct($factory);
 		$this->transfer_model = new Transfer_Model;
 		$this->fee_model = new Fee_Model;
 		$this->device_model = new Device_Model;
@@ -58,7 +61,7 @@ class ExpirationCalcService extends \AbstractService
 	 * @author Michal Kliment, Ondrej Fibich
 	 * @param object $account
 	 * @param int $shortened_on_year year to shortened expiration date from
-	 *							     (10 years from now by default)
+	 * 							     (10 years from now by default)
 	 * @return ExpirationCalcResult
 	 */
 	public function get_expiration_info($account, $shortened_on_year = NULL)
@@ -72,9 +75,9 @@ class ExpirationCalcService extends \AbstractService
 		$balance = $account->balance;
 
 		$last_deduct_date = date_parse(
-			date::get_closses_deduct_date_to(
-				$this->transfer_model->get_last_transfer_datetime_of_account($account->id)
-			)
+				date::get_closses_deduct_date_to(
+						$this->transfer_model->get_last_transfer_datetime_of_account($account->id)
+				)
 		);
 
 		// date
@@ -99,13 +102,11 @@ class ExpirationCalcService extends \AbstractService
 		$entrance_date = date_parse($entrance_date_str);
 
 		// finds debt payment rate of entrance fee
-		$debt_payment_rate = ($account->member->debt_payment_rate > 0)
-				? $account->member->debt_payment_rate : $account->member->entrance_fee;
+		$debt_payment_rate = ($account->member->debt_payment_rate > 0) ? $account->member->debt_payment_rate : $account->member->entrance_fee;
 
 		// finds all debt payments of entrance fee
 		self::find_debt_payments(
-				$payments, $entrance_date['month'], $entrance_date['year'],
-				$account->member->entrance_fee, $debt_payment_rate
+				$payments, $entrance_date['month'], $entrance_date['year'], $account->member->entrance_fee, $debt_payment_rate
 		);
 
 		// finds all member's devices with debt payments
@@ -118,8 +119,7 @@ class ExpirationCalcService extends \AbstractService
 
 			// finds all debt payments of this device
 			self::find_debt_payments(
-					$payments, $buy_date['month'], $buy_date['year'],
-					$device->price, $device->payment_rate
+					$payments, $buy_date['month'], $buy_date['year'], $device->price, $device->payment_rate
 			);
 		}
 
@@ -201,7 +201,7 @@ class ExpirationCalcService extends \AbstractService
 	 * @param float $payment_rate
 	 */
 	protected static function find_debt_payments(
-			&$payments, $month, $year, $payment_left, $payment_rate)
+	&$payments, $month, $year, $payment_left, $payment_rate)
 	{
 		while ($payment_left > 0)
 		{
@@ -247,7 +247,7 @@ class ExpirationCalcResult
 	 * @var string
 	 */
 	public $expiration_date;
-	
+
 	/**
 	 * Flag whether the expiration was too long and was shortened.
 	 *

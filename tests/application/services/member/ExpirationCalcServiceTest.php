@@ -27,10 +27,10 @@ require_once APPPATH . '/services/member/ExpirationCalcService' . EXT;
 class ExpirationCalcServiceTest extends AbstractItCase
 {
 
-    /**
-     * @var ExpirationCalcService
-     */
-    private $object;
+	/**
+	 * @var ExpirationCalcService
+	 */
+	private $object;
 
 	/**
 	 * Hold deduct day during test for recover.
@@ -40,10 +40,10 @@ class ExpirationCalcServiceTest extends AbstractItCase
 	private $old_deduct_day;
 
 	protected function setUp()
-    {
-        $this->object = new ConfigurableTestExpirationCalcService(self::$services);
+	{
+		$this->object = new ConfigurableTestExpirationCalcService(self::$services);
 		$this->old_deduct_day = Settings::get('deduct_day');
-    }
+	}
 
 	protected function tearDown()
 	{
@@ -150,6 +150,7 @@ class ExpirationCalcServiceTest extends AbstractItCase
  */
 class ConfigurableTestExpirationCalcService extends ExpirationCalcService
 {
+
 	public function set_transfer_model($transfer_model)
 	{
 		$this->transfer_model = $transfer_model;
@@ -164,10 +165,12 @@ class ConfigurableTestExpirationCalcService extends ExpirationCalcService
 	{
 		$this->device_model = $device_model;
 	}
+
 }
 
 class TestStaticTransferModel
 {
+
 	private $account_id;
 	private $last_transfer_date;
 
@@ -181,10 +184,12 @@ class TestStaticTransferModel
 	{
 		return $this->account_id == $account_id ? $this->last_transfer_date : NULL;
 	}
+
 }
 
 class TestStaticFeeModel
 {
+
 	private $member_id;
 	private $fee;
 
@@ -208,4 +213,5 @@ class TestStaticFeeModel
 	{
 		return ($this->member_id == $member_id) ? $this->fee : 0;
 	}
+
 }

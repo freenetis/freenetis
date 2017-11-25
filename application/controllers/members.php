@@ -2113,11 +2113,6 @@ class Members_Controller extends Controller
 			$sign = -1;
 		}
 
-		// ttl = time to live - it is count how many ending conditions
-		// will have to happen to end cycle
-		// negative balance needs one extra more
-		$ttl =  ($balance < 0) ? 2 : 1;
-
 		// negative balance will drawn by red color, else balance will drawn by green color
 		$color = ($balance < 0) ? 'red' : 'green';
 
@@ -2179,13 +2174,7 @@ class Members_Controller extends Controller
 			// attributed / deduct fee to / from balance
 			$balance -= $sign * $fee;
 
-			if ($sign == -1 && $balance == 0)
-				$ttl--;
-
 			if ($balance * $sign < 0)
-				$ttl--;
-
-			if ($ttl == 0)
 				break;
 
 			$month += $sign;

@@ -74,6 +74,25 @@ class Preprocessor_Model extends Model
 	}
 
 	/**
+	 * Gets count of former members that can be deleted.
+	 *
+	 * constant 15 equals Member_Model::TYPE_FORMER - memory consumption hack
+	 *
+	 * @param integer $limit_years former member limit years
+	 * @return integer
+	 */
+	public function count_of_former_members_to_delete($limit_years)
+	{
+		$time_Xyears_before = strtotime('-' . intval($limit_years) . ' years');
+		$date_Xyears_before = date('Y-m-d', $time_Xyears_before);
+		return $this->db->query("
+				SELECT COUNT(m.id) AS count
+				FROM members m
+				WHERE m.type = ? && m.leaving_date <= ?
+		", 15, $date_Xyears_before)->current()->count;
+	}
+
+	/**
 	 * Returns count of all unread inbox messages of user
 	 * 
 	 * Moved from Mail_message_Model

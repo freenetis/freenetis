@@ -545,4 +545,33 @@ class Bank_transfer_Model extends ORM
 		return NULL;
 	}
 
+	/**
+	 * Deletes all bank transactions that has specified bank account set as
+	 * origin.
+	 *
+	 * @param int $bank_account_id
+	 */
+	public function delete_all_with_origin($bank_account_id)
+	{
+		$this->db->query("
+				DELETE FROM bank_transfers
+				WHERE origin_id = ?
+		", intval($bank_account_id));
+	}
+
+	/**
+	 * Deletes all bank transactions that is bound to transfer with assigned
+	 * specified member.
+	 *
+	 * @param int $member_id
+	 */
+	public function delete_all_with_transfer_to($member_id)
+	{
+		$this->db->query("
+				DELETE bank_transfers FROM bank_transfers
+				INNER JOIN transfers ON bank_transfers.transfer_id = transfers.id
+				WHERE transfers.member_id = ?
+		", intval($member_id));
+	}
+
 }

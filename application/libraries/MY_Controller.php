@@ -915,6 +915,24 @@ class Controller extends Controller_Core
 			$menu->addItem(
 				'members/show_all', __('Members'), 'users');
 		}
+
+		// list of former members to delete
+		if ($this->acl_check_delete('Members_Controller', 'members'))
+		{
+			$Xyears = intval(Settings::get('member_former_limit_years'));
+			$date_Xyears_before = date('Y-m-d', strtotime('-' . $Xyears . ' years'));
+			// TODO: add support for building link in Filter_form library
+			$menu->addItem(
+				'members/show_all?on[0]=1&types[0]=type&opers[0]=3&values[0][]=15'
+				. '&tables[type]=m&tables[leaving_date]=m&on[1]=1'
+				. '&types[1]=leaving_date&opers[1]=8&values[1][0]=' . $date_Xyears_before
+				. '&types[2]=type&opers[2]=3&values[2][0]=1',
+				__('Former members (%d years)', array($Xyears)), 'users', array
+				(
+					'count' => $pm->count_of_former_members_to_delete($Xyears),
+					'color' => 'red'
+				));
+		}
 		
 		/**
 		 * @todo Add own AXO

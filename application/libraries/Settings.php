@@ -269,6 +269,9 @@ class Settings
 		
 		// username regex #360
 		'username_regex'					=> '/^[a-z][a-z0-9_]{4,}$/',
+
+		// former member delete limit
+		'member_former_limit_years'			=> 5,
 	);
 	
 	/**

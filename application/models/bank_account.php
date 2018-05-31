@@ -150,6 +150,21 @@ class Bank_account_Model extends ORM
 	}
 
 	/**
+	 * Gets bank account of specified member.
+	 *
+	 * @param int $member_id
+	 * @return Mysql_Result
+	 */
+	public function get_member_bank_accounts($member_id)
+	{
+		return $this->db->query("
+				SELECT ba.*
+				FROM bank_accounts ba
+				WHERE ba.member_id = ?
+		", intval($member_id));
+	}
+
+	/**
 	 * It gets all bank accounts except bank accounts of association.
 	 * @return Mysql_Result
 	 */

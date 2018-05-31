@@ -489,15 +489,17 @@ class Transfers_Controller extends Controller
 		$breadcrumbs = breadcrumbs::add()
 				->link('members/show_all', 'Members',
 						$this->acl_check_view('Members_Controller', 'members')
-				)->disable_translation()
-				->link('members/show/' . $account->member_id,
-						'ID ' . $account->member->id . ' - ' . $account->member->name,
-						$this->acl_check_view(
-								'Members_Controller', 'members',
-								$account->member_id
-						)
-				)->enable_translation()
-				->text('Transfers');
+				)->disable_translation();
+		if ($account->member_id) {
+			$breadcrumbs->link('members/show/' . $account->member_id,
+					'ID ' . $account->member->id . ' - ' . $account->member->name,
+					$this->acl_check_view(
+							'Members_Controller', 'members',
+							$account->member_id
+					)
+			);
+		}
+		$breadcrumbs->enable_translation()->text('Transfers');
 
 		$view = new View('main');
 		$view->title = $headline;

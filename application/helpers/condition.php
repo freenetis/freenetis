@@ -247,5 +247,19 @@ class condition
 			return FALSE;
 		}
 	}
+
+	/**
+	 * Checks whether given member is former and has left before X years.
+	 *
+	 * @param object $item member query item
+	 * @return boolean
+	 */
+	public static function is_former_for_more_than_limit_years($item)
+	{
+		$Xyears = Settings::get('member_former_limit_years');
+		$date_Xyears_before = date('Y-m-d', strtotime('-' . $Xyears . ' years'));
+		return ($item->type == Member_Model::TYPE_FORMER)
+			&& ($item->leaving_date <= $date_Xyears_before);
+	}
 	
 }

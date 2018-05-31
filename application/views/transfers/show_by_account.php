@@ -24,7 +24,7 @@ echo implode(' | ', $links); ?>
 	</tr>
 	<tr>
 		<th><?php echo __('Owner of account')?></th>
-		<td><?php echo html::anchor('members/show/'.$account->member_id, $account->member->name) ?></td>
+		<td><?php if ($account->member_id) { echo html::anchor('members/show/'.$account->member_id, $account->member->name); } ?></td>
 	</tr>
 	<tr>
 		<th><?php echo __('Type of double-entry account')?></th>

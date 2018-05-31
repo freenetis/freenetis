@@ -283,6 +283,16 @@ class Members_Controller extends Controller
 			$grid->datasource($query);
 		}
 
+		if ($this->acl_check_delete(get_class($this), 'members'))
+		{
+			$actions->add_conditional_action('id')
+					->condition('is_former_for_more_than_limit_years')
+					->icon_action('delete')
+					->url('members/delete_former')
+					->label('Delete member')
+					->class('delete_link');
+		}
+
 		if (isset($_POST) && count($_POST) > 1)
 		{
 			$ids = $_POST["ids"];
@@ -1714,9 +1724,24 @@ class Members_Controller extends Controller
 		$member_links = array();
 		$user_links = array();
 
-		// member edit link
-		if (!$is_former &&
-			$this->acl_check_edit(get_class($this), 'members', $member->id))
+		// member delete/edit link
+		if ($is_former)
+		{
+			if ($this->acl_check_delete(get_class($this), 'members')
+				&& condition::is_former_for_more_than_limit_years($member))
+			{
+				$member_links[] = html::anchor(
+						'members/delete_former/'.$member->id,
+						__('Delete'),
+						array
+						(
+							'title' => __('Delete'),
+							'class' => 'delete_link'
+						)
+				);
+			}
+		}
+		else if ($this->acl_check_edit(get_class($this), 'members', $member->id))
 		{
 			$member_links[] = html::anchor(
 					'members/edit/'.$member->id,
@@ -3819,6 +3844,83 @@ class Members_Controller extends Controller
 		$view->render(TRUE);
 	} // end of edit function
 	
+	/**
+	 * Delete former member that has left at least before 5 years.
+	 *
+	 * @param int $member_id	id of member to delete
+	 */
+	public function delete_former($member_id = NULL)
+	{
+		if (!isset($member_id) || !is_numeric($member_id))
+		{
+			self::warning(PARAMETER);
+		}
+
+		$member = new Member_Model($member_id);
+
+		// member doesn't exist
+		if (!$member->id)
+		{
+			self::error(RECORD);
+		}
+
+		// access control
+		if (!$this->acl_check_delete(get_class($this), 'members'))
+		{
+			self::error(ACCESS);
+		}
+
+		if (!condition::is_former_for_more_than_limit_years($member))
+		{
+			self::error(ACCESS);
+		}
+
+		try
+		{
+			$ba_model = new Bank_account_Model();
+			$bank_trans_model = new Bank_transfer_Model();
+
+			$member->transaction_start();
+
+			// change member credit account name
+			$credit_account = $member->get_credit_account();
+			if ($credit_account->id)
+			{
+				$credit_account->name = __('Former member') . ' ' . $member->id;
+				$credit_account->save_throwable();
+			}
+
+			// delete bank accounts and their transfers with owner set to the
+			// member
+			$bank_accounts = $ba_model->get_member_bank_accounts($member->id);
+
+			foreach ($bank_accounts as $bank_account)
+			{
+				$bank_trans_model->delete_all_with_origin($bank_account->id);
+				$ba_model->delete_throwable($bank_account->id);
+			}
+
+			// delete bank tranfers that was assigned to the member but does not
+			// come from his bank account (e.g. from post service)
+			$bank_trans_model->delete_all_with_transfer_to($member->id);
+
+			// delete member, user, jobs, job reports, contacts, etc.
+			$member->delete_throwable();
+
+			$member->transaction_commit();
+
+			status::success('Member has been successfully removed.');
+			url::redirect('members/show_all');
+		}
+		catch (Exception $ex)
+		{
+			$member->transaction_rollback();
+			Log::add_exception($ex);
+			status::error('Error - cannot remove member.', $ex);
+			url::redirect('members/show_all');
+		}
+	}
+
 	/**
 	 * Enables to edid member settings (e.g. notification settings).
 	 * 

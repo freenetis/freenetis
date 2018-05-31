@@ -18,7 +18,7 @@
  *
  * @author Ondřej Fibich <ondrej.fibich@gmail.com>
  */
-$upgrade_sql['1.1.22'] = array
+$upgrade_sql['1.2.0~alpha10'] = array
 (
 	"ALTER TABLE watchers DROP FOREIGN KEY watchers_ibfk_1;",
 	"ALTER TABLE watchers ADD CONSTRAINT watchers_ibfk_1 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;",

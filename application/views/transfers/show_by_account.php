@@ -66,10 +66,10 @@ echo implode(' | ', $links); ?>
 		    <?php endforeach; ?>
 		</td>
 	</tr>
-	<?php if (isset($expiration_date)) { ?>
+	<?php if (isset($expiration_info)) { ?>
 	<tr>
 		<th><?php echo __('Payed to')?></th>
-		<td><?php echo $expiration_date ?></td>
+		<td><span style="color: <?php echo ($balance < 0) ? 'red' : 'green' ?>"><?php if ($expiration_info->shortened): ?>&gt; <?php endif; ?><?php echo $expiration_info->expiration_date ?></span></td>
 	</tr>
 	<?php } ?>
 	<?php } ?>

@@ -95,4 +95,12 @@ class ServiceFactory
         return $this->inject('core\SetupService');
     }
 
+    /**
+     * @return \freenetis\service\member\ExpirationCalcService
+     */
+    public function injectMemberExpirationCalc()
+    {
+        return $this->inject('member\ExpirationCalcService');
+    }
+
 }

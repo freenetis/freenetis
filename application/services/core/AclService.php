@@ -35,9 +35,9 @@ class AclService extends \AbstractService
     {
         parent::__construct($factory);
         // singleton resolver instance
-        if (empty($this->resolver))
+        if (empty(self::$resolver))
         {
-            $this->resolver = new \Groups_aro_map_Model();
+            self::$resolver = new \Groups_aro_map_Model();
         }
     }
 
@@ -58,7 +58,7 @@ class AclService extends \AbstractService
 		if (($member_id == $_SESSION['member_id']) || $force_own)
 		{
 			// check own access
-			if ($this->resolver->has_access(
+			if (self::$resolver->has_access(
 					$_SESSION['user_id'], $aco_type . '_own',
 					$axo_section, $axo_value
 				))
@@ -69,7 +69,7 @@ class AclService extends \AbstractService
 		}
 
 		// check all
-		return $this->resolver->has_access(
+		return self::$resolver->has_access(
 				$_SESSION['user_id'], $aco_type . '_all',
 				$axo_section, $axo_value
 		);
@@ -84,7 +84,7 @@ class AclService extends \AbstractService
 	 */
 	public function is_user_in_group($aro_group_id, $aro_id)
 	{
-		return $this->resolver->groups_aro_map_exists($aro_group_id, $aro_id);
+		return self::$resolver->groups_aro_map_exists($aro_group_id, $aro_id);
 	}
 
 	/**

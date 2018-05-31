@@ -448,7 +448,7 @@ class Controller extends Controller_Core
         }
         catch (InvalidArgumentException $iaex)
         {
-            self::error(WRITABLE, server::base_dir() . 'upload');
+            self::error(WRITABLE, server::base_dir() . '/upload');
         }
         catch (NotEnabledDbUpgradeException $neu)
         {

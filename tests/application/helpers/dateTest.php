@@ -19,6 +19,37 @@
  */
 class dateTest extends AbstractItCase
 {
+    /**
+     * @covers date::create
+     */
+    public function test_create()
+    {
+        $this->assertEquals('2017-01-01', date::create(1, 1, 2017));
+        $this->assertEquals('2017-12-01', date::create(1, 12, 2017));
+        $this->assertEquals('2017-01-31', date::create(31, 1, 2017));
+    }
+
+    /**
+     * @covers date::days_of_month
+     */
+    public function test_days_of_month()
+    {
+        $this->assertEquals(31, date::days_of_month(1, 2017));
+        $this->assertEquals(28, date::days_of_month(2, 2014));
+        $this->assertEquals(28, date::days_of_month(2, 2015));
+        $this->assertEquals(29, date::days_of_month(2, 2016));
+        $this->assertEquals(28, date::days_of_month(2, 2017));
+        $this->assertEquals(31, date::days_of_month(3, 2017));
+        $this->assertEquals(30, date::days_of_month(4, 2017));
+        $this->assertEquals(31, date::days_of_month(5, 2017));
+        $this->assertEquals(30, date::days_of_month(6, 2017));
+        $this->assertEquals(31, date::days_of_month(7, 2017));
+        $this->assertEquals(31, date::days_of_month(8, 2017));
+        $this->assertEquals(30, date::days_of_month(9, 2017));
+        $this->assertEquals(31, date::days_of_month(10, 2017));
+        $this->assertEquals(30, date::days_of_month(11, 2017));
+        $this->assertEquals(31, date::days_of_month(12, 2017));
+    }
 
     /**
      * @covers date::get_next_deduct_date_to

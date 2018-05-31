@@ -1479,12 +1479,13 @@ class Members_Controller extends Controller
 		}
 		
 		// finds date of expiration of member fee
-		$expiration_date = '';
+		$expiration_info = '';
 		
 		if (Settings::get('finance_enabled') &&
 			isset($account) && !$is_applicant && !$is_former)
 		{
-			$expiration_date = self::get_expiration_date($account);
+			$expiration_info = $this->services->injectMemberExpirationCalc()
+					->get_expiration_info($account);
 		}
 
 		// finds total traffic of member
@@ -2072,7 +2073,7 @@ class Members_Controller extends Controller
 		$view->content->contacts = $contacts;
 		$view->content->contact_types = $contact_types;
 		$view->content->variable_symbols = (isset($variable_symbols)) ? $variable_symbols : NULL;
-		$view->content->expiration_date = $expiration_date;
+		$view->content->expiration_info = $expiration_info;
 		$view->content->entrance_fee_paid = (isset($entrance_fee_paid)) ? $entrance_fee_paid : NULL;
 		$view->content->entrance_fee_left = (isset($entrance_fee_left)) ? $entrance_fee_left : NULL;
 		$view->content->account = (isset($account)) ? $account : NULL;
@@ -2102,187 +2103,6 @@ class Members_Controller extends Controller
 		$view->content->is_association = $is_association;
 		$view->render(TRUE);
 	} // end of show function
-
-
-
-	/**
-	 * Gets expiration date of member's payments.
-	 * 
-	 * @author Michal Kliment, Ondrej Fibich
-	 * @param object $account
-	 * @return string
-	 */
-	public static function get_expiration_date($account)
-	{
-		// member's actual balance
-		$balance = $account->balance;
-		
-		$transfer_model = new Transfer_Model();
-		
-		$close_date = date_parse(
-			date::get_closses_deduct_date_to(
-				$transfer_model->get_last_transfer_datetime_of_account($account->id)
-			)
-		);
-		
-		// date
-		$day = $close_date['day'];
-		$month = $close_date['month'];
-		$year = $close_date['year'];
-
-		// balance is in positive, we will go to the future
-		if ($balance > 0)
-		{
-			$sign = 1;
-		}
-		// balance is in negative, we will go to the past
-		else
-		{
-			$sign = -1;
-		}
-
-		// ttl = time to live - it is count how many ending conditions
-		// will have to happen to end cycle
-		// negative balance needs one extra more
-		$ttl =  ($balance < 0) ? 2 : 1;
-
-		// negative balance will drawn by red color, else balance will drawn by green color
-		$color = ($balance < 0) ? 'red' : 'green';
-
-		$payments = array();
-
-		// finds entrance date of member
-		$entrance_date_str = date::get_closses_deduct_date_to($account->member->entrance_date);
-		$entrance_date = date_parse($entrance_date_str);
-
-		// finds debt payment rate of entrance fee
-		$debt_payment_rate = ($account->member->debt_payment_rate > 0)
-				? $account->member->debt_payment_rate : $account->member->entrance_fee;
-
-		// finds all debt payments of entrance fee
-		self::find_debt_payments(
-				$payments, $entrance_date['month'], $entrance_date['year'],
-				$account->member->entrance_fee, $debt_payment_rate
-		);
-
-		// finds all member's devices with debt payments
-		$devices = ORM::factory('device')->get_member_devices_with_debt_payments($account->member_id);
-
-		foreach ($devices as $device)
-		{
-			// finds buy date of this device
-			$buy_date = date_parse(date::get_closses_deduct_date_to($device->buy_date));
-
-			// finds all debt payments of this device
-			self::find_debt_payments(
-					$payments, $buy_date['month'], $buy_date['year'],
-					$device->price, $device->payment_rate
-			);
-		}
-
-		$fee_model = new Fee_Model();
-		
-		// protection from unending loop
-		$too_long = FALSE;
-
-		// finds min and max date = due to prevent before unending loop
-		$min_fee_date = $fee_model->get_min_fromdate_fee_by_type ('regular member fee');
-		$max_fee_date = $fee_model->get_max_todate_fee_by_type ('regular member fee');
-
-		while (true)
-		{
-			$date = date::create(date::get_deduct_day_to($month, $year), $month, $year);
-
-			// date is bigger/smaller than max/min fee date, ends it (prevent before unending loop)
-			if (($sign == 1 && $date > $max_fee_date) || ($sign == -1 && $date < $min_fee_date))
-				break;
-
-			// finds regular member fee for this month
-			$fee = $fee_model->get_regular_member_fee_by_member_date($account->member_id, $date);
-
-			// if exist payment for this month, adds it to the fee
-			if (isset($payments[$year][$month]))
-				$fee += $payments[$year][$month];
-
-			// attributed / deduct fee to / from balance
-			$balance -= $sign * $fee;
-
-			if ($sign == -1 && $balance == 0)
-				$ttl--;
-
-			if ($balance * $sign < 0)
-				$ttl--;
-
-			if ($ttl == 0)
-				break;
-
-			$month += $sign;
-
-			if ($month == 0 OR $month == 13)
-			{
-				$month = ($month == 13) ? 1 : 12;
-				$year += $sign;
-			}
-			
-			// if we are 5 years in future, there is no point of counting more
-			if (date('Y') + 10 < $year)
-			{
-				$too_long = TRUE;
-				break;
-			}
-		}
-
-		$month--;
-		if ($month == 0)
-		{
-			$month = 12;
-			$year--;
-		}
-		
-		$date = date::create(date::days_of_month($month), $month, $year);
-		
-		if (strtotime($date) < strtotime($entrance_date_str))
-			$date = $entrance_date_str;
-
-		return  '<span style="color: '.$color.'">'
-				. ($too_long ? '&gt; ' : '')
-				. $date. '</span>';
-	}
-
-	/**
-	 * It stores debt payments into double-dimensional array (indexes year, month)
-	 *
-	 * @author Michal Kliment
-	 * @param array $payments
-	 * @param int $month
-	 * @param int $year
-	 * @param float $payment_left
-	 * @param float $payment_rate
-	 */
-	protected static function find_debt_payments(
-			&$payments, $month, $year, $payment_left, $payment_rate)
-	{
-		while ($payment_left > 0)
-		{
-			if ($payment_left > $payment_rate)
-				$payment = $payment_rate;
-			else
-				$payment = $payment_left;
-
-			if (isset($payments[$year][$month]))
-				$payments[$year][$month] += $payment;
-			else
-				$payments[$year][$month] = $payment;
-
-			$month++;
-			if ($month > 12)
-			{
-				$year++;
-				$month = 1;
-			}
-			$payment_left -= $payment;
-		}
-	}
 
 	/**
 	 * Function adds new member to database.

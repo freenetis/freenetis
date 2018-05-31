@@ -2456,6 +2456,12 @@ class Members_Controller extends Controller
 				->years($entrace_start_year)
 				->rules('required')
 				->callback(array($this, 'valid_entrance_date'));
+
+		if ($this->acl_check_edit('Members_Controller', 'registration'))
+		{
+			$form->dropdown('registration')
+					->options(arr::rbool());
+		}
 		
 		$form->textarea('comment')
 				->rules('length[0,250]');
@@ -2692,6 +2698,11 @@ class Members_Controller extends Controller
 						else
 						{
 							$member->entrance_date = date('Y-m-d', $form_data['entrance_date']);
+						}
+
+						if ($this->acl_check_edit('Members_Controller', 'registration'))
+						{
+							$member->registration = $form_data['registration'];
 						}
 
 						// saving member

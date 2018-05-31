@@ -260,9 +260,10 @@ class Mikrotik_Snmp extends Abstract_Snmp
 				
 				case 5:
 					$expires[$ip_address] = ($value != 4294967295) ? $value : '';
-				
+					break;
+
 				case 8:
-					$leases[$ip_address] = network::bin2mac($value);
+					$leases[$ip_address] = network::bin2mac(mb_substr($value, -6));
 					break;
 			}
 		}

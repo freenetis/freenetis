@@ -786,6 +786,10 @@ class Settings_Controller extends Controller
         $this->form->checkbox('user_email_duplicities_enabled')
                 ->label('Enable multiple users to have assigned same e-mail contact')
 				->checked(Settings::get('user_email_duplicities_enabled'));
+
+        $this->form->checkbox('user_birthday_required')
+                ->label('Is user birthday a mandatory information?')
+				->checked(Settings::get('user_birthday_required'));
 		
 		$this->form->group('Security');
 		

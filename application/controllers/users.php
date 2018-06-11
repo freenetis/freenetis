@@ -492,7 +492,7 @@ class Users_Controller extends Controller
 				->rules('required')
 				->value(strtotime($user->birthday));
 
-		if (Settings::get('user_birthday_required'))
+		if (!Settings::get('users_birthday_empty_enabled'))
 		{
 			$form->date('birthday')
 					->label('Birthday')
@@ -844,7 +844,7 @@ class Users_Controller extends Controller
 
 		$form->group('Additional information');
 
-		if (Settings::get('user_birthday_required'))
+		if (!Settings::get('users_birthday_empty_enabled'))
 		{
 			$form->date('birthday')
 					->label('Birthday')

@@ -92,7 +92,7 @@ class Registration_Controller extends Controller
 				->label('Post title')
 				->rules('length[3,30]');
 		
-		if (Settings::get('user_birthday_required'))
+		if (!Settings::get('users_birthday_empty_enabled'))
 		{
 			$form->date('birthday')
 					->label('Birthday')

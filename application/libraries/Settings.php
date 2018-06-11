@@ -268,7 +268,7 @@ class Settings
         'user_phone_duplicities_enabled'    => FALSE,
 
 		// user birthday
-		'user_birthday_required'			=> TRUE,
+		'users_birthday_empty_enabled'		=> FALSE,
 		
 		// username regex #360
 		'username_regex'					=> '/^[a-z][a-z0-9_]{4,}$/',

@@ -2588,7 +2588,7 @@ class Members_Controller extends Controller
 				->add_button('speed_classes')
 				->style('width:200px');
 
-		if (Settings::get('user_birthday_required'))
+		if (!Settings::get('users_birthday_empty_enabled'))
 		{
 			$form->date('birthday')
 					->label('Birthday')

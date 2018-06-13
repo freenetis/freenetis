@@ -1541,6 +1541,7 @@ $lang = array
 	'is not in' => 'není v',
 	'is unreachable' => 'je nedostupný',
 	'is unreachable since' => 'je nedostupný od',
+	'users birthday can be empty' => 'Datum narození uživatele může být prázdný',
 	'issued' => 'Vydaná',
 	'it can means that username/password/host are bad or host is unavailable' => 'To může znamenat, že uživatelské jméno/heslo/hostitel je špatné nebo je hostitel nedostupný.',
 	'it is not possible activate e-mail notification for this message' => 'Není možné aktivovat e-mail upozornění pro tuto zprávu.',

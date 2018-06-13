@@ -92,10 +92,20 @@ class Registration_Controller extends Controller
 				->label('Post title')
 				->rules('length[3,30]');
 		
-		$form->date('birthday')
-				->label('Birthday')
-				->years(date('Y') - 100, date('Y'))
-				->rules('required');
+		if (!Settings::get('users_birthday_empty_enabled'))
+		{
+			$form->date('birthday')
+					->label('Birthday')
+					->years(date('Y')-100, date('Y'))
+					->rules('required');
+		}
+		else
+		{
+			$form->date('birthday')
+					->label('Birthday')
+					->years(date('Y')-100, date('Y'))
+					->value('');
+		}
 		
 		$legalp_group = $form->group('Legal person innformation')->visible(FALSE);
 		
@@ -264,8 +274,16 @@ class Registration_Controller extends Controller
 					$user->surname = $form_data['surname'];
 					$user->pre_title = $form_data['title1'];
 					$user->post_title = $form_data['title2'];
-					$user->birthday = date('Y-m-d', $form_data['birthday']);
 					$user->type = User_Model::MAIN_USER;
+
+					if (empty($form_data['birthday']))
+					{
+						$user->birthday	= NULL;
+					}
+					else
+					{
+						$user->birthday	= date("Y-m-d", $form_data['birthday']);
+					}
 
 					// entrance fee
 					$fee_model = new Fee_Model();

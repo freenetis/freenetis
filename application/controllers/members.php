@@ -2587,11 +2587,21 @@ class Members_Controller extends Controller
 				->selected($default_speed_class ? $default_speed_class->id : NULL)
 				->add_button('speed_classes')
 				->style('width:200px');
-		
-		$form->date('birthday')
-				->label('Birthday')
-				->years(date('Y')-100, date('Y'))
-				->rules('required');
+
+		if (!Settings::get('users_birthday_empty_enabled'))
+		{
+			$form->date('birthday')
+					->label('Birthday')
+					->years(date('Y')-100, date('Y'))
+					->rules('required');
+		}
+		else
+		{
+			$form->date('birthday')
+					->label('Birthday')
+					->years(date('Y')-100, date('Y'))
+					->value('');
+		}
 		
 		$form->date('entrance_date')
 				->label('Entrance date')
@@ -2774,7 +2784,16 @@ class Members_Controller extends Controller
 					$user->surname = $form_data['surname'];
 					$user->pre_title = $form_data['title1'];
 					$user->post_title = $form_data['title2'];
-					$user->birthday	= date("Y-m-d",$form_data['birthday']);
+
+					if (empty($form_data['birthday']))
+					{
+						$user->birthday	= NULL;
+					}
+					else
+					{
+						$user->birthday	= date("Y-m-d", $form_data['birthday']);
+					}
+
 					$user->password	= sha1($form_data['password']);
 					$user->type = User_Model::MAIN_USER;
 					$user->application_password = security::generate_password();

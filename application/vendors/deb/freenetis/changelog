@@ -1,3 +1,11 @@
+freenetis (1.1.22) stable; urgency=low
+  * GDPR: Former members older than 5 years can be deleted
+  * Member registration field can be set during adding
+  * User birthday can be non-mandatory item
+  * Fix getting MAC from DHCP leases through SNMP on RouterOS 6.35>=
+  * Fix payed to calculation if deduct day is set to 28th
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Wed, 13 Jun 2018 22:41:16 +0200
+
 freenetis (1.1.21) stable; urgency=low
   * Add support for SMTP servers with encryption
   * Fix RB importer in PHP 5.6 >=

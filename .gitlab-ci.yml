@@ -3,7 +3,7 @@ stages:
   - deploy
 
 deb_package_check:
-  script: /bin/bash tests/deb_package_check.sh
+  script: tests/deb_package_check.sh
   stage: test
   tags:
     - deb_check

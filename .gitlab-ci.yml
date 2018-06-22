@@ -3,6 +3,7 @@ stages:
   - deploy
 
 deb_package_check:
+  image: debian:stable
   script: tests/deb_package_check.sh
   stage: test
   tags:
@@ -18,6 +19,4 @@ deb_package_deploy_master_tag:
   tags:
     - deb_repository
   only:
-    - /^1[.]1[.][0-9]+$/
-  except:
-    - branches
+    - tags

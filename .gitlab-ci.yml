@@ -3,7 +3,7 @@ stages:
   - deploy
 
 deb_package_check:
-  image: debian:stable
+  image: debian:jessie
   script: tests/deb_package_check.sh
   before_script:
     - apt-get update -q >/dev/null

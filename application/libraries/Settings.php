@@ -23,6 +23,14 @@ class Settings
 	 * @var Config_Model
 	 */
 	private static $config_model = NULL;
+
+	/**
+	 * When turned ON no DB queries are performed. Useful for non-setup
+	 * environment.
+	 *
+	 * @var bool
+	 */
+	private static $offline_mode = FALSE;
 	
 	/**
 	 * Variable for cache
@@ -310,6 +318,11 @@ class Settings
 		// not connected? connect!
 		if (!self::$config_model)
 		{
+			if (self::$offline_mode)
+			{
+				return FALSE;
+			}
+
 			try
 			{
 				// create config model
@@ -338,21 +351,25 @@ class Settings
 	{
 		// init
 		self::init();
-		
+
 		// if cache is enabled, return it from it
 		if ($cache && isset(self::$cache[$key]))
 		{
 			return self::$cache[$key];
 		}
 
+		$value = '';
+
 		// try if query return exception, for example config table doesn't exist
 		try
 		{
-			$value = self::$config_model->get_value_from_name($key);
+			if (!self::$offline_mode)
+			{
+				$value = self::$config_model->get_value_from_name($key);
+			}
 		}
 		catch (Kohana_Database_Exception $e)
 		{
-			$value = '';
 		}
 
 		// if we find not-null value, return it
@@ -386,6 +403,12 @@ class Settings
 	 */
 	public static function set($key, $value)
 	{
+		if (self::$offline_mode)
+		{
+			self::cache_value_set($key, $value);
+			return FALSE;
+		}
+
 		// init
 		self::init();
 

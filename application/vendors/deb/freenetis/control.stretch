@@ -1,0 +1,39 @@
+Priority: optional
+Section: web
+Pre-Depends: debconf (>= 0.5) | debconf-2.0
+Depends: coreutils (>= 6.10-6), wget (>= 1.11-4.1), grep (>= 2.5.3), apache2, php, php-curl, libapache2-mod-php, php-mysql, mysql-client, php-mcrypt, php-mbstring, php-gd, php-snmp, php-imap, cron | anacron | cron-daemon, locales
+Suggests: mysql-server (>= 5.0.0), mysql-client
+Architecture: all
+Maintainer: Ondrej Fibich <ondrej.fibich@gmail.com>
+Homepage: http://www.freenetis.org
+Description: Information system for managing non-profit networks
+ FreenetIS is multilingual information system for managing non-profit networks.
+ .
+ It is capable to manage:
+  - users and their groups;
+  - double-entry accounting system (payments, double-entry transfers,
+    bank transfers, accounts, bank accounts, cash flow);
+  - network infrastructure (devices, segments, interfaces, IP addresses,
+    subnets, VLANs, VLAN interfaces, bridges, ports);
+  - network management (device monitoring, DHCP servers configuration,
+    traffic statistics, QoS);
+  - notifications of users (traffic redirection, e-mail messages, SMS messages);
+  - work reporting of active users and work approval;
+  - lists of calls and billing of VoIP;
+  - etc.
+Description-cs.UTF-8: Informační systém pro počítačové sítě, provozované neziskovou organizací
+ FreenetIS je vícejazyčný informační systém pro počítačové sítě, provozované
+ neziskovou organizací.
+ .
+ Je schopen spravovat:
+  - uživatele a jejich skupiny;
+  - podvojné účty organizace (platby, podvojné převody, bankovní převody,
+    bankovní účty, cash flow);
+  - síťová infrastruktura (zařízení, segmenty, rozhraní, IP adresy, podsítě,
+    VLANy, VLAN rozhraní, bridge, porty);
+  - správa sítě (monitorování zařízení, konfigurace DHCP serverů,
+    statistiky provozu, QoS);
+  - upozorňování uživatelů (přesměrování provozu, e-mailové zprávy, SMS zprávy);
+  - práce aktivních uživatelů a jejich schvalování;
+  - výpisy volání a placení VoIP po napojení na ústřednu;
+  - atd.

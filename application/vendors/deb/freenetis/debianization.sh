@@ -129,18 +129,22 @@ find * -type f ! -regex '^DEBIAN/.*' -exec md5sum {} \; >> DEBIAN/md5sums
 echo "Package: ${NAME}" >> DEBIAN/control
 echo "Version: ${VERSION}-${DEBIAN}" >> DEBIAN/control
 echo "Installed-Size: ${SIZE}" >> DEBIAN/control
-cat ../../${NAME}/control >> DEBIAN/control
+if [ $DEBIAN = "stretch" ]; then
+    cat ../../${NAME}/control.stretch >> DEBIAN/control
+else
+    cat ../../${NAME}/control >> DEBIAN/control
+fi
 
 # scripts ######################################################################
 
 cp -a -f ../../${NAME}/preinst DEBIAN/preinst
-if [ $DEBIAN = "jessie" ]; then
+if [ $DEBIAN = "jessie" ] || [ $DEBIAN = "stretch" ]; then
     cp -a -f ../../${NAME}/postinst.jessie DEBIAN/postinst
 else
     cp -a -f ../../${NAME}/postinst DEBIAN/postinst
 fi
 cp -a -f ../../${NAME}/prerm DEBIAN/prerm
-if [ $DEBIAN = "jessie" ]; then
+if [ $DEBIAN = "jessie" ] || [ $DEBIAN = "stretch" ]; then
     cp -a -f ../../${NAME}/postrm.jessie DEBIAN/postrm
 else
     cp -a -f ../../${NAME}/postrm DEBIAN/postrm

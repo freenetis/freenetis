@@ -152,11 +152,6 @@ class Setup_config_Controller extends Controller
 		}
 		else
 		{
-			if (Settings::get('db_schema_version'))
-			{
-				Settings::set('index_page', 0);
-			}
-			
 			$this->redirect('setup_config/setup');
 		}
 		
@@ -215,33 +210,35 @@ class Setup_config_Controller extends Controller
 			$form_data = $form->as_array(FALSE);
 
 			// test connection to database
-			$con = @mysql_connect(
-					$form_data['db_host'],
-					$form_data['db_user'],
-					$form_data['db_password']
-			);
-			
-			$db = @mysql_select_db($form_data['db_name'], $con);
-			
-			if (!$db)
+			$database = new Database(array
+			(
+				'type'     => (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 60000) ? 'mysqli' : 'mysql',
+				'host'     => $form_data['db_host'],
+				'user'     => $form_data['db_user'],
+				'pass'     => $form_data['db_password'],
+				'database' => $form_data['db_name'],
+				'port'     => FALSE,
+				'socket'   => FALSE
+			));
+
+			try
 			{
-				$result = @mysql_query("
-					CREATE DATABASE `" . mysql_escape_string($form_data['db_name']) . "`
-					CHARACTER SET utf8 COLLATE utf8_general_ci;
-				", $con);
-				
-				if ($result)
-				{
-					$db = @mysql_select_db($form_data['db_name'], $con);
-				}
+				$database->connect();
+				$con = TRUE;
+			}
+			catch (Exception $ex)
+			{
+				$con = FALSE;
+				$error_cause = $ex->getMessage();
 			}
 
 			$view = new View('setup_config/main');
 			$view->content = new View('setup_config/setup');
 
 			// cannot connect to database => form data are bad
-			if (!$con OR !$db)
+			if (!$con)
 			{
+				$view->content->error_cause = $error_cause;
 				$view->content->error = TRUE;
 			}
 			// successfully connect to database, we can create config file

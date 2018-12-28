@@ -26,4 +26,17 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 			$("#"+name).addClass("dispNone");
 		}
 	});
+
+	window.mapycz_dev = function (divId, gpsx, gpsy)
+	{
+		var center = SMap.Coords.fromWGS84(gpsy, gpsx);
+		var m = new SMap(JAK.gel(divId), center, 17);
+		m.addDefaultLayer(SMap.DEF_BASE).enable();
+		m.addDefaultControls();
+
+		var markerLayer = new SMap.Layer.Marker();
+		markerLayer.addMarker(new SMap.Marker(center, "myMarker", {}));
+		m.addLayer(markerLayer);
+		markerLayer.enable();
+	};
 	

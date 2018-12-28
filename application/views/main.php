@@ -34,6 +34,7 @@
 <?php echo html::script('media/js/messages_cs', FALSE) ?>
 <?php echo html::script('media/js/php.min', FALSE) ?>
 <?php if (isset($google_jsapi_enabled)): ?><script type="text/javascript" src="https://www.google.com/jsapi"></script><?php endif ?>
+<?php if (isset($mapycz_enabled)): ?><script type="text/javascript" src="https://api.mapy.cz/loader.js"></script><script type="text/javascript">Loader.load()</script><?php endif ?>
 <?php if (TextEditor::$instance_counter): ?>
 <?php echo html::script('media/js/tinymce/tiny_mce', FALSE) ?>
 <script type="text/javascript"><!--

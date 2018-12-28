@@ -29,8 +29,8 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 				if (data !== '')
 				{
 					var s = data.split(" ");
-					$("#gpsx").val(s[0]);
-					$("#gpsy").val(s[1]);
+					$("#gpsx").val(gps_dms_coord(s[0]));
+					$("#gpsy").val(gps_dms_coord(s[1]));
 					
 					// show on map
 					if ($("#ap_map").length)
@@ -40,10 +40,10 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 						var width = $('#ap_map .no_map').width();
 						var height = $('#ap_map .no_map').height();
 						
-						var map = '<img src="http://maps.google.com/maps/api/staticmap?center='+s[0]+','+s[1]+'&zoom=13&maptype=normal&size='+width+'x'+height+'&markers=color:red%7C'+s[0]+','+s[1]+'&language<?php echo Config::get('lang')?>&sensor=false"></img>';
-						map = '<div class="ap_form_map_container"><a href="http://maps.google.com/maps?f=q&hl=<?php echo Config::get('lang') ?>&geocode=&q='+s[0]+','+s[1]+'&z=18&t=h&ie=UTF8" target="_blank">'+map+'</a></div>';
+						var map = '<img src="http://staticmap.openstreetmap.de/staticmap.php?center='+s[0]+','+s[1]+'&zoom=18&size=' + width + 'x' + height + '&maptype=mapnik" width="' + width + '" height="' + height + '"></img>';
+						map = '<div class="ap_form_map_container"><a href="http://mapy.cz/zakladni?x='+s[1]+'&y='+s[0]+'&z=18" target="_blank">'+map+'</a></div>';
 						$("#ap_map").html(map);
-						map_add_zoom_buttons($("#ap_map a"), 6, 20);
+						map_add_zoom_buttons($("#ap_map a"), 6, 18);
 					}
 				}
 				else
@@ -74,8 +74,8 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 				if (data !== '')
 				{
 					var s = data.split(" ");
-					$("#domicile_gpsx").val(s[0]);
-					$("#domicile_gpsy").val(s[1]);
+					$("#domicile_gpsx").val(gps_dms_coord(s[0]));
+					$("#domicile_gpsy").val(gps_dms_coord(s[1]));
 					
 					// show on map
 					if ($("#domicile_ap_map").length)
@@ -85,10 +85,10 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 						var width = $('#domicile_ap_map .no_map').width();
 						var height = $('#domicile_ap_map .no_map').height();
 						
-						var map = '<img src="http://maps.google.com/maps/api/staticmap?center='+s[0]+','+s[1]+'&zoom=13&maptype=normal&size='+width+'x'+height+'&markers=color:red%7C'+s[0]+','+s[1]+'&language<?php echo Config::get('lang')?>&sensor=false"></img>';
-						map = '<div class="ap_form_map_container"><a href="http://maps.google.com/maps?f=q&hl=<?php echo Config::get('lang') ?>&geocode=&q='+s[0]+','+s[1]+'&z=18&t=h&ie=UTF8" target="_blank">'+map+'</a></div>';
+						var map = '<img src="http://staticmap.openstreetmap.de/staticmap.php?center='+s[0]+','+s[1]+'&zoom=18&size=' + width + 'x' + height + '&maptype=mapnik" width="' + width + '" height="' + height + '"></img>';
+						map = '<div class="ap_form_map_container"><a href="http://mapy.cz/zakladni?x='+s[1]+'&y='+s[0]+'&z=18" target="_blank">'+map+'</a></div>';
 						$("#domicile_ap_map").html(map);
-						map_add_zoom_buttons($("#domicile_ap_map a"), 6, 20);
+						map_add_zoom_buttons($("#domicile_ap_map a"), 6, 18);
 					}
 				}
 				else

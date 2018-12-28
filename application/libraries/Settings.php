@@ -438,5 +438,15 @@ class Settings
 		
 		return FALSE;
 	}
+	
+	/**
+	 * Enable/disable DB queries on get/set.
+	 *
+	 * @param bool $flag
+	 */
+	public static function set_offline_mode($flag)
+	{
+		self::$offline_mode = $flag;
+	}
 
 }

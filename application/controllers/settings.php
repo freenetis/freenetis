@@ -1966,13 +1966,22 @@ class Settings_Controller extends Controller
 				->label(__('Payment notice boundary')." (".
 						Settings::get('currency')."):&nbsp;".
 						help::hint('payment_notice_boundary'))
+				->rules('valid_numeric')
 				->value(Settings::get('payment_notice_boundary'));
 		
 		$this->form->input('debtor_boundary')
 				->label(__('Debtor boundary')." (".
 						Settings::get('currency')."):&nbsp;".
 						help::hint('debtor_boundary'))
+				->rules('valid_numeric')
 				->value(Settings::get('debtor_boundary'));
+
+		$this->form->input('big_debtor_boundary')
+				->label(__('Big debtor boundary')." (".
+						Settings::get('currency')."):&nbsp;".
+						help::hint('big_debtor_boundary'))
+				->rules('valid_numeric')
+				->value(Settings::get('big_debtor_boundary'));
 		
 		$this->form->input('initial_immunity')
 				->label(__('Initial immunity').': '.

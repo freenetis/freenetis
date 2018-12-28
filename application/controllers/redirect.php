@@ -92,6 +92,7 @@ class Redirect_Controller extends Controller
 			(
 				Message_Model::INTERRUPTED_MEMBERSHIP_MESSAGE => __('Membership interrupt'),
 				Message_Model::DEBTOR_MESSAGE => __('Debtor'),
+				Message_Model::BIG_DEBTOR_MESSAGE => __('Big debtor'),
 				Message_Model::PAYMENT_NOTICE_MESSAGE => __('Payment notice'),
 				Message_Model::UNALLOWED_CONNECTING_PLACE_MESSAGE => __('Unallowed connecting place'),
 				Message_Model::CONNECTION_TEST_EXPIRED => __('Connection test expired'),

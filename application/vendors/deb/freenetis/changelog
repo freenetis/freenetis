@@ -1,3 +1,12 @@
+freenetis (1.1.23) stable; urgency=low
+  * Support for Debian 9 (Stretch)
+  * Big debtor notification message
+  * E-mail reports of notification message activations with list of affected
+  * Fix map support by using Mapy.cz (maps) and OSM Nominativ (GPS lookup)
+  * Fix setup on Wheezy
+  * Fix order of options in filter fields with selectbox
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Fri, 28 Dec 2018 10:25:25 +0100
+
 freenetis (1.1.22) stable; urgency=low
   * GDPR: Former members older than 5 years can be deleted
   * Member registration field can be set during adding

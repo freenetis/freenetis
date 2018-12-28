@@ -3,7 +3,11 @@ stages:
   - deploy
 
 deb_package_check:
-  script: "~/ci-scripts/freenetis/freenetis/deb_package_check.sh"
+  image: debian:jessie
+  script: tests/deb_package_check.sh
+  before_script:
+    - apt-get update -q >/dev/null
+    - apt-get install -q -y fakeroot lintian >/dev/null
   stage: test
   tags:
     - deb_check

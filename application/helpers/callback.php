@@ -1442,9 +1442,22 @@ class callback
 		{
 			switch ($message->type)
 			{
+				case Message_Model::BIG_DEBTOR_MESSAGE:
+
+					if ($item->balance < Settings::get('big_debtor_boundary')
+						&& !$item->interrupt
+						&& ($item->type != Member_Model::TYPE_FORMER)
+						&& (!$item->whitelisted || $message->ignore_whitelist))
+					{
+						$selected = Notifications_Controller::ACTIVATE;
+					}
+
+					break;
+
 				case Message_Model::DEBTOR_MESSAGE:
 
-					if ($item->balance < Settings::get('debtor_boundary')
+					if ($item->balance >= Settings::get('big_debtor_boundary')
+						&& $item->balance < Settings::get('debtor_boundary')
 						&& !$item->interrupt
 						&& ($item->type != Member_Model::TYPE_FORMER)
 						&& (!$item->whitelisted || $message->ignore_whitelist))

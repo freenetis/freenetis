@@ -24,6 +24,7 @@
  * @property boolean $redirection_enabled
  * @property boolean $email_enabled
  * @property boolean $sms_enabled
+ * @property string $send_activation_to_email
  */
 class Messages_automatical_activation_Model extends Time_Activity_Rule
 {

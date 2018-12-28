@@ -18,6 +18,7 @@ $lang = array
 	'matches'       => 'The %s field must match the %s field.',
 	'valid_url'     => 'The %s field must contain a valid URL.',
 	'valid_email'   => 'The %s field must contain a valid e-mail.',
+	'valid_emails'  => 'The %s field must contain a valid e-mails delimited by comma.',
 	'valid_ip'      => 'The %s field must contain a valid IP address.',
 	'valid_type'    => 'The %s field must only contain %s characters.',
 	'range'         => 'The %s field must be between specified ranges.',

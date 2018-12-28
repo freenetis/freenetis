@@ -851,13 +851,27 @@ class Member_Model extends ORM
 				$where = "AND mi.id IS NOT NULL";
 				$order_by = 'whitelisted ASC, interrupt DESC';
 				break;
-			
-			case Message_Model::DEBTOR_MESSAGE:
+
+			case Message_Model::BIG_DEBTOR_MESSAGE:
 				// without interrupted members, former members, applicants
-				$where = "AND mi.id IS NULL " 
+				$where = "AND mi.id IS NULL "
 						. " AND m.type <> " . intval(Member_Model::TYPE_APPLICANT)
 						. " AND m.type <> " . Member_Model::TYPE_FORMER
-						. " AND a.balance < ".intval(Settings::get('debtor_boundary'))
+						. " AND a.balance < ".intval(Settings::get('big_debtor_boundary'))
+						." AND DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_debtor_immunity'));
+				$order_by = "whitelisted ASC, balance ASC, m.name ASC";
+				break;
+			
+			case Message_Model::DEBTOR_MESSAGE:
+				// without interrupted members, former members, applicants, big debtors (if enabled)
+				$where = "AND mi.id IS NULL " 
+						. " AND m.type <> " . intval(Member_Model::TYPE_APPLICANT)
+						. " AND m.type <> " . Member_Model::TYPE_FORMER;
+				if (is_numeric(Settings::get('big_debtor_boundary')))
+				{
+					$where .= " AND a.balance >= ".intval(Settings::get('big_debtor_boundary'));
+				}
+				$where .= " AND a.balance < ".intval(Settings::get('debtor_boundary'))
 						." AND DATEDIFF(CURDATE(), m.entrance_date) >= ".intval(Settings::get('initial_debtor_immunity'));
 				$order_by = "whitelisted ASC, balance ASC, m.name ASC";
 				break;
@@ -1458,6 +1472,11 @@ class Member_Model extends ORM
 		
 		if (Settings::get('finance_enabled'))
 		{
+			$big_debtor_message_id = $message_model
+				->get_message_id_by_type(
+						Message_Model::BIG_DEBTOR_MESSAGE
+				);
+
 			$debtor_message_id = $message_model
 				->get_message_id_by_type(
 						Message_Model::DEBTOR_MESSAGE
@@ -1540,33 +1559,40 @@ class Member_Model extends ORM
 				continue; // no other messages for applicants
 			}
 			
-			// variables
-			$idi = Settings::get('initial_debtor_immunity');
-			$ii = Settings::get('initial_immunity');
-			$ed_diff = (time() - strtotime($member->entrance_date)) / 86400;
-			
-			// member is debtor
-			if (Settings::get('finance_enabled') && !$has_membership_interrupt &&
-				$balance < Settings::get('debtor_boundary') &&
-				($ed_diff >= $idi))
+			// finance redirections
+			if (Settings::get('finance_enabled') && !$has_membership_interrupt)
 			{
-				$messages_ip_addresses_model
-					->add_redirection_to_ip_address(
-							$debtor_message_id, $ip_address->id, ''
-					);
-			}
-			
-			// member is almost debtor
-			if (Settings::get('finance_enabled') && !$has_membership_interrupt &&
-				$balance < Settings::get('payment_notice_boundary') && (
-						$balance >= Settings::get('debtor_boundary') &&
-						($ed_diff >= $idi)
-				) || (($ed_diff < $idi) && ($ed_diff >= $ii)))
-			{
-				$messages_ip_addresses_model
-					->add_redirection_to_ip_address(
-							$payment_notice_message_id, $ip_address->id, ''
-					);
+				$idi = Settings::get('initial_debtor_immunity');
+				$ii = Settings::get('initial_immunity');
+				$ed_diff = (time() - strtotime($member->entrance_date)) / 86400;
+
+				if (is_numeric(Settings::get('big_debtor_boundary')) &&
+					$balance < Settings::get('big_debtor_boundary') &&
+					($ed_diff >= $idi))
+				{ // member is big debtor
+					$messages_ip_addresses_model
+						->add_redirection_to_ip_address(
+								$big_debtor_message_id, $ip_address->id, ''
+						);
+				}
+				else if ($balance < Settings::get('debtor_boundary') &&
+					($ed_diff >= $idi))
+				{ // member is debtor
+					$messages_ip_addresses_model
+						->add_redirection_to_ip_address(
+								$debtor_message_id, $ip_address->id, ''
+						);
+				}
+				else if ($balance < Settings::get('payment_notice_boundary') && (
+							$balance >= Settings::get('debtor_boundary') &&
+							($ed_diff >= $idi)
+					) || (($ed_diff < $idi) && ($ed_diff >= $ii)))
+				{ // member is almost debtor
+					$messages_ip_addresses_model
+						->add_redirection_to_ip_address(
+								$payment_notice_message_id, $ip_address->id, ''
+						);
+				}
 			}
 		}
 		

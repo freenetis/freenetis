@@ -373,9 +373,8 @@ class Messages_Controller extends Controller
 		if (!$message->id)
 			Controller::error(RECORD);
 		
-		if (($message->id == Message_Model::PAYMENT_NOTICE_MESSAGE ||
-			$message->id == Message_Model::DEBTOR_MESSAGE ||
-			$message->id == Message_Model::RECEIVED_PAYMENT_NOTICE_MESSAGE) && !Settings::get('finance_enabled'))
+		if (!Settings::get('finance_enabled') &&
+			Message_Model::is_finance_message($message->type))
 		{
 			Controller::error(ACCESS);
 		}
@@ -428,11 +427,9 @@ class Messages_Controller extends Controller
 		// record doesn't exist
 		if (!$message->id)
 			Controller::error(RECORD);
-		
-		if (($message->id == Message_Model::PAYMENT_NOTICE_MESSAGE ||
-			$message->id == Message_Model::DEBTOR_MESSAGE ||
-			$message->id == Message_Model::RECEIVED_PAYMENT_NOTICE_MESSAGE) &&
-			!Settings::get('finance_enabled'))
+
+		if (!Settings::get('finance_enabled') &&
+			Message_Model::is_finance_message($message->type))
 		{
 			Controller::error(ACCESS);
 		}
@@ -623,9 +620,8 @@ class Messages_Controller extends Controller
 			Controller::error(RECORD);
 		}
 		
-		if (($message->id == Message_Model::PAYMENT_NOTICE_MESSAGE ||
-			$message->id == Message_Model::DEBTOR_MESSAGE) &&
-			!Settings::get('finance_enabled'))
+		if (!Settings::get('finance_enabled') &&
+			Message_Model::is_finance_message($message->type))
 		{
 			Controller::error(ACCESS);
 		}
@@ -636,7 +632,8 @@ class Messages_Controller extends Controller
 		
 		// shows beetween page only for interrupt payment notice and debtor
 		if ($message->type == Message_Model::PAYMENT_NOTICE_MESSAGE ||
-			$message->type == Message_Model::DEBTOR_MESSAGE)
+			$message->type == Message_Model::DEBTOR_MESSAGE ||
+			$message->type == Message_Model::BIG_DEBTOR_MESSAGE)
 		{
 			if (!isset($_POST) || !isset($_POST['ids']))
 			{
@@ -1020,7 +1017,8 @@ class Messages_Controller extends Controller
 		{
 			$message = new Message_Model($this->message_id);
 			
-			if ($message->type != Message_Model::DEBTOR_MESSAGE &&
+			if ($message->type != Message_Model::BIG_DEBTOR_MESSAGE &&
+				$message->type != Message_Model::DEBTOR_MESSAGE &&
 				$message->type != Message_Model::PAYMENT_NOTICE_MESSAGE &&
 				$message->type != Message_Model::USER_MESSAGE)
 			{

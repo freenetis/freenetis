@@ -29,6 +29,7 @@ $lang = array
 	'matches'       => 'Pole %s se musí shodovat s polem %s.',
 	'valid_url'     => 'Pole %s musí obsahovat platnou URL.',
 	'valid_email'   => 'Pole %s musí obsahovat platnou emailovou adresu.',
+	'valid_emails'  => 'Pole %s musí obsahovat platné emailové adresy oddělené čárkou.',
 	'valid_ip'      => 'Pole %s musí obsahovat platnou IP adresu.',
 	'valid_type'    => 'Pole %s musí obsahovat pouze %s.',
 	'range'         => 'Pole %s musí být v definovaném rozsahu.',

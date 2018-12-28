@@ -69,7 +69,7 @@ $(document).ready(function(){
 			b = ["<select name='" + name + "' class='v'>"];
 			for (var i in types[val]['values'])
 			{
-				b.push("<option value='"+i+"'>"+types[val]['values'][i]+"</option>");
+				b.push("<option value='"+types[val]['values'][i][0]+"'>"+types[val]['values'][i][1]+"</option>");
 			}
 			b.push("</select>");
 			// replace old input with select

@@ -565,7 +565,7 @@ class Filter_form
 			if ($filter->values)
 			{
 				foreach ($filter->values as $key => $value)
-					$js_data[$filter->name]["values"][$key] = $value;
+					$js_data[$filter->name]["values"][] = array($key, $value);
 			}
 			else
 				$js_data[$filter->name]["values"] = '';

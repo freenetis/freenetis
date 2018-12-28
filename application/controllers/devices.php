@@ -731,7 +731,7 @@ class Devices_Controller extends Controller
 
 		$gps = '';
 
-		if (!empty($device->address_point->gps))
+		if ($device->address_point->gps != NULL)
 		{
 		    $gps_result = $device->address_point->get_gps_coordinates();
 
@@ -770,6 +770,7 @@ class Devices_Controller extends Controller
 		$view->title = __('Device').' '.$device->name;
 		$view->breadcrumbs = $breadcrumbs->html();
 		$view->action_logs = action_logs::object_last_modif($device, $device_id);
+		$view->mapycz_enabled = TRUE;
 		$view->content = new View('devices/show');
 		$view->content->device = $device;
 		$view->content->device_type = $device_type;
@@ -2265,7 +2266,7 @@ class Devices_Controller extends Controller
 		$gpsx = '';
 		$gpsy = '';
 		
-		if (!empty($device->address_point->gps))
+		if ($device->address_point->gps != NULL)
 		{
 		    $gps_result = $device->address_point->get_gps_coordinates();
 

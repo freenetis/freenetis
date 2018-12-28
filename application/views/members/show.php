@@ -83,7 +83,7 @@
 			<table style="float: right">
 				<tr>
 					<td style="border: none; padding: 0;">
-						<a href="http://maps.google.com/maps?f=q&hl=<?php echo $lang ?>&geocode=&q=<?php echo $map_query ?>&z=18&t=h&ie=UTF8" target="_blank" style="float: right; text-decoration: none;">
+						<a href="http://mapy.cz?q=<?php echo urlencode($map_query) ?>&z=18" target="_blank" style="float: right; text-decoration: none;">
 							<?php echo html::image(array
 								(
 									'width'		=> 16,
@@ -137,7 +137,7 @@
 			<table style="float: right">
 				<tr>
 					<td style="border: none; padding: 0;">
-						<a href="http://maps.google.com/maps?f=q&hl=<?php echo $lang ?>&geocode=&q=<?php echo $map_domicile_query ?>&z=18&t=h&ie=UTF8" target="_blank" style="float: right; text-decoration: none;">
+						<a href="http://mapy.cz?q=<?php echo urlencode($map_domicile_query) ?>" target="_blank" style="float: right; text-decoration: none;">
 							<?php echo html::image(array
 								(
 									'width'		=> 16,

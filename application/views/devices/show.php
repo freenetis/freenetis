@@ -139,11 +139,13 @@ echo implode(' | ', $links)
 </table>
 
 <?php if (!empty($gps)): ?>
-<div id="ap_gmap" style="float: <?php echo ($this->popup ? 'left' : 'right');?>">
-	<a class="gmap" href="http://maps.google.com/maps?f=q&hl=<?php echo $lang ?>&geocode=&q=<?php echo $gpsx ?>,<?php echo $gpsy ?>&z=18&t=h&ie=UTF8" target="_blank">
-		<img alt="<?php echo __('Address point detail') ?>" src="http://maps.google.com/maps/api/staticmap?center=<?php echo $gpsx ?>,<?php echo $gpsy ?>&zoom=18&maptype=hybrid&size=300x300&markers=color:red%7C<?php echo $gpsx ?>,<?php echo $gpsy ?>&sensor=false" style="float: right; margin-right: 10px;" />
-	</a>
+<div id="ap_gmap" style="float: <?php echo ($this->popup ? 'left' : 'right');?>; width:400px;height:300px;">
 </div>
+<script type="text/javascript">
+	$(document).ready(function () {
+		mapycz_dev('ap_gmap', <?php echo $gpsx ?>, <?php echo $gpsy ?>);
+	});
+</script>
 <?php endif; ?>
 
 <br class="clear" />

@@ -1514,6 +1514,36 @@ function status_exception_expander(anchor)
 	$(anchor).hide('slow');
 }
 
+/*
+ * This function returns the GPS coordinate conversion string in DD to DMS.
+ */
+function gps_dms(lat, lng)
+{
+	var flat = parseFloat(lat),
+		flng = parseFloat(lng),
+		latResult = gps_dms_coord(flat) + ((flat >= 0) ? 'N' : 'S'),
+		lngResult = gps_dms_coord(flng) + ((flng >= 0) ? 'E' : 'W');
+	return latResult + ' ' + lngResult;
+}
+
+function gps_dms_coord(val)
+{
+	var valDeg, valMin, valSec, result;
+
+	val = Math.abs(val);
+
+	valDeg = Math.floor(val);
+	result = valDeg + "°";
+
+	valMin = Math.floor((val - valDeg) * 60);
+	result += valMin + "′";
+
+	valSec = Math.round((val - valDeg - valMin / 60) * 3600 * 1000) / 1000;
+	result += valSec + '″';
+
+	return result;
+}
+
 <?php
 
 /*

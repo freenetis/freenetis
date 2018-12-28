@@ -52,12 +52,13 @@ else
 </table>
 
 <?php if (!empty($gps)): ?>
-	<div id="ap_gmap" style="float: <?php echo ($this->popup ? 'left' : 'right');?>">
-		<a class="gmap" href="http://maps.google.com/maps?f=q&hl=<?php echo $lang ?>&geocode=&q=<?php echo $gpsx ?>,<?php echo $gpsy ?>&z=18&t=h&ie=UTF8"  target="_blank">
-			<img alt="<?php echo __('Address point detail') ?>" src="http://maps.google.com/maps/api/staticmap?center=<?php echo $gpsx ?>,<?php echo $gpsy ?>&zoom=16&maptype=hybrid&size=400x300&markers=color:red%7C<?php echo $gpsx ?>,<?php echo $gpsy ?>&language<?php echo $lang ?>&sensor=false"/>
-		</a>
-	</div>
+	<div id="ap_gmap" style="float: <?php echo ($this->popup ? 'left' : 'right'); ?>; width:500px; height:300px"></div>
 	<div style="margin-bottom: 10px; float:left"></div>
+	<script type="text/javascript">
+	    $(document).ready(function () {
+	        mapycz_addr('ap_gmap', <?php echo $gpsx ?>, <?php echo $gpsy ?>);
+	    });
+	</script>
 <?php endif; ?>
 
 <div style="clear: both"></div>

@@ -105,8 +105,22 @@ class Messages_auto_settings_Controller extends Controller
 					->callback('callback::boolean')
 					->label('SMS');
 		}
+
+		if (Settings::get('email_enabled'))
+		{
+			$grid->field('send_activation_to_email')
+					->label('Report to');
+		}
 		
 		$actions = $grid->grouped_action_field();
+
+		if ($this->acl_check_edit('Messages_Controller', 'auto_config'))
+		{
+			$actions->add_action()
+					->icon_action('edit')
+					->url('messages_auto_settings/edit')
+					->class('popup_link');
+		}
 		
 		if ($this->acl_check_delete('Messages_Controller', 'auto_config'))
 		{
@@ -205,6 +219,16 @@ class Messages_auto_settings_Controller extends Controller
 					->label('Sending of SMS messages enabled')
 					->value('1');
 		}
+
+		if (Settings::get('email_enabled'))
+		{
+			$form->group('Activation report');
+
+			$form->input('send_activation_to_email')
+					->rules('valid_emails|length[0,255]')
+					->label('Send report to email')
+					->help(help::hint('messages_send_activation_to_email'));
+		}
 		
 		$form->submit('Add');
 
@@ -255,7 +279,14 @@ class Messages_auto_settings_Controller extends Controller
 				$message_asettings->sms_enabled = 
 						Settings::get('sms_enabled') && 
 						$form_data['sms_enabled'];
-				
+
+				if (Settings::get('email_enabled') &&
+					!empty($form_data['send_activation_to_email']))
+				{
+					$message_asettings->send_activation_to_email =
+							$form_data['send_activation_to_email'];
+				}
+
 				$message_asettings->save_throwable();
 				
 				// commit transaction
@@ -280,6 +311,112 @@ class Messages_auto_settings_Controller extends Controller
 		// headline
 		$headline = __('Add automatical activation rule');
 		
+		// bread crumbs
+		$breadcrumbs = breadcrumbs::add()
+				->link('messages/show_all', 'Messages',
+						$this->acl_check_view('Messages_Controller', 'message'))
+				->text($message->name)
+				->disable_translation()
+				->text($headline)
+				->html();
+
+		// view
+		$view = new View('main');
+		$view->title = $headline;
+		$view->breadcrumbs = $breadcrumbs;
+		$view->content = new View('form');
+		$view->content->form = $form->html();
+		$view->content->headline = $headline;
+		$view->render(TRUE);
+	}
+
+	/**
+	 * Edits a rule.
+	 *
+	 * @param integer $rule_id
+	 */
+	public function edit($rule_id = NULL)
+	{
+		// check param
+		if (!$rule_id || !is_numeric($rule_id))
+		{
+			self::warning(PARAMETER);
+		}
+
+		// check access
+		if (!$this->acl_check_edit('Messages_Controller', 'auto_config'))
+		{
+			self::error(ACCESS);
+		}
+
+		$message_asettings = new Messages_automatical_activation_Model($rule_id);
+
+		// exists?
+		if (!$message_asettings || !$message_asettings->id)
+		{
+			self::error(RECORD);
+		}
+
+		$message = new Message_Model($message_asettings->message_id);
+
+		// form
+		$form = new Forge('messages_auto_settings/edit/' . $rule_id);
+
+		if (Settings::get('email_enabled'))
+		{
+			$form->group('Activation report');
+
+			$form->input('send_activation_to_email')
+					->rules('valid_emails|length[0,255]')
+					->label('Send report to email')
+					->help(help::hint('messages_send_activation_to_email'))
+					->value($message_asettings->send_activation_to_email);
+		}
+
+		$form->submit('Edit');
+
+		// validate form and save data
+		if ($form->validate())
+		{
+			try
+			{
+				// start transaction
+				$message_asettings->transaction_start();
+
+				// load data
+				$form_data = $form->as_array();
+
+				if (Settings::get('email_enabled') &&
+					!empty($form_data['send_activation_to_email']))
+				{
+					$message_asettings->send_activation_to_email =
+							$form_data['send_activation_to_email'];
+				}
+
+				$message_asettings->save_throwable();
+
+				// commit transaction
+				$message_asettings->transaction_commit();
+
+				// message
+				status::success('Message automatical activation setting rule has been succesfully updated');
+
+				// redirection
+				$this->redirect('messages_auto_settings/show', $message_asettings->message_id);
+			}
+			catch (Exception $e)
+			{
+				// roolback transaction
+				$message_asettings->transaction_rollback();
+				Log::add_exception($e);
+				// message
+				status::error('Error - cant add message automatical activation settings rule', $e);
+			}
+		}
+
+		// headline
+		$headline = __('Edit automatical activation rule');
+
 		// bread crumbs
 		$breadcrumbs = breadcrumbs::add()
 				->link('messages/show_all', 'Messages',

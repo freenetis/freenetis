@@ -136,6 +136,11 @@ class Message_Model extends ORM
 	 * when the end membership begins
 	 */
 	const FORMER_MEMBER_MESSAGE											= 19;
+
+	/**
+	 * content of page for big debtors, this redirection can be set in system
+	 */
+	const BIG_DEBTOR_MESSAGE											= 20;
 	
 	// self-cancel constants
 	
@@ -169,6 +174,7 @@ class Message_Model extends ORM
 		self::UNKNOWN_DEVICE_MESSAGE						=> 'Unknown device',
 		self::INTERRUPTED_MEMBERSHIP_MESSAGE				=> 'Interrupted membership message',
 		self::DEBTOR_MESSAGE								=> 'Debtor message',
+		self::BIG_DEBTOR_MESSAGE							=> 'Big debtor message',
 		self::PAYMENT_NOTICE_MESSAGE						=> 'Payment notice',
 		self::UNALLOWED_CONNECTING_PLACE_MESSAGE			=> 'Unallowed connecting place',
 		self::RECEIVED_PAYMENT_NOTICE_MESSAGE				=> 'Received payment notice',
@@ -256,6 +262,7 @@ class Message_Model extends ORM
 			$type == self::USER_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_MESSAGE ||
 			$type == self::DEBTOR_MESSAGE ||
+			$type == self::BIG_DEBTOR_MESSAGE ||
 			$type == self::PAYMENT_NOTICE_MESSAGE ||
 			$type == self::UNALLOWED_CONNECTING_PLACE_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE ||
@@ -286,6 +293,22 @@ class Message_Model extends ORM
 			$type == self::CONNECTION_TEST_EXPIRED ||
 			$type == self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE
+		);
+	}
+
+	/**
+	 * Check if message is from finance module.
+	 *
+	 * @author Ondřej Fibich
+	 * @param integer $type	Type of message
+	 * @return boolean
+	 */
+	public static function is_finance_message($type)
+	{
+		return (
+			$type == self::BIG_DEBTOR_MESSAGE ||
+			$type == self::DEBTOR_MESSAGE ||
+			$type == self::PAYMENT_NOTICE_MESSAGE
 		);
 	}
 	
@@ -324,6 +347,7 @@ class Message_Model extends ORM
 		return (
 			$type == self::USER_MESSAGE || 
 			$type == self::DEBTOR_MESSAGE ||
+			$type == self::BIG_DEBTOR_MESSAGE ||
 			$type == self::PAYMENT_NOTICE_MESSAGE ||
 			$type == self::RECEIVED_PAYMENT_NOTICE_MESSAGE ||
 			$type == self::APPLICANT_APPROVE_MEMBERSHIP ||
@@ -352,6 +376,7 @@ class Message_Model extends ORM
 		return (
 			$type == self::USER_MESSAGE || 
 			$type == self::DEBTOR_MESSAGE ||
+			$type == self::BIG_DEBTOR_MESSAGE ||
 			$type == self::PAYMENT_NOTICE_MESSAGE ||
 			$type == self::RECEIVED_PAYMENT_NOTICE_MESSAGE ||
 			$type == self::CONNECTION_REQUEST_APPROVE ||
@@ -403,6 +428,7 @@ class Message_Model extends ORM
 	{
 		return (
 			$type == self::DEBTOR_MESSAGE ||
+			$type == self::BIG_DEBTOR_MESSAGE ||
 			$type == self::PAYMENT_NOTICE_MESSAGE
 		);
 	}
@@ -553,7 +579,12 @@ class Message_Model extends ORM
 		{
 			$where[] = "m.type <> " . intval(self::PAYMENT_NOTICE_MESSAGE);
 			$where[] = "m.type <> " . intval(self::DEBTOR_MESSAGE);
+			$where[] = "m.type <> " . intval(self::BIG_DEBTOR_MESSAGE);
 			$where[] = "m.type <> " . intval(self::RECEIVED_PAYMENT_NOTICE_MESSAGE);
+		}
+		else if (!is_numeric(Settings::get('big_debtor_boundary')))
+		{
+			$where[] = "m.type <> " . intval(self::BIG_DEBTOR_MESSAGE);
 		}
 		
 		if (!Settings::get('membership_interrupt_enabled'))

@@ -23,6 +23,24 @@ class valid {
 	}
 
 	/**
+	 * Validate emails, commonly used characters only, separated by commas
+	 *
+	 * @param   string   email address
+	 * @return  boolean
+	 */
+	public static function emails($emails)
+	{
+		foreach (explode(',', $emails) as $email)
+		{
+			if (!self::email($email))
+			{
+				return FALSE;
+			}
+		}
+		return TRUE;
+	}
+
+	/**
 	 * Validate email, RFC compliant version
 	 * Note: This function is LESS strict than valid_email. Choose carefully.
 	 *

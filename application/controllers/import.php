@@ -237,6 +237,10 @@ class Import_Controller extends Controller
 			// redirection reactivation
 			if ($debtor_redir_react)
 			{
+				if (is_numeric(Settings::get('big_debtor_boundary')))
+				{
+					$this->reactivate_redir(Message_Model::BIG_DEBTOR_MESSAGE);
+				}
 				$this->reactivate_redir(Message_Model::DEBTOR_MESSAGE);
 			}
 			
@@ -331,6 +335,10 @@ class Import_Controller extends Controller
 			// redirection reactivation
 			if ($debtor_redir_react)
 			{
+				if (is_numeric(Settings::get('big_debtor_boundary')))
+				{
+					$this->reactivate_redir(Message_Model::BIG_DEBTOR_MESSAGE);
+				}
 				$this->reactivate_redir(Message_Model::DEBTOR_MESSAGE);
 			}
 			
@@ -428,6 +436,10 @@ class Import_Controller extends Controller
 			// redirection reactivation
 			if ($debtor_redir_react)
 			{
+				if (is_numeric(Settings::get('big_debtor_boundary')))
+				{
+					$this->reactivate_redir(Message_Model::BIG_DEBTOR_MESSAGE);
+				}
 				$this->reactivate_redir(Message_Model::DEBTOR_MESSAGE);
 			}
 			

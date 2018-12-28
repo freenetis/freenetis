@@ -478,6 +478,7 @@ class Form_Input
 					{
 						case 'valid_url':
 						case 'valid_email':
+						case 'valid_emails':
 						case 'valid_ip':
 							// Fetch an i18n error message
 							$error = Kohana::lang('validation.' . $func, $args);

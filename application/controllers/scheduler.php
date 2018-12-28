@@ -425,16 +425,23 @@ class Scheduler_Controller extends Controller
 					$rules = $messages_aa->get_message_settings($message->id);
 					// activate flags
 					$a_redir = $a_email = $a_sms = FALSE;
+					$report_to = array();
 					// get all rules that match
 					$filtered_rules = Time_Activity_Rule::filter_rules(
 							$rules, self::AM_NOTIFICATION, $this->t
-					);				
+					);
 					// check all rules if redir/email/sms should be activated now
 					foreach ($filtered_rules as $rule)
 					{
 						$a_redir = $a_redir || $rule->redirection_enabled;
 						$a_email = $a_email || $rule->email_enabled;
 						$a_sms = $a_sms || $rule->sms_enabled;
+						$any = $rule->redirection_enabled || $rule->email_enabled || $rule->sms_enabled;
+
+						if ($any && $rule->send_activation_to_email)
+						{
+							$report_to += explode(',', $rule->send_activation_to_email);
+						}
 					}
 					// global options
 					$a_redir = $a_redir && Settings::get('redirection_enabled');
@@ -463,25 +470,49 @@ class Scheduler_Controller extends Controller
 						if (count($info_messages))
 						{
 							$m = __('Notification message "%s" has been automatically activated',
-									array(__($message->name)));
+									__($message->name));
 							Log_queue_Model::info($m, implode("\n", $info_messages));
+							// send report
+							if (count($report_to))
+							{
+								$this->send_message_activation_report($report_to, $m, $info_messages, $members);
+							}
 						}
 					}
 					catch (Exception $e)
 					{
-						self::log_error($e->getMessage(), $e, FALSE);
+						self::log_error('notification_activation', $e, FALSE);
 						Log_queue_Model::error($e->getMessage(), $e);
 					}
 				}
 			}
 			catch (Exception $e)
 			{
-				self::log_error($error_prefix, $e, FALSE);
+				self::log_error('notification_activation', $e, FALSE);
 				Log_queue_Model::error($error_prefix, $e);
 			}
 		}
 	}
-	
+
+	private function send_message_activation_report($to_emails, $description,
+			$actions, $activated_members)
+	{
+		$email_view = new View('email_templates/notification_activation_report');
+		$email_view->header = $description;
+		$email_view->actions = $actions;
+		$email_view->affected_members = $activated_members;
+		$email_subject = Settings::get('email_subject_prefix') . ': ' . $description;
+		$email_body = $email_view->render();
+
+		$from = Settings::get('email_default_email');
+		$email_model = new Email_queue_Model();
+
+		foreach ($to_emails as $email)
+		{
+			$email_model->push($from, $email, $email_subject, $email_body);
+		}
+	}
+
 	/**
 	 * Deduct all fees automatically if enabled
 	 * 

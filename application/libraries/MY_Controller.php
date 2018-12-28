@@ -124,6 +124,24 @@ class Controller extends Controller_Core
 		// This part only needs to be run once
 		if (self::$instance === NULL)
 		{
+			// init settings
+			$this->settings = new Settings();
+
+			$not_setup = !file_exists('config.php') || !file_exists('.htaccess');
+
+			// change setting for non-setup in order to prevent database init
+			// in Settings
+			if ($not_setup)
+			{
+				Settings::set_offline_mode(TRUE);
+
+				$this->settings->set('index_page', !file_exists('.htaccess'));
+				// Choose all automatically for setup (see url helper)
+				$this->settings->set('domain', '');
+				$this->settings->set('suffix', '');
+				$this->settings->set('protocol', '');
+			}
+
 			// init sessions
 			$this->session = Session::instance();
 			
@@ -160,9 +178,6 @@ class Controller extends Controller_Core
 				// Die
 				die();
 			}
-			
-			// init settings
-			$this->settings = new Settings();
 
 			// if true, freenetis will run in popup mode (without header and menu)
 			$this->popup = (isset($_GET['popup']) && $_GET['popup']) ? 1 : 0;
@@ -174,16 +189,11 @@ class Controller extends Controller_Core
 			$this->noredirect = ($this->input->get('noredirect') || $this->input->post('noredirect'));
 
 			// config file doesn't exist, we must create it
-			if (!file_exists('config.php') || !file_exists('.htaccess'))
+			if ($not_setup)
 			{
 				// protection before loop
 				if (url_lang::current(1) == 'setup_config')
 					return;
-				
-				if (!file_exists('.htaccess'))
-				{
-					Settings::set('index_page', 1);
-				}
 				
 				url::redirect('setup_config');
 			}

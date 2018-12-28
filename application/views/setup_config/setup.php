@@ -1,5 +1,8 @@
 <?php if (isset($error) && $error): ?>
 <h2><?php echo __('Cannot connect to database') ?></h2>
+<?php if (isset($error_cause) && $error_cause): ?>
+<p class="error"><?php echo __('Error') . ': ' . $error_cause ?></p>
+<?php endif ?>
 <p><?php echo __('It can means that username/password/host are bad or host is unavailable.') ?></p>
 <ul>
     <li><?php echo __('Are you really sure that you use correct username and password?') ?></li>

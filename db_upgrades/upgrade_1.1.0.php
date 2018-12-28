@@ -259,7 +259,7 @@ $upgrade_sql['1.1.0'] = array
 		`comments_thread_id` INT NULL DEFAULT NULL ,
 		PRIMARY KEY ( `id` ),
 		FOREIGN KEY `closed_by_user_id_fk` (`closed_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-		FOREIGN KEY `comments_thread_id_fk` (`comments_thread_id`) REFERENCES `comments_threads` (`id`) ON DELETE SET NULL
+		FOREIGN KEY `log_queues_comments_thread_id_fk` (`comments_thread_id`) REFERENCES `comments_threads` (`id`) ON DELETE SET NULL
 	 ) ENGINE = InnoDB;",
 	
 /**
@@ -301,7 +301,7 @@ $upgrade_sql['1.1.0'] = array
 		PRIMARY KEY (`id`),
 		INDEX `since_index` (`since`),
 		INDEX `until` (`until`),
-		FOREIGN KEY `member_id_fk` (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE
+		FOREIGN KEY `members_whitelists_member_id_fk` (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE
 	) ENGINE = InnoDB COMMENT = 'Redirection member white list.';",
 	/* Import old data */
 	// association

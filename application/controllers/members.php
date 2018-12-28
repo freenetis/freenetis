@@ -1312,7 +1312,7 @@ class Members_Controller extends Controller
 			}
 			
 			// gps coordinates
-			if (!empty($member->address_point->gps))
+			if ($member->address_point->gps != NULL)
 			{
 				$gps_result = ORM::factory('address_point')->get_gps_coordinates(
 						$member->address_point->id
@@ -1373,7 +1373,7 @@ class Members_Controller extends Controller
 			}
 			
 			// gps coordinates
-			if (!empty($member->members_domicile->address_point->gps))
+			if ($member->members_domicile->address_point->gps != NULL)
 			{
 				$gps_result = ORM::factory('address_point')->get_gps_coordinates(
 						$member->members_domicile->address_point->id
@@ -3192,7 +3192,7 @@ class Members_Controller extends Controller
 			$gpsx = '';
 			$gpsy = '';
 
-			if (!empty($member->address_point->gps))
+			if ($member->address_point->gps != NULL)
 			{
 				$gps_result = $member->address_point->get_gps_coordinates(
 						$member->address_point->id
@@ -3209,7 +3209,7 @@ class Members_Controller extends Controller
 			$domicile_gpsx = '';
 			$domicile_gpsy = '';
 
-			if (!empty($member->members_domicile->address_point->gps))
+			if ($member->members_domicile->address_point->gps != NULL)
 			{
 				$gps_result = $member->address_point->get_gps_coordinates(
 						$member->members_domicile->address_point->id

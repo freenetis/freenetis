@@ -504,14 +504,14 @@ class Address_point_Model extends ORM
 		$country_id, $town, $district, $street, $number, $zip)
 	{
 		$where = " AND country_id = '".intval($country_id).
-				"' AND town LIKE '".mysql_real_escape_string($town)."'".
-				" AND street LIKE '".mysql_real_escape_string($street)."'".
-				" AND street_number LIKE '".mysql_real_escape_string($number)."'".
-				" AND t.zip_code LIKE '".mysql_real_escape_string($zip)."'";
+				"' AND town LIKE '".$this->db->escape_str($town)."'".
+				" AND street LIKE '".$this->db->escape_str($street)."'".
+				" AND street_number LIKE '".$this->db->escape_str($number)."'".
+				" AND t.zip_code LIKE '".$this->db->escape_str($zip)."'";
 		
 		if ($district)
 		{
-			$where .= " AND quarter LIKE '".mysql_real_escape_string($district)."'";
+			$where .= " AND quarter LIKE '".$this->db->escape_str($district)."'";
 		}
 		else
 		{

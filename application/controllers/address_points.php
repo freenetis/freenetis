@@ -19,7 +19,7 @@
 class Address_points_Controller extends Controller
 {
 
-	const METHOD_GOOGLE = 1;
+	const METHOD_OSM_NOMINATIM = 1;
 	
 	/**
 	 * Index redirects to show all
@@ -268,7 +268,7 @@ class Address_points_Controller extends Controller
 
 		$gps = "";
 
-		if (! empty ($ap->gps))
+		if ($ap->gps != NULL)
 		{
 		    $gps_result = $ap->get_gps_coordinates($ap->id);
 
@@ -340,6 +340,7 @@ class Address_points_Controller extends Controller
 		$view = new View('main');
 		$view->breadcrumbs = $breadcrumbs;
 		$view->title = __('Address point detail');
+		$view->mapycz_enabled = TRUE;
 		$view->content = new View('address_points/show');
 		$view->content->address_point = $ap;
 		$view->content->members_grid = $members_grid;
@@ -531,7 +532,7 @@ class Address_points_Controller extends Controller
 		$gpsx = NULL;
 		$gpsy = NULL;
 
-		if (!empty($ap->gps))
+		if ($ap->gps != NULL)
 		{
 		    $gps_result = $ap->get_gps_coordinates($ap->id);
 
@@ -712,10 +713,7 @@ class Address_points_Controller extends Controller
 		// success, we end
 		if ($address_point && strlen($address_point->gps))
 		{
-			$gps = explode(' ', $address_point->gps);
-			echo gps::real2degrees($gps[0], FALSE) . ' ';
-			echo gps::real2degrees($gps[1], FALSE);
-
+			echo $address_point->gps;
 			return;
 		}
 		
@@ -742,21 +740,19 @@ class Address_points_Controller extends Controller
 		if (!$street_number || $town == '' || $country == '')
 			return;
 		
-		$data = self::get_geocode_from_google ($street, $street_number, $town, $country);
+		$data = self::get_geocode_from_nomanatim ($street, $street_number, $town, $country);
 
 		if (!$data)
 			return;
-		
+
 		/* return only precise GPS coordinates
-		 * 
-		 * Valid location types: ROOFTOP
+		 *
+		 * Valid location types: class=place
 		 */
-		$type = $data->results[0]->geometry->location_type;
-		if ($type != "ROOFTOP")
+		if ($data[0]->class != "place")
 			return;
 		
-		echo gps::real2degrees(num::decimal_point($data->results[0]->geometry->location->lat), FALSE)." ".
-			gps::real2degrees(num::decimal_point($data->results[0]->geometry->location->lng), FALSE);
+		echo num::decimal_point($data[0]->lat)." ".num::decimal_point($data[0]->lon);
 	}
 	
 	/**
@@ -792,10 +788,7 @@ class Address_points_Controller extends Controller
 			// success, we end
 			if ($address_point && strlen($address_point->gps))
 			{
-				$gps = explode(' ', $address_point->gps);
-				echo gps::real2degrees($gps[0], FALSE) . ' ';
-				echo gps::real2degrees($gps[1], FALSE);
-
+				echo $address_point->gps;
 				return;
 			}
 
@@ -813,21 +806,19 @@ class Address_points_Controller extends Controller
 			if (!$number || $town == '' || $country == '')
 				return;
 
-			$data = self::get_geocode_from_google ($street, $number, $town, $country);
+			$data = self::get_geocode_from_nomanatim ($street, $number, $town, $country);
 
 			if (!$data)
 				return;
-			
-			/* return only precise GPS coordinates
-			 * 
-			 * Valid location types: ROOFTOP
-			 */
-			$type = $data->results[0]->geometry->location_type;
-			if ($type != "ROOFTOP")
-				return;
 
-			echo gps::real2degrees(num::decimal_point($data->results[0]->geometry->location->lat), FALSE)." ".
-				gps::real2degrees(num::decimal_point($data->results[0]->geometry->location->lng), FALSE);
+			/* return only precise GPS coordinates
+			 *
+			 * Valid location types: class=place
+			 */
+			if ($data[0]->class != "place")
+				return;
+			
+			echo num::decimal_point($data[0]->lat)." ".num::decimal_point($data[0]->lon);
 		}
 	}
 	
@@ -841,21 +832,32 @@ class Address_points_Controller extends Controller
 	 * @param type $country
 	 * @return type 
 	 */
-	private function get_geocode_from_google($street, $street_number, $town, $country)
+	private function get_geocode_from_nomanatim($street, $street_number, $town, $country)
 	{
 		$address = $street." ".$street_number.",".$town.",".$country;
-		
-		$URL = "http://maps.googleapis.com/maps/api/geocode/json?address="
-			.urlencode($address)."&sensor=false";
-		
-		$json = file_get_contents($URL);
+
+		$opts = array(
+			"http" => array(
+				"method" => "GET",
+				"header" => "Referer: " . url_lang::current() . "\r\n"
+			)
+		);
+
+		$context = stream_context_create($opts);
+
+		$URL = "http://nominatim.openstreetmap.org/?q=".urlencode($address)
+				."&format=json&limit=1";
+
+		$json = file_get_contents($URL, FALSE, $context);
 		
 		$data = json_decode($json);
 		
 		if (!$data ||
-			!is_object($data) ||
-			$data->status != 'OK' ||
-			!isset($data->results[0]))
+			!is_array($data) ||
+			count($data) == 0 ||
+			!is_object($data[0]) ||
+			!isset($data[0]->lat) ||
+			!isset($data[0]->lon))
 		{
 			return FALSE;
 		}
@@ -878,7 +880,7 @@ class Address_points_Controller extends Controller
 		$form->dropdown('method')
 				->options(array
 				(
-					self::METHOD_GOOGLE => __('Google API')
+					self::METHOD_OSM_NOMINATIM => __('OSM Nominatim')
 				));
 		
 		$form->submit('Update');
@@ -891,7 +893,7 @@ class Address_points_Controller extends Controller
 			// Google method
 			switch ($form_data['method'])
 			{
-				case self::METHOD_GOOGLE:
+				case self::METHOD_OSM_NOMINATIM:
 					
 					$address_point_model = new Address_point_Model();
 					
@@ -909,8 +911,8 @@ class Address_points_Controller extends Controller
 						
 						$town .= ', '.$address_point->zip_code;
 						
-						// finds gps from google
-						$data = self::get_geocode_from_google (
+						// finds gps from Nominatim
+						$data = self::get_geocode_from_nomanatim (
 								$address_point->street,
 								$address_point->street_number,
 								$town,
@@ -919,12 +921,19 @@ class Address_points_Controller extends Controller
 		
 						if (!$data)
 							continue;
+
+						/* return only precise GPS coordinates
+						 *
+						 * Valid location types: class=place
+						 */
+						if ($data[0]->class != "place")
+							continue;
 						
 						// updates GPS coords
 						$address_point_model->update_gps_coordinates(
 								$address_point->id,
-								num::decimal_point($data->results[0]->geometry->location->lat),
-								num::decimal_point($data->results[0]->geometry->location->lng)
+								num::decimal_point($data[0]->lat),
+								num::decimal_point($data[0]->lon)
 						);	
 						$updated++;
 		

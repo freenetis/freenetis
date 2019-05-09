@@ -1808,6 +1808,7 @@ $lang = array
 	'members count' => 'Počet členů',
 	'members - date of born' => 'Členové - datum narození',
 	'members on this address' => 'Členové na této adrese',
+	'members with active whitelist' => 'Členové s aktivní bílou listinou',
 	'membership can be ended only to former member' => 'Členství může být ukončeno jen bývalému členovi.',
 	'membership interrupt' => 'Přerušení členství',
 	'membership interrupt begins notification' => 'Oznámení o započetí přerušení členství',

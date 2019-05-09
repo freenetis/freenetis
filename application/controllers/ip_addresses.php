@@ -880,7 +880,7 @@ class Ip_addresses_Controller extends Controller
 						'IP address does not match the subnet/mask.'
 				));
 			}
-			else if ($size > 1 && ($ip == $net || $ip == ($net + $size - 1)))
+			else if ($size > 2 && ($ip == $net || $ip == ($net + $size - 1)))
 			{
 				$input->add_error('required', __('Invalid IP address'));
 			}

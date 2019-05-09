@@ -47,7 +47,9 @@ echo implode(' | ', $links)
 <br />
 <br />
 
-<table class="extended" cellspacing="0" style="float:left; width: 400px; word-wrap: break-word;">
+<div style="display: grid; grid-column-gap: 50px; grid-template-columns: 400px auto;">
+
+<table class="extended" cellspacing="0" style="word-wrap: break-word;">
 	<tr>
 		<th><?php echo __('Device ID') ?></th>
 		<td><?php echo $device->id ?></td>
@@ -139,7 +141,7 @@ echo implode(' | ', $links)
 </table>
 
 <?php if (!empty($gps)): ?>
-<div id="ap_gmap" style="float: <?php echo ($this->popup ? 'left' : 'right');?>; width:400px;height:300px;">
+<div id="ap_gmap">
 </div>
 <script type="text/javascript">
 	$(document).ready(function () {
@@ -148,9 +150,9 @@ echo implode(' | ', $links)
 </script>
 <?php endif; ?>
 
-<br class="clear" />
-<br />
+</div>
 
+<br />
 <br />
 
 <?php if ($this->acl_check_view('Ifaces_Controller', 'iface', $device->user->member_id)): ?>

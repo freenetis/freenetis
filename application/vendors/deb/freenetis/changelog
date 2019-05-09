@@ -1,3 +1,10 @@
+freenetis (1.1.25) stable; urgency=low
+  * Add support for subnet CIDR 31
+  * Fix links to works/requests/work reports from user account on Stretch
+  * Fixes presence of whitelisted members in notification e-mail report message
+  * Fix map preview display in member popup window
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Thu, 09 May 2019 20:35:49 +0200
+
 freenetis (1.1.24) stable; urgency=hight
   * Fix scheduler failure on Debian 8 and higher
   * Drop support for Debian 5 (Lenny)

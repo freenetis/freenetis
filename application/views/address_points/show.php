@@ -8,7 +8,10 @@ else
 
 ?>
 <br /><br />
-<table class="extended" style="float:left; margin-bottom: 20px;" cellspacing="0">
+
+<div style="display: grid; grid-column-gap: 50px; grid-template-columns: 1fr 2fr; margin-bottom: 2em">
+
+<table class="extended" cellspacing="0">
 	<tr>
 		<th><?php echo __('ID') ?></th>
 		<td><?php echo $address_point->id ?></td>
@@ -52,17 +55,10 @@ else
 </table>
 
 <?php if (!empty($gps)): ?>
-	<div id="ap_gmap" style="float: <?php echo ($this->popup ? 'left' : 'right'); ?>; width:500px; height:300px"></div>
-	<div style="margin-bottom: 10px; float:left"></div>
-	<script type="text/javascript">
-	    $(document).ready(function () {
-	        mapycz_addr('ap_gmap', <?php echo $gpsx ?>, <?php echo $gpsy ?>);
-	    });
-	</script>
+	<div id="ap_gmap" style="min-height: 400px" data-gpsx="<?php echo $gpsx ?>" data-gpsy="<?php echo $gpsy ?>"></div>
 <?php endif; ?>
 
-<div style="clear: both"></div>
-<br /><br />
+</div>
 
 <h3><?php echo __('Members on this address') ?></h3>
 <?php echo $members_grid ?>

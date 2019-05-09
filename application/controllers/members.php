@@ -2056,6 +2056,7 @@ class Members_Controller extends Controller
 		$view->title = $title;
 		$view->breadcrumbs = $breadcrumbs->html();
 		$view->action_logs = action_logs::object_last_modif($member, $member_id);
+		$view->mapycz_enabled = TRUE; // for popup link to address point
 		$view->content = new View('members/show');
 		$view->content->title = $title;
 		$view->content->member = $member;

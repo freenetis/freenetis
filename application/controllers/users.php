@@ -965,7 +965,8 @@ class Users_Controller extends Controller
 	 */
 	public function show_work ($work_id = NULL)
 	{
-		Works_Controller::show ($work_id);
+		$controller = new Works_Controller();
+		$controller->show($work_id);
 	}
 	
 	/**
@@ -976,7 +977,8 @@ class Users_Controller extends Controller
 	 */
 	public function show_work_report ($work_report_id = NULL)
 	{
-		Work_reports_Controller::show ($work_report_id);
+		$controller = new Work_reports_Controller();
+		$controller->show($work_report_id);
 	}
 	
 	/**
@@ -987,7 +989,8 @@ class Users_Controller extends Controller
 	 */
 	public function show_request ($request_id = NULL)
 	{
-		Requests_Controller::show ($request_id);
+		$controller = new Requests_Controller();
+		$controller->show($request_id);
 	}
 
 	/**

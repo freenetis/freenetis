@@ -290,22 +290,22 @@ class Controller extends Controller_Core
 				fclose($f);
 			}
 			
-			// load these variables only if preprocessor is enabled and user is logged
-			if ($this->is_preprocesor_enabled() && $this->user_id)
-			{
-				// for preprocessing some variable
-				try
-				{
-					$this->preprocessor();
-				}
-				catch(Exception $e)
-				{
-					Log::add_exception($e);
-				}
-			}
+			$this->preprocessor_if_enabled();
 
 			// Singleton instance
 			self::$instance = $this;
+		}
+		else // copy resources from singleton in order to be capable to initiate another controller
+		{
+			$this->settings = self::$instance->settings;
+			$this->session = self::$instance->session;
+			$this->user_id = self::$instance->user_id;
+			$this->member_id = self::$instance->member_id;
+			$this->popup = self::$instance->popup;
+			$this->dialog = self::$instance->dialog;
+			$this->noredirect = self::$instance->noredirect;
+
+			$this->preprocessor_if_enabled();
 		}
 	}
 	
@@ -341,7 +341,7 @@ class Controller extends Controller_Core
 				$response_code = 403; // Forbidden
 				break;
 			case EMAIL:
-				$message = url_lang::lang('states.Failed to send e-mail') . 
+				$message = url_lang::lang('states.Failed to send e-mail') .
 					'<br />' . url_lang::lang('states.Please check settings.');
 				$response_code = 500; // Internal server error
 				break;
@@ -659,6 +659,25 @@ class Controller extends Controller_Core
 	}
 
 	/**
+	 * Loads variables only if preprocessor is enabled and user is logged.
+	 */
+	private function preprocessor_if_enabled()
+	{
+		if ($this->is_preprocesor_enabled() && $this->user_id)
+		{
+			// for preprocessing some variable
+			try
+			{
+				$this->preprocessor();
+			}
+			catch(Exception $e)
+			{
+				Log::add_exception($e);
+			}
+		}
+	}
+
+	/**
 	 * Function to preprocessing of some useful variables
 	 * 
 	 * @author Michal Kliment
@@ -879,7 +898,7 @@ class Controller extends Controller_Core
 		}
 		
 		// my requests
-		if (Settings::get('approval_enabled') && 
+		if (Settings::get('approval_enabled') &&
 			$this->member_id != Member_Model::ASSOCIATION &&
 			$this->acl_check_view('Requests_Controller', 'request', $this->member_id))
 		{

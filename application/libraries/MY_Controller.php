@@ -229,33 +229,22 @@ class Controller extends Controller_Core
                 $this->upgrade_db();
             }
 
-			// load these variables only if preprocessor is enabled and user is logged
-			if ($this->is_preprocesor_enabled() && $this->user_id)
-			{
-				// for preprocessing some variable
-				try
-				{
-					$user_model = new User_Model($this->user_id);
-					if ($user_model->id &&
-						$user_model->password_is_onetime &&
-						url_lang::current(2) != 'login/change_password' &&
-						url_lang::current(2) != 'login/logout')
-					{
-						url::redirect('login/change_password');
-					}
-					else
-					{
-						$this->preprocessor();
-					}
-				}
-				catch(Exception $e)
-				{
-					Log::add_exception($e);
-				}
-			}
+			$this->preprocessor_if_enabled();
 
 			// Singleton instance
 			self::$instance = $this;
+		}
+		else // copy resources from singleton in order to be capable to initiate another controller
+		{
+			$this->settings = self::$instance->settings;
+			$this->session = self::$instance->session;
+			$this->user_id = self::$instance->user_id;
+			$this->member_id = self::$instance->member_id;
+			$this->popup = self::$instance->popup;
+			$this->dialog = self::$instance->dialog;
+			$this->noredirect = self::$instance->noredirect;
+
+			$this->preprocessor_if_enabled();
 		}
 	}
 
@@ -594,6 +583,35 @@ class Controller extends Controller_Core
 	protected function is_preprocesor_enabled()
 	{
 		return TRUE;
+	}
+
+	/**
+	 * Loads variables only if preprocessor is enabled and user is logged.
+	 */
+	private function preprocessor_if_enabled()
+	{
+		if ($this->is_preprocesor_enabled() && $this->user_id)
+		{
+			try
+			{
+				$user_model = new User_Model($this->user_id);
+				if ($user_model->id &&
+					$user_model->password_is_onetime &&
+					url_lang::current(2) != 'login/change_password' &&
+					url_lang::current(2) != 'login/logout')
+				{
+					url::redirect('login/change_password');
+				}
+				else
+				{
+					$this->preprocessor();
+				}
+			}
+			catch(Exception $e)
+			{
+				Log::add_exception($e);
+			}
+		}
 	}
 
 	/**

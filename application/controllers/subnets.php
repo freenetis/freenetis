@@ -311,8 +311,8 @@ class Subnets_Controller extends Controller
 		
 		// subnet has gateway
 		$has_gateway = $subnet->has_gateway();
-		
-		if ($has_gateway)
+
+		if ($has_gateway && $total_available != 2) // not for CIDR /31
 		{
 			$total_available = $total_available - 2;
 			

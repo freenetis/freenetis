@@ -1583,7 +1583,8 @@ class Member_Model extends ORM
 								$debtor_message_id, $ip_address->id, ''
 						);
 				}
-				else if ($balance < Settings::get('payment_notice_boundary') && (
+				else if ($balance < Settings::get('payment_notice_boundary') &&
+					$member->notification_by_redirection && (
 							$balance >= Settings::get('debtor_boundary') &&
 							($ed_diff >= $idi)
 					) || (($ed_diff < $idi) && ($ed_diff >= $ii)))

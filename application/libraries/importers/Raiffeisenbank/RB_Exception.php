@@ -16,5 +16,3 @@
  * @author Jiri Svitak
  */
 class RB_Exception extends Exception {}
-
-?>

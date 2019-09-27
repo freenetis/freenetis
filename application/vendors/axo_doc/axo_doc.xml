@@ -2793,10 +2793,7 @@
     <object name="importers/Fio_Bank_Statement_File_Importer" type="library"></object>
     <object name="importers/Json_Fio_Bank_Statement_File_Importer" type="library"></object>
     <object name="importers/Raiffeisenbank/Parser_Ebanka" type="library"></object>
-    <object name="importers/Raiffeisenbank/Parser_Html_Table" type="library"></object>
     <object name="importers/Raiffeisenbank/RB_Exception" type="library"></object>
-    <object name="importers/Raiffeisenbank/RB_Importer" type="library"></object>
-    <object name="importers/Raiffeisenbank/RB_Statistics" type="library"></object>
     <object name="importers/Unicredit/UnicreditException" type="library"></object>
     <object name="importers/Unicredit/UnicreditImport" type="library"></object>
     <object name="importers/Unicredit/UnicreditParser" type="library"></object>

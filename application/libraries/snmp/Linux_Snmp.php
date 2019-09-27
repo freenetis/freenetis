@@ -49,7 +49,8 @@ class Linux_Snmp extends Abstract_Snmp
 			return FALSE;
 		}
 		
-		if (text::starts_with($row, 'Linux'))
+		if (text::starts_with($row, 'Linux') ||
+			text::starts_with($row, 'S6720'))
 		{
 			return TRUE;
 		}

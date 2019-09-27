@@ -11,11 +11,10 @@
  * 
  */
 
-require_once APPPATH."libraries/importers/Raiffeisenbank/RB_Importer.php";
-require_once APPPATH."libraries/importers/Raiffeisenbank/Parser_Ebanka.php";
 require_once APPPATH."libraries/importers/Unicredit/UnicreditImport.php";
 require_once APPPATH."libraries/importers/Unicredit/UnicreditSaver.php";
-
+require_once APPPATH."libraries/importers/Raiffeisenbank/Parser_RB.php";
+require_once APPPATH."libraries/importers/Raiffeisenbank/RB_Saver.php";
 
 /**
  * Handles importing of all types of bank listings into the database.
@@ -32,7 +31,7 @@ class Import_Controller extends Controller
 	 */
 	private static $file_types = array
 	(
-		Bank_account_Model::TYPE_RAIFFEISENBANK	=> 'HTML Raiffeisenbank',
+		Bank_account_Model::TYPE_RAIFFEISENBANK         => 'XML Raiffeisenbank',
 		Bank_account_Model::TYPE_FIO			=> 'Fio CSV',
 		Bank_account_Model::TYPE_UNICREDIT		=> 'Unicredit CSV'
 	);
@@ -152,7 +151,7 @@ class Import_Controller extends Controller
 			switch ($bank_acc_model->type)
 			{
 					case Bank_account_Model::TYPE_RAIFFEISENBANK:
-						$this->import_ebank(
+						$this->import_raiffeisenbank(
 								$id, $form->listing->value,
 								Settings::get('email_enabled') &&
 								@$form_data['send_email_notice'] == 1,
@@ -264,72 +263,74 @@ class Import_Controller extends Controller
 		}
 	}
 
-	/**
-	 * Parse ebank account
+    /**
+	 * Parse and imports Raiffeisen bank account statement
+	 * This part of code was created for parsing RB XML account statemenets. 
+	 * This is only a modified code of function below 
+	 * "import_unicredit(@params)" which was created earlier.
 	 * 
-	 * @author Jiri Svitak
-	 * @param integer $back_account_id
+	 * @author Jakub Juračka
+	 *  
+	 * @param integer $bank_account_id
 	 * @param string $file_url
 	 * @param boolean $send_emails Send emails as payment accept notification?
 	 * @param boolean $send_sms Send SMSs as payment accept notification?
 	 * @param boolean $debtor_redir_react Reactivate debtor redirection?
 	 * @param boolean $payment_notice_redir_react Reactivate payment notice redirection?
 	 */
-	private function import_ebank($bank_account_id, $url, $send_emails, $send_sms,
-			$debtor_redir_react, $payment_notice_redir_react)
+	private function import_raiffeisenbank($bank_account_id, $file_url,
+			$send_emails, $send_sms, $debtor_redir_react,
+			$payment_notice_redir_react)
 	{
 		try
 		{
 			$db = new Transfer_Model();
 			$db->transaction_start();
+			
+			$parser = new Parser_RB;
+                        
+			// parse bank listing items
+			$parser->parse($file_url);
+			// get data
+			$data = $parser->get_data();
 
-			$parser = new Parser_Ebanka($send_emails, $send_sms);
-			if (isset($bank_account_id))
+			// get header
+			$header = $parser->get_header();
+                        
+			// does match bank account in system with bank account of statement?
+			$ba = new Bank_account_Model($bank_account_id);
+			
+			if ($ba->account_nr != $header['account_nr'] ||
+				$ba->bank_nr != $header['bank_nr'])
 			{
-				$ba = new Bank_account_Model($bank_account_id);
-				RB_Importer::$parsed_bank_acc = $ba;
-			}
-			else
-			{
-				throw new RB_Exception("Nebyl nastaven bankovní účet k importu!");
-			}
-
-			$statement = new Bank_statement_Model();
-			$statement->set_logger(FALSE);
-			$statement->bank_account_id = $bank_account_id;
-			$statement->user_id = $this->session->get('user_id');
-			$statement->type = self::$file_types[Bank_account_Model::TYPE_RAIFFEISENBANK];
-			$statement->save_throwable();
-
-			RB_Importer::$bank_statement_id = $statement->id;
-			RB_Importer::$user_id = $this->session->get('user_id');
-			RB_IMporter::$time_now = date('Y-m-d H:i:s');
-
-			// safe import is done by transaction processing started in method which called this one
-			$parser->parse($url);
-
-			// does imported bank account and bank account on the statement match?
-			if ($ba->account_nr != $parser->account_nr ||
-				$ba->bank_nr != $parser->bank_nr)
-			{
-				$ba_nr = $ba->account_nr."/".$ba->bank_nr;
-				$listing_ba_nr = $parser->account_nr."/".$parser->bank_nr;
+				$ba_nr = $ba->account_nr.'/'.$ba->bank_nr;
+				$listing_ba_nr = $header['account_nr'].'/'.$header['bank_nr'];
+				
 				throw new RB_Exception(__(
-						"Bank account number in listing (%s) header does not match " .
-						"bank account %s in database!", array($listing_ba_nr, $ba_nr)
+						'Bank account number in listing (%s) header does not match ' .
+						'bank account %s in database!', array($listing_ba_nr, $ba_nr)
 				));
 			}
 
-			// save statement's from and to
-			$statement->from = $parser->from;
-			$statement->to = $parser->to;
-			// save statement number
-			$statement->statement_number = $parser->statement_number;
-			// save starting and ending balance
-			$statement->opening_balance = $parser->opening_balance;
-			$statement->closing_balance = $parser->closing_balance;
+			// save bank statement
+			$statement = new Bank_statement_Model();
+			$statement->set_logger(FALSE);
+			$statement->bank_account_id = $bank_account_id;
+			$statement->user_id = $this->user_id;
+			$statement->type = self::$file_types[Bank_account_Model::TYPE_RAIFFEISENBANK];
+			$statement->from = $header['from'];
+			$statement->to = $header['to'];
+			$statement->opening_balance = $header['bal_start'];
+			$statement->closing_balance = $header['bal_end'];
 			$statement->save_throwable();
-			
+
+          
+			// save bank listing items
+			$stats = RB_Saver::save(
+					$data, $bank_account_id, $statement->id,
+					$this->user_id, $send_emails, $send_sms
+			);
+
 			$db->transaction_commit();
 			
 			// redirection reactivation
@@ -352,10 +353,7 @@ class Import_Controller extends Controller
 		catch (RB_Exception $e)
 		{
 			$db->transaction_rollback();
-			status::error(__('Import has failed.') . ' ' .
-					$e->getMessage(), NULL, FALSE
-			);
-			url::redirect('bank_accounts/show_all');
+			status::error(__('Import has failed.') . ' ' . $e->getMessage(), NULL, FALSE);
 		}
 		catch (Duplicity_Exception $e)
 		{
@@ -371,12 +369,12 @@ class Import_Controller extends Controller
 			$db->transaction_rollback();
 			Log::add_exception($e);
 			status::error(
-					__('Import has failed') . '.<br>' . $e->getMessage(),
-					NULL, FALSE
+					__('Import has failed') . '.<br>' . $e->getMessage(), NULL, FALSE
 			);
 		}
-	}
 
+	}
+        
 	/**
 	 * Imports fio bank listing items from specified file.
 	 * 

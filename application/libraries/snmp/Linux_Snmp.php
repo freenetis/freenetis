@@ -53,7 +53,8 @@ class Linux_Snmp extends Abstract_Snmp
 		
 		if (preg_match('/STRING: "?(.*)"?/', $row, $matches) > 0)
 		{
-			return text::starts_with($matches[1], 'Linux');
+			return text::starts_with($matches[1], 'Linux') ||
+					text::starts_with($matches[1], 'S6720'); // Huawei switch
 		}
 		else
 		{

@@ -32,7 +32,16 @@ if (FALSE): ?><script type="text/javascript"><?php endif
 			markerLayer.enable();
 		};
 
-		var $map = $('#ap_gmap');
-		mapycz_addr('ap_gmap', $map.data('gpsx'), $map.data('gpsy'));
+		(function map_async_loader() {
+			if ('Loader' in window) {
+				Loader.async = true;
+				Loader.load(null, null, function () {
+					var $map = $('#ap_gmap');
+					mapycz_addr('ap_gmap', $map.data('gpsx'), $map.data('gpsy'));
+				});
+			} else {
+				setTimeout(map_async_loader, 1000);
+			}
+		})();
 	});
 	

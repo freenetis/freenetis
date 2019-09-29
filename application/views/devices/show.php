@@ -145,7 +145,16 @@ echo implode(' | ', $links)
 </div>
 <script type="text/javascript">
 	$(document).ready(function () {
-		mapycz_dev('ap_gmap', <?php echo $gpsx ?>, <?php echo $gpsy ?>);
+		(function map_async_loader() {
+			if ('Loader' in window) {
+				Loader.async = true;
+				Loader.load(null, null, function () {
+					mapycz_dev('ap_gmap', <?php echo $gpsx ?>, <?php echo $gpsy ?>);
+				});
+			} else {
+				setTimeout(map_async_loader, 1000);
+			}
+		})();
 	});
 </script>
 <?php endif; ?>

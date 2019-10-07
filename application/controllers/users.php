@@ -523,6 +523,13 @@ class Users_Controller extends Controller
 				$user_data->login = $form_data['username'];
 			}
 			$user_data->birthday = (empty($form_data['birthday']) ? NULL : date("Y-m-d",$form_data['birthday']));
+
+			if ($user->type != User_Model::MAIN_USER &&
+				$this->acl_check_edit(get_class($this), 'member', $user->member_id))
+			{
+				$user_data->member_id = $form_data['member_id'];
+			}
+
 			$user_data->pre_title = $form_data['pre_title'];
 			$user_data->name = $form_data['name'];
 			$user_data->middle_name = $form_data['middle_name'];

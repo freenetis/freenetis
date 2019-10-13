@@ -87,7 +87,7 @@ class Database {
 	 */
 	public function __construct($config = array())
 	{
-		if (!is_array($config) && count($config))
+		if (!is_array($config) && is_string($config) && strlen($config))
 		{
 			// Parse the DSN, creating an array to hold the connection parameters
 			$db = array

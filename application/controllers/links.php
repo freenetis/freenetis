@@ -494,7 +494,10 @@ class Links_Controller extends Controller
 			$link_model = new Link_Model();
 			$link_model->name = $form_data['name'];
 			$link_model->medium = $form_data['medium'];
-			$link_model->bitrate = $form_data['bitrate'] * $form_data['bit_unit'];
+			if (is_numeric($form_data['bitrate']) && is_numeric($form_data['bit_unit']))
+			{
+				$link_model->bitrate = $form_data['bitrate'] * $form_data['bit_unit'];
+			}
 			$link_model->duplex = $form_data['duplex'];
 			$link_model->comment = $form_data['comment'];
 			

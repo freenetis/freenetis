@@ -129,8 +129,8 @@ find * -type f ! -regex '^DEBIAN/.*' -exec md5sum {} \; >> DEBIAN/md5sums
 echo "Package: ${NAME}" >> DEBIAN/control
 echo "Version: ${VERSION}-${DEBIAN}" >> DEBIAN/control
 echo "Installed-Size: ${SIZE}" >> DEBIAN/control
-if [ $DEBIAN = "stretch" ]; then
-    cat ../../${NAME}/control.stretch >> DEBIAN/control
+if [ -f ../../${NAME}/control.${DEBIAN} ]; then
+    cat ../../${NAME}/control.${DEBIAN} >> DEBIAN/control
 else
     cat ../../${NAME}/control >> DEBIAN/control
 fi
@@ -138,13 +138,13 @@ fi
 # scripts ######################################################################
 
 cp -a -f ../../${NAME}/preinst DEBIAN/preinst
-if [ $DEBIAN = "jessie" ] || [ $DEBIAN = "stretch" ]; then
+if [ $DEBIAN = "jessie" ] || [ $DEBIAN = "stretch" ] || [ $DEBIAN = "buster" ]; then
     cp -a -f ../../${NAME}/postinst.jessie DEBIAN/postinst
 else
     cp -a -f ../../${NAME}/postinst DEBIAN/postinst
 fi
 cp -a -f ../../${NAME}/prerm DEBIAN/prerm
-if [ $DEBIAN = "jessie" ] || [ $DEBIAN = "stretch" ]; then
+if [ $DEBIAN = "jessie" ] || [ $DEBIAN = "stretch" ] || [ $DEBIAN = "buster" ]; then
     cp -a -f ../../${NAME}/postrm.jessie DEBIAN/postrm
 else
     cp -a -f ../../${NAME}/postrm DEBIAN/postrm

@@ -426,7 +426,7 @@ class Filter_form
 		}
 
 		// load data
-		if (count($values))
+		if (!is_null($values) && count($values))
 		{
 			$this->tables = $tables;
 			

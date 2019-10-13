@@ -37,13 +37,13 @@ class Config_Model extends Model
 				from config
 				where name = ?
 			", $name);
+
+			return (!is_null($result) && count($result)) ? $result[0]->value : '';
 		}
 		catch (Kohana_Database_Exception $e)
 		{
-			$result = NULL;
+			return '';
 		}
-
-		return (count($result)) ? $result[0]->value : '';
 	}
 
 	/**

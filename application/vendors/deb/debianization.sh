@@ -22,7 +22,7 @@ fi
 
 NAMES=(freenetis freenetis-monitoring freenetis-redirection freenetis-dhcp \
 	   freenetis-ssh-keys freenetis-qos)
-DEBIANS=(squeeze wheezy jessie stretch)
+DEBIANS=(squeeze wheezy jessie stretch buster)
 VERSION=$1
 
 if [ $# -eq 2 ] || [ $# -eq 3 ]; then

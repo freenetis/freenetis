@@ -1489,7 +1489,7 @@ class Members_Controller extends Controller
 		}
 		
 		// finds date of expiration of member fee
-		$expiration_info = '';
+		$expiration_info = NULL;
 		
 		if (Settings::get('finance_enabled') &&
 			isset($account) && !$is_applicant && !$is_former)

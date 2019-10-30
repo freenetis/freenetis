@@ -237,10 +237,15 @@
 		</td>
 	</tr>
 	<?php if ($member->type != Member_Model::TYPE_APPLICANT) { ?>
-	<?php if (isset($expiration_info) && ($entrance_fee_paid == $member->entrance_fee)) { ?>
+	<?php if ($expiration_info && ($entrance_fee_paid == $member->entrance_fee)) { ?>
 	<tr>
 		<th><?php echo __('Payed to').'&nbsp;'.help::hint('payed_to') ?></th>
-		<td><span style="color: <?php echo ($account->balance < 0) ? 'red' : 'green' ?>"><?php if ($expiration_info->shortened): ?>&gt; <?php endif; ?><?php echo $expiration_info->expiration_date ?></span></td>
+		<td><span style="color: <?php echo ($account->balance < 0) ? 'red' : 'green' ?>">
+                        <?php 
+                                if ($expiration_info->shortened): ?>&gt; <?php endif;
+
+                                echo $expiration_info->expiration_date ?>
+                </span></td>
 	</tr>
 	<?php } ?>
 	<?php if (isset($fee)) { ?>

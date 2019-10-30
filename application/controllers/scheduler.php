@@ -1055,7 +1055,7 @@ class Scheduler_Controller extends Controller
 			
 			// Build the HTML message
 			$html_message = email::create_preview_link($hash) . $email->body;
-			$message = new Swift_Message($email->subject, $html_messsage, 'text/html');
+			$message = new Swift_Message($email->subject, $html_message, 'text/html');
 			
 			// Send
 			if (Config::get('unit_tester') || 

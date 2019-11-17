@@ -1416,7 +1416,7 @@ class ORM_Core {
 		if ( ! isset($this->db_applied['select']))
 		{
 			// there are at least 1 ignored column, select columns manually
-			if (count($this->ignored_columns) > 0)
+			if (is_array($this->ignored_columns) && count($this->ignored_columns) > 0)
 			{
 				// removes ignored columns from all columnns
 				$columns = array_diff(

@@ -129,19 +129,20 @@ class file {
 		}
 		
 		$last = substr($size, -1);
+		$size_num = intval($size);
 		switch ($last)
 		{
 			case 't':
-				$size *= 1024;
+				$size_num *= 1024;
 			case 'g':
-				$size *= 1024;
+				$size_num *= 1024;
 			case 'm':
-				$size *= 1024;
+				$size_num *= 1024;
 			case 'k':
-				$size *= 1024;
+				$size_num *= 1024;
 		}
-		
-		return $size;
+
+		return $size_num;
 	}
 
 } // End file

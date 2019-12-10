@@ -257,7 +257,7 @@ class Transfers_Controller extends Controller
 	 * @param string $order_by_direction
 	 */
 	public function show_by_account(
-			$account_id = NULL, $limit_results = 500, $order_by = 'id',
+			$account_id = NULL, $limit_results = 40, $order_by = 'datetime',
 			$order_by_direction = 'desc', $page_word = null, $page = 1)
 	{
 		if (!isset($account_id))
@@ -303,10 +303,10 @@ class Transfers_Controller extends Controller
 		{
 			$order_by = 'datetime';
 		}
-
+		
 		if (strtolower($order_by_direction) != 'desc')
 		{
-			$order_by_direction = 'desc';
+			$order_by_direction = 'asc';
 		}
 
 		// creates fields for filtering
@@ -338,10 +338,7 @@ class Transfers_Controller extends Controller
 		// transfers on account
 		$transfer_model = new Transfer_Model();
 		$total_transfers = $transfer_model->count_transfers($account_id,
-				$filter_form->as_sql(array
-					(
-						'name', 'datetime', 'amount', 'text'
-					)),
+				$filter_form->as_sql(array('name', 'datetime', 'amount', 'text')),
 				$filter_form->as_array()
 		);
 		
@@ -350,38 +347,72 @@ class Transfers_Controller extends Controller
 			$sql_offset = 0;
 		}
 
-		$transfers = $transfer_model->get_transfers(
+		$transfers_list = $transfer_model->get_transfers(
 				$account_id, $sql_offset, (int) $limit_results, $order_by,
 				$order_by_direction,
-				$filter_form->as_sql(array
-					(
-						'name', 'datetime', 'amount', 'text'
-					)),
+				$filter_form->as_sql(array('name', 'datetime', 'amount', 'text')),
 				$filter_form->as_array()
 		);
+		
+		//counting subtotal
+		$transfers_list_with_subtotal = array();
+
+		$is_credit_account = $account->account_attribute_id == Account_attribute_Model::CREDIT;
+
+		if ($is_credit_account)
+		{
+			$count_transfers = $transfer_model->count_transfers($account_id);
+			$temp_transfers = $transfer_model->get_transfers(
+					$account_id, 0, $count_transfers, 'datetime', 'ASC'
+			);
+
+			$temp_res = array();
+			$temp_subtotal = 0;
+
+			foreach ($temp_transfers as $transfer)
+			{
+				$temp_subtotal += doubleval($transfer->amount);
+				$temp_res[$transfer->id] = $temp_subtotal;
+			}
+
+			for ($i = 0; $i < count($transfers_list); $i++)
+			{
+				$transfers_list_with_subtotal[$i] = (object) array
+				(
+					'id' => $transfers_list[$i]->id,
+					'name' => $transfers_list[$i]->name,
+					'datetime' => $transfers_list[$i]->datetime,
+					'amount' => $transfers_list[$i]->amount,
+					'text' => $transfers_list[$i]->text,
+					'variable_symbol' => $transfers_list[$i]->variable_symbol,
+					'subtotal' => $temp_res[$transfers_list[$i]->id]
+				);
+			}
+		}
 
 		// total amount of inbound and outbound transfers and total balance
 		$balance = $inbound = $outbound = 0;
-		if (count($transfers) > 0)
+		if (count($transfers_list) > 0)
 		{
 			// inbound and outbound amount of money are calculated from transfers of account
-			$inbound = $transfers->current()->inbound;
-			$outbound = $transfers->current()->outbound;
+			$inbound = $transfers_list->current()->inbound;
+			$outbound = $transfers_list->current()->outbound;
 			// balance is not calculated, fast redundant value from account itself is used
 			$balance = $account->balance;
 		}
+                
 		// headline
 		$headline = __('Transfers of double-entry account');
 		// grid of transfers
 		$transfers_grid = new Grid('transfers', null, array
 		(
 			'current'					=> $limit_results,
-			'selector_increace'			=> 500,
-			'selector_min'				=> 500,
+			'selector_increace'			=> 40,
+			'selector_min'				=> 40,
 			'selector_max_multiplier'	=> 10,
 			'base_url'					=> Config::get('lang') . '/transfers/show_by_account/'
-										. $account_id . '/' . $limit_results . '/'
-										. $order_by . '/' . $order_by_direction,
+											. $account_id . '/' . $limit_results . '/'
+											. $order_by . '/' . $order_by_direction,
 			'uri_segment'				=> 'page',
 			'total_items'				=> $total_transfers,
 			'items_per_page'			=> $limit_results,
@@ -446,12 +477,15 @@ class Transfers_Controller extends Controller
 		$transfers_grid->order_callback_field('amount')
 				->label(__('Amount'))
 				->callback('callback::amount_field');
-
-		$transfers_grid->callback_field('id')
+		
+        if ($is_credit_account)
+		{
+			$transfers_grid->callback_field('subtotal')
 				->label('Subtotal')
 				->help(help::hint('account_subtotal'))
-				->callback('callback::amount_after_transfer_field', $account_id);
-		
+				->callback('callback::amount_after_transfer_field');
+		}
+
 		$transfers_grid->order_field('text')
 				->label(__('Text'));
 		
@@ -467,7 +501,14 @@ class Transfers_Controller extends Controller
 					->label('Show transfer');
 		}
 		
-		$transfers_grid->datasource($transfers);
+		if($is_credit_account)
+		{
+			$transfers_grid->datasource($transfers_list_with_subtotal);
+		}
+		else
+		{
+			$transfers_grid->datasource($transfers_list);
+		}
 
 		if ($this->acl_check_view('Members_Controller', 'comment', $account->member_id))
 		{

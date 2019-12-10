@@ -261,7 +261,7 @@ class Transfer_Model extends ORM
 				LEFT JOIN transfers pt ON pt.id = t.previous_transfer_id
 				LEFT JOIN bank_transfers bt ON pt.id = bt.transfer_id
 				$where $cond
-				ORDER BY $order_by $order_by_direction
+				ORDER BY $order_by $order_by_direction, `id` $order_by_direction
 				LIMIT ".intval($limit_from).", ".intval($limit_results)."
 		");
 	}

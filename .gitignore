@@ -3,3 +3,5 @@
 /upload/
 /logs/
 /tests/config.ini
+/nbproject/private/
+/docker-compose.yml

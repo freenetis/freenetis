@@ -451,37 +451,24 @@ class callback
 	 * @param $item
 	 * @param $name
 	 */
-	public static function amount_after_transfer_field($item, $name , $args = array())
+	public static function amount_after_transfer_field($item, $name)
 	{
-		static $tm = null;
 
-		if ($tm == null)
-		{
-			$tm = new Transfer_Model();
-		}
-
-		if (!isset($args[0]))
-		{
-			return;
-		}
-
-		$sum = $tm->sum_transfers_to_id($args[0], $item->id);
-
-		if ($sum > 0)
+		if ($item->subtotal > 0)
 		{
 			echo  '<span style="color:green">'
-				. number_format((float)$sum, 2, ',', ' ')
+				. number_format((float)$item->subtotal, 2, ',', ' ')
 				. '</span>';
 		}
-		else if ($sum < 0)
+		else if ($item->subtotal < 0)
 		{
 			echo  '<span style="color:red">'
-				. number_format((float)$sum, 2, ',', ' ')
+				. number_format((float)$item->subtotal, 2, ',', ' ')
 				. '</span>';
 		}
 		else
 		{
-			echo $sum;
+			echo $item->subtotal;
 		}
 	}
 	

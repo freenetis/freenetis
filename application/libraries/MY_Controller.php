@@ -238,6 +238,7 @@ class Controller extends Controller_Core
 		{
 			$this->settings = self::$instance->settings;
 			$this->session = self::$instance->session;
+			$this->services = self::$instance->services;
 			$this->user_id = self::$instance->user_id;
 			$this->member_id = self::$instance->member_id;
 			$this->popup = self::$instance->popup;

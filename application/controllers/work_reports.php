@@ -1153,7 +1153,10 @@ class Work_reports_Controller extends Controller
 						}
 
 						$suggest_amount = $work_report->price_per_hour * $hours;
-						$suggest_amount += $work_report->price_per_km * $km;
+						if (!empty($km))
+						{
+							$suggest_amount += $work_report->price_per_km * $km;
+						}
 						
 						$work_report_suggest_amount += $suggest_amount;
 

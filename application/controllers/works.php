@@ -1493,9 +1493,11 @@ class Works_Controller extends Controller
 			try
 			{
 				// calculate suggested amount
-				$suggest_amount =
-					$form_data['hours'] * $form_data['payment_per_hour'] +
-					$form_data['km'] * $form_data['price_per_kilometre'];
+				$suggest_amount = $form_data['hours'] * $form_data['payment_per_hour'];
+				if (!empty($form_data['km']) && !empty($form_data['price_per_kilometre']))
+				{
+					$suggest_amount += $form_data['km'] * $form_data['price_per_kilometre'];
+				}
 
 				// creates new work
 				$work = new Job_Model();

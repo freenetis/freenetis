@@ -29,7 +29,9 @@ class Email_Controller extends Controller
 		parent::__construct();
 		
 		if (!module::e('email'))
-			Controller::error (ACCESS);
+		{
+			self::error(ACCESS);
+		}
 	}
 	
 	/**
@@ -37,81 +39,103 @@ class Email_Controller extends Controller
 	 */
 	public function index()
 	{
-		if ($this->input->post('address') == NULL ||
-			$this->input->post('email_member_id') == NULL)
-		{
-			Controller::warning(PARAMETER);
-		}
-
-		$te = new TextEditor();
-		$te->setWidth(656);
-		$te->setHeight(480);
-		$te->setFieldName('editor');
-		$te->setContent(
-				($this->input->post('editor') == NULL)
-				? '' : $this->input->post('editor')
-		);
-
-		$view = new View('main');
-		$view->title = __('Write email');
-		$view->content = new View('email/write');
-		$view->content->editorFieldName = $te->getFieldName();
-		$view->content->email_from = Settings::get('email_default_email');
-		$view->content->email_to = $this->input->post('address');
-		$view->content->subject = ($this->input->post('subject') == NULL) ? '' : $this->input->post('subject');
-		$view->content->editor = $te->getHtml();
-		$view->content->email_member_id = $this->input->post('email_member_id');
-		$view->render(TRUE);
+		$this->redirect('send');
 	}
 
 	/**
-	 * Sends email
+	 * Sends email via e-mail queue using an email form. Receiver is prefilled
+	 * from the specified contact.
 	 */
-	public function send()
+	public function send($contact_id = NULL)
 	{
-		if ($this->input->post('email_from') == NULL ||
-			$this->input->post('email_to') == NULL ||
-			$this->input->post('email_member_id') == NULL)
+		// check parameter
+		if ($contact_id && is_numeric($contact_id))
 		{
-			Controller::warning(PARAMETER);
+			$contact = new Contact_Model($contact_id);
+
+			if (!$contact->id || $contact->type != Contact_Model::TYPE_EMAIL)
+			{
+				unset($contact);
+			}
 		}
 
-		// Use connect() method to load Swiftmailer and connect
-		// using the parameters set in the email config file
-		$swift = email::connect();
+		// form
+		$form = new Forge();
 
-		// From, subject and HTML message
-		$from = $this->input->post('email_from');
-		$subject = 'FreenetIS - ' . $this->input->post('subject');
+		$form->input('from')
+				->rules('required')
+				->style('width:631px')
+				->value(Settings::get('email_default_email'));
 
-		$message = '<html><body>' . $this->input->post('editor') . '</body></html>';
-		// Build recipient lists
-		$recipients = new Swift_RecipientList;
-		$recipients->addTo($this->input->post('email_to'));
+		$form->input('to')
+				->rules('required|valid_email')
+				->style('width:631px')
+				->value(isset($contact) ? $contact->value : '');
 
-		// Build the HTML message
-		$message = new Swift_Message($subject, $message, "text/html");
+		$form->input('subject')
+				->style('width:631px');
 
-		if ($swift->send($message, $recipients, $from))
+		$form->html_textarea('email_message')
+				->label('Message');
+
+		$form->submit('Send');
+
+		if ($form->validate())
 		{
-			url::redirect('members/show/' . $this->input->post('email_member_id'));
+			$form_data = $form->as_array(FALSE);
+			$email = new Email_queue_Model();
+
+			try
+			{
+				// insert email into queue
+				$email->transaction_start();
+
+				$email->from = $form_data['from'];
+				$email->to = $form_data['to'];
+				$email->subject = $form_data['subject'];
+				$email->body = $form_data['email_message'];
+				$email->state = Email_queue_Model::STATE_NEW;
+
+				$email->save_throwable();
+
+				$email->transaction_commit();
+
+				status::success('E-mail was inserted to e-mail queue.');
+
+				if ($this->acl_check_view('Email_queues_Controller', 'email_queue'))
+				{
+					$this->redirect('show', $email->id);
+				}
+				else
+				{
+					$this->redirect('send');
+				}
+			}
+			catch (Exception $e)
+			{
+				$email->transaction_rollback();
+
+				status::error('Error - cannot insert e-mail to queue.', $e);
+				$this->redirect('send');
+			}
 		}
 		else
 		{
-			$content = form::open(url_lang::base() . 'email');
-			$content.= form::hidden('email_member_id', $this->input->post('email_member_id'));
-			$content.= form::hidden('address', $this->input->post('email_to'));
-			$content.= form::hidden('email_from', $this->input->post('email_from'));
-			$content.= form::hidden('subject', $this->input->post('subject'));
-			$content.= form::hidden('editor', $this->input->post('editor'));
-			$content.= form::submit('submit', __('Back'), 'class="submit"');
-			$content.= form::close();
+			// breadcrumbs
+			$breadcrumbs = breadcrumbs::add()
+				->link('email_queues', 'E-mails',
+						$this->acl_check_view('Email_queues_Controller', 'email_queue'))
+				->text('New e-mail');
 
-			Controller::error(EMAIL, $content);
+			$view = new View('main');
+			$view->title = __('New e-mail');
+			$view->breadcrumbs = $breadcrumbs->html();
+			$view->content = new View('form');
+			$view->content->headline = __('New e-mail');
+			$view->content->link_back = '';
+			$view->content->form = $form->html();
+			$view->render(TRUE);
 		}
-
-		// Disconnect
-		$swift->disconnect();
 	}
 
 	/**

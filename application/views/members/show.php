@@ -1,4 +1,4 @@
-<h2><?php echo $title ?></h2>
+	<h2><?php echo $title ?></h2>
 <br />
 
 <?php echo $member_links ?>
@@ -427,13 +427,9 @@
     		<table class="picturebox">
     			<tr>
         			<td><?php echo  __('E-mail') ?></td>
-        			<td><?php if (Settings::get('email_enabled')):
-						echo  form::open(url_lang::base().'email') ;
-						echo  form::hidden('email_member_id', $member->id );
-						echo  form::hidden('address', $contact->value );
-						echo  form::imagebutton('submit', url::base().'media/images/icons/write_email.png', array('title' => __('Send e-mail'), 'style' => 'width:16px; height:16px; border-width: 0px 0px 0px 0px; border-spacing: 0px;'));
-						echo  form::close();
-					endif ?></td>
+					<?php if (Settings::get('email_enabled')): ?>
+					<td><?php echo html::anchor('email/send/'.$contact->id, html::image('media/images/icons/write_email.png', array('title' => __('Send e-mail'), 'style' => 'width:16px; height:16px; border-width: 0px 0px 0px 0px; border-spacing: 0px;'))) ?></td>
+					<?php endif; ?>
 				</tr>
 			</table>
 		</th>

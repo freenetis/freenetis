@@ -362,7 +362,8 @@ class Email_queue_Model	extends ORM
 			INSERT INTO email_queues
 			SELECT
 				NULL, ?, ?, ?, ?, ?,
-				FROM_UNIXTIME(UNIX_TIMESTAMP(MIN(access_time))-1)
+				FROM_UNIXTIME(UNIX_TIMESTAMP(MIN(access_time))-1),
+				''
 			FROM email_queues
 		", array($from, $to, $subject, $body, self::STATE_NEW));
 	}

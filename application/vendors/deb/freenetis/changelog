@@ -1,3 +1,17 @@
+freenetis (1.1.26) stable; urgency=low
+  * Support for import of Raiffeisenbank XML statement
+  * Support Debian Buster
+  * SNMP Linux driver supports some Huawei switches
+  * Fix user transfer to a different member
+  * Fix invalid payment notification activation on fee recalculation
+  * Fix slow loading of Mapy.cz in offline mode
+  * Fix installation on PHP 7.3 or higher
+  * Fix database connection on PHP 7.2 and higher
+  * Fix roaming link adding on PHP 7.3 or higher
+  * Fix work adding on PHP 7.3 or higher
+  * Fix work report on PHP 7.3 or higher
+ -- Ondrej Fibich <ondrej.fibich@gmail.com>  Fri, 31 Jan 2020 00:14:30 +0100
+
 freenetis (1.1.25) stable; urgency=low
   * Add support for subnet CIDR 31
   * Fix links to works/requests/work reports from user account on Stretch

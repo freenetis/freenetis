@@ -4096,10 +4096,12 @@ class Members_Controller extends Controller
 		if (!$member->id)
 			Controller::error(RECORD);
 		
-		// acess
-		if ($member->type != Member_Model::TYPE_FORMER ||
+		// access
+		if ($member->leaving_date == '0000-00-00' ||
 			!$this->acl_check_edit(get_class($this), 'members', $member_id))
+		{
 			Controller::error(ACCESS);
+		}
 		
 		try
 		{

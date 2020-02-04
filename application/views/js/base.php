@@ -1551,7 +1551,7 @@ $(document).ready(function()
 	});
 	
 	// validate all form and filters
-	$('.form, #filter_form').each(function() {
+	$('form.form, #filter_form').each(function() {
 		$(this).validate({
 			errorPlacement: function(error, el)
 			{

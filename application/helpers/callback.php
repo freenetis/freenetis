@@ -1576,15 +1576,15 @@ class callback
 	{
 		if ($item->member_id)
 		{
-            if ($item->member_name)
-            {
-                $title = $item->member_name . ' (' . $item->member_id . ')';
-            }
-            else
-            {
-                $title = $item->member_id;
-            }
-            echo html::anchor("members/show/$item->member_id", $title);
+			if ($item->member_name)
+			{
+				$title = $item->member_name . ' (' . $item->member_id . ')';
+			}
+			else
+			{
+				$title = $item->member_id;
+			}
+			echo html::anchor("members/show/$item->member_id", $title);
 		}
 		else
 		{
@@ -1601,12 +1601,19 @@ class callback
 	 */
 	public static function member_type_field ($item, $name)
 	{
-		echo Member_Model::get_type($item->$name);
-        // redirection flag
-        if (property_exists($item, 'interrupt') && $item->interrupt)
-        {
-            echo ' (' . __('I') . ')';
-        }
+		if (property_exists($item, 'type_name'))
+		{
+			echo $item->type_name;
+		}
+		else
+		{
+			echo Member_Model::get_type($item->$name);
+		}
+		// redirection flag
+		if (property_exists($item, 'interrupt') && $item->interrupt)
+		{
+			echo ' (' . __('I') . ')';
+		}
 	}
 	
 	/**

@@ -289,16 +289,18 @@ class ApiAccountManager implements \phphttpauthserver\IAccountManager
 	 */
 	public function getUserPassword($username)
 	{
-		try
+        try
 		{
 			$ua = $this->api_account_model->find_by_username($username);
-            if ($ua === NULL)
-            {
-                return FALSE;
-            }
-            return $ua->token;
+
+			if ($ua === NULL)
+			{
+				return FALSE;
+			}
+
+			return $ua->token;
 		}
-		catch (Exception $ex) 
+		catch (Exception $ex)
 		{
 			Log::add_exception($ex);
 			return FALSE;

@@ -52,7 +52,19 @@
 	<?php if ($this->acl_check_view('Members_Controller', 'leaving_date', $member->id)  &&  $member->leaving_date != '0000-00-00') { ?>
 	<tr>
 		<th><?php echo  __('Leaving date') ?></th>
-		<td><?php echo  $member->leaving_date ?></td>
+		<td>
+		<?php 
+			echo $member->leaving_date;
+			if ($member->type != Member_Model::TYPE_FORMER)
+			{
+				echo html::anchor(url_lang::base().'members/restore_membership/'.$member->id, html::image(array
+				(
+					'src' => url::base().'media/images/icons/grid_action/delete.png',
+					'style' => 'vertical-align:middle'
+				)), array('title' => __('Restore membership'), 'class' => 'action-icon popup_link'));
+			}
+		?>
+		</td>
 	</tr>
 	<?php } ?>
 	<?php if ($this->acl_check_view('Membership_transfers_Controller', 'membership_transfer', $member->id) && $membership_transfer_from_member): ?>

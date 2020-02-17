@@ -37,8 +37,6 @@
  * @property datetime $applicant_registration_datetime
  * @property date $applicant_connected_from
  * @property integer $locked
- * @property integer $voip_billing_limit
- * @property integer $voip_billing_type
  * @property string $comment
  * @property User_Model $user
  * @property Address_point_Model $address_point

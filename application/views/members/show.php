@@ -290,38 +290,6 @@
 	<?php endif ?>
 	<?php } ?>
 	<?php } ?>
-	<?php if (Settings::get('voip_enabled') && $billing_has_driver && ($billing_account != null))
-	{ ?>
-	<tr>
-		<th colspan="2"><?php echo  __('VoIP information') ?></th>
-	</tr>
-	<tr>
-		<th><?php echo  __('State') ?></th>
-		<td><?php echo ($billing_account->state == 'active') ? '<b style="color:green">'.__('Active').'</b>' : '<b style="color:red">'.__('Inactive').'</b>' ?></td>
-	</tr>
-	<tr>
-		<th><?php echo  __('Current credit') ?></th>
-		<td><?php echo $billing_account->ballance.' '.$billing_account->currency.((!$is_association)? '&nbsp;&nbsp;-&nbsp;&nbsp;'.html::anchor(url_lang::base().'transfers/add_voip/'.$account->id, __('Recharge')):''); ?></td>
-	</tr>
-	<tr>
-		<th><?php echo  __('Limit') ?></th>
-		<td><?php echo $billing_account->limit.' '.$billing_account->currency.'&nbsp;&nbsp;-&nbsp;&nbsp;'.html::anchor(url_lang::base().'voip/change_member_limit/'.$member->id, __('Change')); ?></td>
-	</tr>
-	<tr>
-		<th><?php echo  __('Type') ?></th>
-		<td><?php echo ($billing_account->type == 'prepaid') ? __('Prepaid') : __('Postpaid') ?></td>
-	</tr>
-	<?php }
-	elseif ($count_voip != 0)
-	{ ?>
-	<tr>
-		<th colspan="2"><?php echo  __('VoIP information') ?></th>
-	</tr>
-	<tr>
-		<th><?php echo  __('State') ?></th>
-		<td><?php echo '<b style="color:darkorange" title="'.__('Registration will be activated after midnight.').'">'.__('Waiting for registration').'</b>' ?></td>
-	</tr>
-	<?php } ?>
 	<?php if ($this->acl_check_view('Members_Controller', 'qos_ceil', $member->id) &&
 			$this->acl_check_view('Members_Controller', 'qos_rate', $member->id) &&
 			$member->speed_class_id
@@ -476,12 +444,6 @@
 <?php if (!empty($redir_grid)): ?>
 <h3><?php echo __('IP addresses')?></h3>
 <?php echo $redir_grid ?>
-<br />
-<?php endif ?>
-
-<?php if (Settings::get('voip_enabled') && !empty($voip_grid)): ?>
-<h3><?php echo __('VoIP')?></h3>
-<?php echo $voip_grid ?>
 <br />
 <?php endif ?>
 

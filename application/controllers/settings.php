@@ -129,11 +129,6 @@ class Settings_Controller extends Controller
 			'name'			=> 'users_enabled',
 			'dependencies'	=> array()
 		),
-		'voip'					=> array
-		(
-			'name'			=> 'voip_enabled',
-			'dependencies'	=> array()
-		),
 		'vtiger'			=> array
 		(
 			'name'			=> 'vtiger_integration',
@@ -228,11 +223,6 @@ class Settings_Controller extends Controller
 			$this->acl_check_edit('Settings_Controller', 'sms_settings'))
 			$this->sections['sms'] 			= __('SMS');
 
-		// is voip enabled
-		if (self::isModuleEnabled('voip') &&
-			$this->acl_check_edit('Settings_Controller', 'voip_settings'))
-			$this->sections['voip'] 		= __('VoIP');
-
 		// is notification enabled
 		if (self::isModuleEnabled('notification') &&
 			$this->acl_check_edit('Settings_Controller', 'notification_settings'))
@@ -281,8 +271,6 @@ class Settings_Controller extends Controller
 			$this->email();
 		else if ($this->acl_check_edit('Settings_Controller', 'sms_settings'))
 			$this->sms();
-		else if ($this->acl_check_edit('Settings_Controller', 'voip_settings'))
-			$this->voip();
 		else if ($this->acl_check_edit('Settings_Controller', 'notification_settings'))
 			$this->notifications();
 		else if ($this->acl_check_edit('Settings_Controller', 'qos_settings'))
@@ -485,12 +473,6 @@ class Settings_Controller extends Controller
 				->label('SMS')
 				->options(arr::bool())
 				->default(Settings::get('sms_enabled'));
-		
-		// VoIP
-		$form_modules['voip'] = $this->form->radio('voip_enabled')
-				->label('VoIP')
-				->options(arr::bool())
-				->default(Settings::get('voip_enabled'));
 		
 		// Network
 		$form_modules['networks'] = $this->form->radio('networks_enabled')
@@ -1593,186 +1575,6 @@ class Settings_Controller extends Controller
 	}
 
 	/**
-	 * VOIP settings
-	 */
-	public function voip()
-	{
-		// access control
-		if (!module::e('voip') ||
-			!$this->acl_check_edit(get_class($this), 'voip_settings'))
-			Controller::error(ACCESS);
-
-		// creating of new forge
-		$this->form = new Forge('settings/voip');
-
-		$this->form->group('VoIP settings');
-
-		// page title
-		$this->form->input('voip_number_interval')
-				->label('Number interval')
-				->rules('length[19,19]|required')
-				->value(addslashes(Settings::get('voip_number_interval')))
-				->callback(array($this, 'valid_voip_number_interval'));
-		
-		$this->form->input('voip_number_exclude')
-				->label('Exclude numbers')
-				->rules('length[9,100]')
-				->value(addslashes(Settings::get('voip_number_exclude')))
-				->callback(array($this, 'valid_voip_number_exclude'));
-		
-		$this->form->input('voip_sip_server')
-				->label('SIP server')
-				->rules('length[1,30]|required')
-				->value(addslashes(Settings::get('voip_sip_server')));
-
-		$this->form->group('Asterisk manager settings');
-		
-		$this->form->input('voip_asterisk_hostname')
-				->label('Hostname')
-				->rules('length[1,50]')
-				->value(Settings::get('voip_asterisk_hostname'));
-		
-		$this->form->input('voip_asterisk_user')
-				->label('User')
-				->rules('length[1,50]')
-				->value(Settings::get('voip_asterisk_user'));
-		
-		$this->form->input('voip_asterisk_pass')
-				->label('Password')
-				->rules('length[1,50]')
-				->value(Settings::get('voip_asterisk_pass'));
-
-
-		$this->form->group('Billing settings');
-		
-		$this->form->dropdown('voip_billing_driver')
-				->label('Driver')
-				->rules('required')
-				->options(array
-				(
-					Billing::INACTIVE		=> __('Inactive'),
-					Billing::NFX_LBILLING	=> 'lBilling - NFX'
-				))->selected(Settings::get('voip_billing_driver'));
-		
-		$this->form->input('voip_billing_partner')
-				->label('Partner')
-				->rules('length[1,50]')
-				->value(Settings::get('voip_billing_partner'));
-		
-		$this->form->input('voip_billing_password')
-				->label('Password')
-				->rules('length[1,50]')
-				->value(Settings::get('voip_billing_password'));
-		
-
-		$this->form->group('Actual price of calls');
-		
-		$this->form->input('voip_tariff_fixed')
-				->label('Fixed line number')
-				->rules('valid_numeric')
-				->value(Settings::get('voip_tariff_fixed'));
-		
-		$this->form->input('voip_tariff_cellphone')
-				->label('Cellphone number')
-				->rules('valid_numeric')
-				->value(Settings::get('voip_tariff_cellphone'));
-		
-		$this->form->input('voip_tariff_voip')
-				->label('VoIP number')
-				->rules('valid_numeric')
-				->value(Settings::get('voip_tariff_voip'));
-
-		$this->form->submit('Save');
-
-		// form validate
-		if ($this->form->validate())
-		{
-			$form_data = $this->form->as_array(FALSE);
-			$issaved = true;
-			$driver = true;
-			
-			// enable VoIP driver
-			if ($form_data['voip_billing_driver'] != Billing::INACTIVE)
-			{
-				$voip_sip = new Voip_sip_Model();
-				
-				// Check pre requirements of VoIP  
-				if (!$voip_sip->check_pre_requirements())
-				{
-					// Make pre requirements
-					try
-					{
-						// creates helper functions
-						Voip_sip_Model::create_functions();
-						// create views
-						Voip_sip_Model::create_views();
-					}
-					catch (Exception $e)
-					{
-						// unset driver
-						Settings::set('voip_billing_driver', Billing::INACTIVE);
-						// don't change in next foreach
-						unset($form_data['voip_billing_driver']);
-						// error flad
-						$driver = false;
-					}
-				}
-			}
-
-			foreach ($form_data as $name => $value)
-			{
-				$issaved = $issaved && Settings::set($name, $value);
-			}
-			
-			if (!$driver)
-			{ // driver error
-				status::error(__(
-						'Cannot enable VoIP driver, allow `%s` rights for MySQL user',
-						array('CREATE ROUTINE')
-				) . '.',NULL,  FALSE);
-			}
-			else if ($issaved)
-			{
-				status::success('System variables have been successfully updated.');
-			}
-			else
-			{
-				status::success('System variables havent been successfully updated.');
-			}
-
-			url::redirect('settings/voip');
-		}
-
-		// drover informations
-		$ai = null;
-
-		if (Billing::instance()->has_driver())
-		{
-			if (Billing::instance()->test_conn())
-			{
-				$ai = __('Testing driver');
-				$ai .= ': lBilling - NFX......<span style="color:green">OK</span>';
-			}
-			else
-			{
-				$ai = __('Testing driver');
-				$ai .= ': lBilling - NFX......<span style="color:red">';
-				$ai .= __('Failed') . '</span>';
-			}
-		}
-
-		// create view for this template
-		$view = new View('main');
-		$view->title = __('Settings') . ' - ' . __('VoIP');
-		$view->content = new View('settings/main');
-		$view->content->current = 'voip';
-		$view->content->content = $this->form->html();
-		$view->content->headline = __('VoIP');
-		$view->content->additional_info = $ai;
-		$view->render(TRUE);
-	}
-
-	/**
 	 * SMS settings
 	 */
 	public function sms()
@@ -2792,96 +2594,6 @@ class Settings_Controller extends Controller
 		$view->render(TRUE);
 	}
 
-	// start of validation function
-
-	/**
-	 * Check if intervals of VoIP numbers are valid
-	 * 
-	 * @author Michal Kliment
-	 * @param object $input input to validation
-	 */
-	public function valid_voip_number_interval($input = NULL)
-	{
-		// validators cannot be accessed
-		if (empty($input) || !is_object($input))
-		{
-			self::error(PAGE);
-		}
-		
-		// parse interval to array of VoIP numbers
-		$numbers = explode('-', $input->value);
-		// check if count of numbers is smaller or longer than 2 
-		// (123456789, 987654321; NOT 123456,654321,987654)
-		if (count($numbers) != 2)
-		{
-			$input->add_error('required', __('Bad VoIP number interval format'));
-		}
-		else
-		{
-			// check if first and second number are 9 characters long (123456789, NOT 1234567890)
-			if (strlen($numbers[0]) != 9 || strlen($numbers[1]) != 9)
-			{
-				$input->add_error('required', __(
-						'VoIP number must be 9 characters long'
-				));
-			}
-			// check if first and second number are numbers :-) (123456789, NOT abcdefghi)
-			if (!is_numeric($numbers[0]) || !is_numeric($numbers[1]))
-			{
-				$input->add_error('required', __('VoIP number must be a number'));
-			}
-			// check if first number are not larger than second number
-			if ($numbers[0] > $numbers[1])
-			{
-				$input->add_error('required', __(
-						'First number mustn\'t be larger then second number'
-				));
-			}
-		}
-	}
-
-	/**
-	 * Validator
-	 *
-	 * @param object $input 
-	 */
-	public function valid_voip_number_exclude($input = NULL)
-	{
-		// validators cannot be accessed
-		if (empty($input) || !is_object($input))
-		{
-			self::error(PAGE);
-		}
-
-        $value = $input->value;
-
-        // do not check empty
-        if (empty($value)) {
-            return;
-        }
-		
-		// parse interval to array of VoIP numbers
-		$numbers = explode(';', $input->value);
-		// check if count of numbers is smaller or longer than 2 
-		// (123456789, 987654321; NOT 123456,654321,987654)
-
-		foreach ($numbers as $number)
-		{
-			// check if first and second number are 9 characters long (123456789, NOT 1234567890)
-			if (strlen($number) != 9)
-			{
-				$input->add_error('required', __('VoIP number must be 9 characters long'));
-				break;
-			}
-			// check if first and second number are numbers :-) (123456789, NOT abcdefghi)
-			if (!is_numeric($number))
-			{
-				$input->add_error('required', __('VoIP number must be a number'));
-				break;
-			}
-		}
-	}// end of validatation function
-	
 	/**
 	 * Validates suffix
 	 * 

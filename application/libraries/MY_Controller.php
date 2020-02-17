@@ -91,8 +91,6 @@ class Controller extends Controller_Core
 	public $dialog = 0;
 	/** @var boolean */
 	public $noredirect = FALSE;
-	/** @var boolean */
-	public $user_has_voip = 0;
 	/** @var string */
 	public $ip_address_span = '';
 	/** @var integer */
@@ -626,9 +624,6 @@ class Controller extends Controller_Core
 		$pm = new Preprocessor_Model();
 		$ra_ip = server::remote_addr();
 
-		// boolean variable if user has active voip number (for menu rendering)
-		$this->user_has_voip = (bool) $pm->has_voip_sips($this->user_id);
-
 		// count of unread mail messages of user
 		$this->unread_user_mails = $pm->count_all_unread_inbox_messages_by_user_id($this->user_id);
 
@@ -857,15 +852,7 @@ class Controller extends Controller_Core
 					'count' => $pm->count_unfilled_phone_invoices($this->user_id)
 				));
 		}
-
-		// my VoIP calls
-		if (Settings::get('voip_enabled') && $this->user_has_voip)
-		{
-			$menu->addItem(
-				'voip_calls/show_by_user/'.$this->user_id,
-				__('My VoIP calls'), 'account');
-		}
-
+		
 		//  my mail
 		$menu->addItem('mail/inbox', __('My mail'), 'account', array
 		(
@@ -1109,14 +1096,6 @@ class Controller extends Controller_Core
 				'vlans/show_all', __('Vlans'), 'networks');
 		}
 
-		// list of VoIP numbers
-		if (Settings::get('voip_enabled') &&
-		    $this->acl_check_view('VoIP_Controller', 'voip'))
-		{
-			$menu->addItem(
-				'voip/show_all', __('VoIP'), 'networks');
-		}
-
 		// list of clouds
 		if (Settings::get('networks_enabled') &&
 			$this->acl_check_view('Clouds_Controller', 'clouds'))
@@ -1235,7 +1214,6 @@ class Controller extends Controller_Core
 			$this->acl_check_edit('Settings_Controller', 'networks_settings') ||
 			$this->acl_check_edit('Settings_Controller', 'email_settings') ||
 			$this->acl_check_edit('Settings_Controller', 'sms_settings') ||
-			$this->acl_check_edit('Settings_Controller', 'voip_settings') ||
 			$this->acl_check_edit('Settings_Controller', 'notification_settings') ||
 			$this->acl_check_edit('Settings_Controller', 'qos_settings') ||
 			$this->acl_check_edit('Settings_Controller', 'monitoring_settings') ||

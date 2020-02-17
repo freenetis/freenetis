@@ -565,17 +565,7 @@ class Js_Controller extends Controller
 	private function _js_users_show_work_report($work_id = NULL)
 	{
 		$this->views['users_show_work_report'] = View::factory('js/work_reports_show')->render();
-	}
-	
-	private function _js_voip_show($user_id = NULL)
-	{
-		$this->voip_calculator($user_id);
-	}
-	
-	private function _js_voip_calls_show_by_user($user_id = NULL)
-	{
-		$this->voip_calculator($user_id);
-	}
+	}	
 	
 	private function _js_work_reports_add()
 	{
@@ -674,33 +664,6 @@ class Js_Controller extends Controller
 	{
 		$this->views['__pieces_time_activity_rule'] =
 				View::factory('js/__pieces/time_activity_rule')->render();
-	}
-	
-	/**
-	 * Calculator for VoIP calls
-	 *
-	 * @param integer $user_id 
-	 */
-	private function voip_calculator($user_id = NULL)
-	{
-		if ($user_id && is_numeric($user_id))
-		{
-			$user = new User_Model($user_id);
-			
-			if ($user && $user->id)
-			{
-				$sip = ORM::factory('voip_sip')
-						->where('user_id', $user->id)
-						->find();
-				
-				if ($sip && $sip->id)
-				{
-					$view = View::factory('js/__pieces/voip_calculator');
-					$view->sip_name = $sip->name;
-					$this->views['__pieces_voip_calculator'] = $view->render();
-				}
-			}
-		}
 	}
 	
 	/**

@@ -159,7 +159,7 @@ class Monitor_host_Model extends ORM
 			$order_by = 'INET_ATON(ip_address)';
 		
 		return $this->db->query("
-			SELECT mh.*
+			SELECT mh.*, SUBSTRING_INDEX(GROUP_CONCAT(ip_address ORDER BY service DESC), ',', 1) AS ip_address
 			FROM
 			(
 			SELECT
@@ -211,7 +211,6 @@ class Monitor_host_Model extends ORM
 			LEFT JOIN translations tr ON et.value = tr.original_term AND lang = 'cs'
 			LEFT JOIN users u ON d.user_id = u.id
 			LEFT JOIN members m ON u.member_id = m.id
-			ORDER BY service DESC, INET_ATON(ip_address)
 			) mh
 			$where
 			GROUP BY mh.device_id

@@ -98,15 +98,6 @@ echo implode (' | ', $links);
 </table>
 
 <table class="extended" cellspacing="0" style="float:left; margin-left:10px; width:360px;">
-<?php if (Settings::get('voip_enabled') && $user_data->id != 1) { ?>
-	<tr>
-		<th colspan="2"><?php echo  __('VoIP') ?></th>
-	</tr>
-	<tr>
-		<th><?php echo __('Phone number') ?></th>
-		<td><?php echo $voip ?></td>
-	</tr>
-<?php } ?>
 	<tr>
 		<th colspan="2"><?php echo  __('Access rights') ?></th>
 	</tr>

@@ -1415,79 +1415,6 @@ class Members_Controller extends Controller
 			}
 		}
 		
-		/********              VoIP         ***********/
-             
-		if (Settings::get('voip_enabled'))
-		{
-			// VoIP SIP model
-			$voip_sip = new Voip_sip_Model();
-			// Gets sips
-			$voip = $voip_sip->get_all_record_by_member_limited($member->id);
-			// Has driver?
-			$has_driver = Billing::instance()->has_driver();
-			// Account
-			$b_account = null;
-			// Check account only if have SIP
-			if ($voip->count())
-			{
-				$b_account = Billing::instance()->get_account($member->id);
-			}
-
-			$voip_grid = new Grid('members', null, array
-			(
-				'separator'		   		=> '<br /><br />',
-				'use_paginator'	   		=> false,
-				'use_selector'	   		=> false
-			));
-
-			$voip_grid->field('id')
-					->label('ID');
-
-			$voip_grid->field('callerid')
-					->label(__('Number'));
-
-			$actions = $voip_grid->grouped_action_field();
-
-			if ($this->acl_check_view('VoIP_Controller', 'voip', $member->id))
-			{
-				$actions->add_action('user_id')
-						->icon_action('phone')
-						->url('voip/show')
-						->label('Show VoIP account');
-			}
-
-			if ($this->acl_check_view('Users_Controller', 'users', $member->id))
-			{
-				$actions->add_action('user_id')
-						->icon_action('member')
-						->url('users/show')
-						->label('Show user who own this VoIP account');
-			}
-			
-			$voip_grid->datasource($voip);
-
-			if ($has_driver && $b_account)
-			{
-				if ($this->acl_check_view('VoIP_Controller', 'voip', $member->id))
-				{
-					$voip_grid->add_new_button(
-							'voip_calls/show_by_member/'.$member->id,
-							__('List of all calls')
-					);
-				}
-
-				if (Settings::get('finance_enabled') &&
-					$this->acl_check_new('Accounts_Controller', 'transfers', $member->id) &&
-					!$is_association)
-				{
-					$voip_grid->add_new_button(
-							'transfers/add_voip/'.$account->id,
-							__('Recharge VoIP credit')
-					);
-				}
-			}
-		}
-		
 		// finds date of expiration of member fee
 		$expiration_info = NULL;
 		
@@ -2093,7 +2020,6 @@ class Members_Controller extends Controller
 		$view->content->user_name = $user_name;
 		$view->content->users_grid = $users_grid;
 		$view->content->redir_grid = Settings::get('redirection_enabled') ? $redir_grid : '';
-		$view->content->voip_grid = (Settings::get('voip_enabled')) ? $voip_grid : '';
 		$view->content->membership_interrupts_grid = Settings::get('membership_interrupt_enabled') ?
 																	$membership_interrupts_grid : '';
 		$view->content->contacts = $contacts;
@@ -2116,9 +2042,6 @@ class Members_Controller extends Controller
 		$view->content->domicile_gps = $domicile_gps;
 		$view->content->town = (isset($town)) ? $town : '';
 		$view->content->country = (isset($country)) ? $country : '';
-		$view->content->billing_has_driver = (Settings::get('voip_enabled')) ? $has_driver : FALSE;
-		$view->content->billing_account = (Settings::get('voip_enabled')) ? $b_account : NULL;
-		$view->content->count_voip = (Settings::get('voip_enabled')) ? count($voip) : 0;
 		$view->content->total_traffic = @$total_traffic;
 		$view->content->today_traffic = @$today_traffic;
 		$view->content->month_traffic = @$month_traffic;

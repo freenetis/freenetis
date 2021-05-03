@@ -2601,40 +2601,6 @@ class callback
 	}
 
 	/**
-	 * Callback to print caller
-	 *
-	 * @author Michal Kliment
-	 * @param object $item
-	 * @param string $name
-	 * @param array $args
-	 */
-	public static function voip_caller($item, $name, $args = array())
-	{
-		$number = VoIP_calls_Controller::parse_number(
-				substr($item->caller, 4, strlen($item->caller) - 4)
-		);
-
-		echo VoIP_calls_Controller::number($number, $args[0], $args[1]);
-	}
-
-	/**
-	 * Callback to print called
-	 *
-	 * @author Michal Kliment
-	 * @param object $item
-	 * @param string $name
-	 * @param array $args
-	 */
-	public static function voip_callcon($item, $name, $args = array())
-	{
-		$number = VoIP_calls_Controller::parse_number(
-				substr($item->callcon, 4, strlen($item->callcon) - 4), $item->area
-		);
-
-		echo VoIP_calls_Controller::number($number, $args[0], $args[1]);
-	}
-
-	/**
 	 * Callback function to show vote as image
 	 * 
 	 * @author Michal Kliment

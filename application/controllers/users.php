@@ -615,26 +615,6 @@ class Users_Controller extends Controller
 			$arr_contact_types[$i] = $enum_type_model->get_value($contact->type);
 		}
 		
-		// voip is enabled
-		if (Settings::get('voip_enabled'))
-		{
-		    $voip_sip = new Voip_sip_Model();
-		    $voip = $voip_sip->get_record_by_user_limited($user_id);
-
-		    if ($voip->count() == 0)
-		    {
-			    $voip = '<span style="color:red;">'.__('Nonactive').'</span>  - '
-					    .html::anchor('voip/add/'.$user_id, __('Activate'));
-		    }
-		    else
-		    {
-			    $voip = html::anchor(
-					    'voip/show/'.$voip->current()->user_id,
-					    $voip->current()->name
-			    );
-		    }
-		}
-		
 		$aro_groups = $user->get_aro_groups_of_user($user_id);
 		
 		
@@ -771,7 +751,6 @@ class Users_Controller extends Controller
 		$view->content->user_data = $user;
 		$view->content->contacts = $contacts;
 		$view->content->contact_types = $arr_contact_types;
-		$view->content->voip = Settings::get('voip_enabled') ? $voip : '';
 		$view->content->aro_groups = $aro_groups;
 		$view->content->admin_devices_grid = @$admin_devices_grid;
 		$view->content->engineer_devices_grid = @$engineer_devices_grid;

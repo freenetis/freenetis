@@ -54,24 +54,6 @@ class Preprocessor_Model extends Model
 			WHERE pi.user_id = ? AND pi.locked = 0 AND p.locked = 0
 		", $user_id)->current()->count;
 	}
-	
-	/**
-	 * Check if given user has any VoIP sips
-	 * 
-	 * Moved from Voip_sip_Model
-	 *
-	 * @author Ondřej Fibich
-	 * @param integer $user_id	User
-	 * @return bool				Has?
-	 */
-	public function has_voip_sips($user_id)
-	{
-		return $this->db->query("
-			SELECT COUNT(id) AS count
-			FROM voip_sips
-			WHERE user_id = ?
-		", $user_id)->current()->count > 0;
-	}
 
 	/**
 	 * Gets count of former members that can be deleted.

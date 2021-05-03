@@ -37,8 +37,6 @@
  * @property datetime $applicant_registration_datetime
  * @property date $applicant_connected_from
  * @property integer $locked
- * @property integer $voip_billing_limit
- * @property integer $voip_billing_type
  * @property string $comment
  * @property User_Model $user
  * @property Address_point_Model $address_point
@@ -249,6 +247,9 @@ class Member_Model extends ORM
 		{
 			$order_by_direction = 'asc';
 		}
+		
+		$account_type_credit = Account_attribute_Model::CREDIT;
+		
 		// query
 		return $this->db->query("
 				SELECT id, id AS member_id, name AS member_name, registration, registrations,
@@ -306,7 +307,7 @@ class Member_Model extends ORM
 					LEFT JOIN address_points ap ON m.address_point_id = ap.id
 					LEFT JOIN streets s ON ap.street_id = s.id
 					LEFT JOIN towns t ON ap.town_id = t.id
-					LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1
+					LEFT JOIN accounts a ON a.member_id = m.id AND m.id <> 1 AND a.account_attribute_id = ?
 					LEFT JOIN variable_symbols vs ON vs.account_id = a.id
 					LEFT JOIN
 					(
@@ -360,6 +361,7 @@ class Member_Model extends ORM
 			__('Yes'),
 			__('No'),
 			Config::get('lang'),
+			$account_type_credit,
 			Config::get('lang'),
 			// redir shortcuts
 			__('IM'),

@@ -2959,6 +2959,7 @@ class Devices_Controller extends Controller
 		$formats = array
 		(
 			'debian-etc-dhcp-dhcpd'				=> 'Debian /etc/dhcp/dhcpd.conf',
+			'debian-etc-kea-kea-dhcp4'			=> 'Debian /etc/kea/kea-dhcp4.conf',
 			'debian-etc-network-interfaces'		=> 'Debian /etc/network/interfaces',
 			'mikrotik-all'						=> 'Mikrotik',
 			'mikrotik-ip-dhcp-server'			=> 'Mikrotik /ip dhcp-server',

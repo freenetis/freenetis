@@ -1483,6 +1483,12 @@ $(document).ready(function()
 	{
 		return (value == '' || value.match(/^([0-9]+[k|M|G|T]?)(\/[0-9]+[k|M|G|T]?)?$/i));
 	}, '<?php echo __('Bad format.') ?>');
+
+	$.validator.addMethod('azimuth', function(value)
+	{
+		var azimuth = parseInt(value);
+		return (value == '' || (azimuth >= 0 && azimuth < 360));
+	}, '<?php echo __('Bad format.') ?>');
 	
 	// set up for password checker
 	$.validator.passwordRating.messages = {

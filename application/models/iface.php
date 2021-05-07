@@ -283,6 +283,18 @@ class Iface_Model extends ORM
 		self::TYPE_ETHERNET => array(self::TYPE_BRIDGE),
 		self::TYPE_VIRTUAL_AP  => array(self::TYPE_WIRELESS)
 	);
+
+	/**
+	 * Boolean value if wireless antenna type can have azimuth
+	 * 
+	 * @var array
+	 */
+	private static $wireless_antenna_has_azimuth = array
+	(
+		self::WIRELESS_ANTENNA_DIRECTIONAL		=> TRUE,
+		self::WIRELESS_ANTENNA_OMNIDIRECTIONAL	=> FALSE,
+		self::WIRELESS_ANTENNA_SECTIONAL		=> TRUE
+	);
 	
 	/**
 	 * Tests if type can have link
@@ -412,6 +424,21 @@ class Iface_Model extends ORM
 		}
 		
 		return array();
+	}
+
+	/**
+	 * Tests if wireless antenna can have azimuth
+	 * 
+	 * @author Michal Kliment
+	 * @param integer $wireless_antenna
+	 * @return boolean 
+	 */
+	public static function wireless_antenna_has_azimuth($wireless_antenna)
+	{
+		if (isset(self::$wireless_antenna_has_azimuth[$wireless_antenna]))
+			return self::$wireless_antenna_has_azimuth[$wireless_antenna];
+		else
+			return TRUE;
 	}
 	
 	/**

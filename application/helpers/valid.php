@@ -516,5 +516,17 @@ class valid {
 	{
 		return preg_match ("/^([0-9]{1,6}-)?([0-9]{2,10})\/[0-9]{4}$/", $str);
 	}
+
+	/**
+	 * Checks whether string is valid azimuth
+	 * 
+	 * @author Michal Kliment
+	 * @param string $str
+	 * @return boolean 
+	 */
+	public static function azimuth($str)
+	{
+		return $str >= 0 && $str < 360;
+	}
 	
 } // End valid

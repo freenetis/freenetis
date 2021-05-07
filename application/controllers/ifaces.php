@@ -836,9 +836,17 @@ class Ifaces_Controller extends Controller
 					->style('width:200px');
 
 				$w_form->dropdown('wireless_antenna')
-					->label('Antenna')
+					->label('Antenna type')
 					->options($antennas)
 					->style('width:200px');
+
+				$w_form->input('wireless_antenna_gain')
+					->label('Antenna gain')
+					->rules('valid_numeric');
+
+				$w_form->input('wireless_antenna_azimuth')
+					->label('Antenna azimuth')
+					->rules('valid_numeric|valid_azimuth');
 			}
 			
 			// print virtual AP fields only if type is virtual AP
@@ -1065,12 +1073,20 @@ class Ifaces_Controller extends Controller
 					{
 						$iface->wireless_mode = $form_data['wireless_mode'];
 						$iface->wireless_antenna = $form_data['wireless_antenna'];
+						$iface->wireless_antenna_gain = $form_data['wireless_antenna_gain'];
+
+						if (Iface_Model::wireless_antenna_has_azimuth($form_data['wireless_antenna']))
+							$iface->wireless_antenna_azimuth = $form_data['wireless_antenna_azimuth'];
 					}
 					else if ($iface->type === Iface_Model::TYPE_VIRTUAL_AP)
 					{
 						$parent_iface = new Iface_Model($form_data['parent_iface_id']);
 						$iface->wireless_mode = $parent_iface->wireless_mode;
 						$iface->wireless_antenna = $parent_iface->wireless_antenna;
+						$iface->wireless_antenna_gain = $parent_iface->wireless_antenna_gain;
+
+						if (Iface_Model::wireless_antenna_has_azimuth($parent_iface->wireless_antenna))
+							$iface->wireless_antenna_azimuth = $parent_iface->wireless_antenna_azimuth;
 					}
 					else if ($iface->type == Iface_Model::TYPE_PORT)
 					{
@@ -1658,10 +1674,20 @@ class Ifaces_Controller extends Controller
 				->selected($iface->wireless_mode);
 
 			$w_form->dropdown('wireless_antenna')
-				->label('Antenna')
+				->label('Antenna type')
 				->options($antennas)
 				->style('width:200px')
 				->selected($iface->wireless_antenna);
+
+			$w_form->input('wireless_antenna_gain')
+				->label('Antenna gain')
+				->rules('valid_numeric')
+				->value($iface->wireless_antenna_gain);
+
+			$w_form->input('wireless_antenna_azimuth')
+				->label('Antenna azimuth')
+				->rules('valid_numeric|valid_azimuth')
+				->value($iface->wireless_antenna_azimuth);
 		}
 		
 		// print virtual AP fields only if type is virtual AP
@@ -1928,6 +1954,8 @@ class Ifaces_Controller extends Controller
 				
 				$iface->wireless_mode = null;
 				$iface->wireless_antenna = null;
+				$iface->wireless_antenna_gain = null;
+				$iface->wireless_antenna_azimuth = null;
 				$iface->number = null;
 				$iface->port_mode = null;
 
@@ -1935,12 +1963,20 @@ class Ifaces_Controller extends Controller
 				{
 					$iface->wireless_mode = $form_data['wireless_mode'];
 					$iface->wireless_antenna = $form_data['wireless_antenna'];
+					$iface->wireless_antenna_gain = $form_data['wireless_antenna_gain'];
+
+					if (Iface_Model::wireless_antenna_has_azimuth($form_data['wireless_antenna']))
+						$iface->wireless_antenna_azimuth = $form_data['wireless_antenna_azimuth'];
 				}
 				else if ($iface->type === Iface_Model::TYPE_VIRTUAL_AP)
 				{
 					$parent_iface = new Iface_Model($form_data['parent_iface_id']);
 					$iface->wireless_mode = $parent_iface->wireless_mode;
 					$iface->wireless_antenna = $parent_iface->wireless_antenna;
+					$iface->wireless_antenna_gain = $parent_iface->wireless_antenna_gain;
+
+					if (Iface_Model::wireless_antenna_has_azimuth($parent_iface->wireless_antenna))
+						$iface->wireless_antenna_azimuth = $parent_iface->wireless_antenna_azimuth;
 				
 					// delete current
 					foreach ($iface->ifaces_relationships as $i)

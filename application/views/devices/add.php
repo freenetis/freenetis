@@ -41,8 +41,16 @@
 				<td><?php echo form::dropdown('wireless_mode_input', $wireless_modes, array(), 'style="width:200px"') ?></td>
 			</tr>
 			<tr>
-				<th><label><?php echo __('Wireless antenna') ?>:</label></th>
+				<th><label><?php echo __('Antenna type') ?>:</label></th>
 				<td><?php echo form::dropdown('wireless_antenna_input', $wireless_antennas, array(), 'style="width:200px"') ?></td>
+			</tr>
+			<tr>
+				<th><label><?php echo __('Antenna gain') ?>:</label></th>
+				<td><?php echo form::input('wireless_antenna_gain_input', '', 'class="number"') ?></td>
+			</tr>
+			<tr>
+				<th><label><?php echo __('Antenna azimuth') ?>:</label></th>
+				<td><?php echo form::input('wireless_antenna_azimuth_input', '', 'class="number azimuth"') ?></td>
 			</tr>
 		</table>
 		<button class="submit" type="button"><?php echo __('Save') ?></button>

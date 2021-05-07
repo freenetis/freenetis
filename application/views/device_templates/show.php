@@ -66,13 +66,17 @@ echo implode(' | ', $arr_links);
 	<tr>
 		<th><?php echo __('Name') ?></th>
 		<th><?php echo __('Wireless mode') ?></th>
-		<th><?php echo __('Wireless antenna') ?></th>
+		<th><?php echo __('Antenna type') ?></th>
+		<th><?php echo __('Antenna gain') ?></th>
+		<th><?php echo __('Antenna azimuth') ?></th>
 	</tr>
 	<?php foreach ($ivals[Iface_Model::TYPE_WIRELESS]['items'] as $item): ?>
 	<tr>
 		<td><?php echo $item['name'] ?></td>
         <td><?php echo Iface_Model::get_wireless_mode(@$item['wireless_mode']) ?></td>
 		<td><?php echo Iface_Model::get_wireless_antenna(@$item['wireless_antenna']) ?></td>
+		<td><?php echo @$item['wireless_antenna_gain'] ?></td>
+		<td><?php echo @$item['wireless_antenna_azimuth'] ?></td>
 	</tr>
 	<?php endforeach; ?>
 </table>

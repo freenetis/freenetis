@@ -244,6 +244,8 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		$('#port_mode_input').val($td.find('input[name^="port_mode["]').val());
 		$('#wireless_mode_input').val($td.find('input[name^="wireless_mode["]').val());
 		$('#wireless_antenna_input').val($td.find('input[name^="wireless_antenna["]').val());
+		$('#wireless_antenna_gain_input').val($td.find('input[name^="wireless_antenna_gain["]').val());
+		$('#wireless_antenna_azimuth_input').val($td.find('input[name^="wireless_antenna_azimuth["]').val());
 		
 		// dialog button action submit
 		$('#dialog_iface_detail form button').unbind('click').click(function ()
@@ -257,6 +259,8 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				$td.find('input[name^="port_mode["]').val($('#port_mode_input').val());
 				$td.find('input[name^="wireless_mode["]').val($('#wireless_mode_input').val());
 				$td.find('input[name^="wireless_antenna["]').val($('#wireless_antenna_input').val());
+				$td.find('input[name^="wireless_antenna_gain["]').val($('#wireless_antenna_gain_input').val());
+				$td.find('input[name^="wireless_antenna_azimuth["]').val($('#wireless_antenna_azimuth_input').val());
 				
 				// update connected to device
 				$td.find('select[name^="connected["]').trigger('change', $td.find('select[name^="connected_iface["]').val());
@@ -280,6 +284,8 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 		$('#port_mode_input').parent().parent().show();
 		$('#wireless_mode_input').parent().parent().show();
 		$('#wireless_antenna_input').parent().parent().show();
+		$('#wireless_antenna_gain_input').parent().parent().show();
+		$('#wireless_antenna_azimuth_input').parent().parent().show();
 
 		switch (parseInt($td.find('input[name^="type["]').val()))
 		{
@@ -292,16 +298,22 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 				$('#port_mode_input').parent().parent().hide();
 				$('#wireless_mode_input').parent().parent().hide();
 				$('#wireless_antenna_input').parent().parent().hide();
+				$('#wireless_antenna_gain_input').parent().parent().hide();
+				$('#wireless_antenna_azimuth_input').parent().parent().hide();
 				break;
 			case <?php echo Iface_Model::TYPE_PORT ?>:
 				$('#wireless_mode_input').parent().parent().hide();
 				$('#wireless_antenna_input').parent().parent().hide();
+				$('#wireless_antenna_gain_input').parent().parent().hide();
+				$('#wireless_antenna_azimuth_input').parent().parent().hide();
 				break;
 			case <?php echo Iface_Model::TYPE_INTERNAL ?>:
 				$('#port_number_input').parent().parent().hide();
 				$('#port_mode_input').parent().parent().hide();
 				$('#wireless_mode_input').parent().parent().hide();
 				$('#wireless_antenna_input').parent().parent().hide();
+				$('#wireless_antenna_gain_input').parent().parent().hide();
+				$('#wireless_antenna_azimuth_input').parent().parent().hide();
 				break;
 		};
 		
@@ -804,6 +816,8 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 			iface_hidden_a['type[' + i + ']'] = data['type'];
 			iface_hidden_a['wireless_mode[' + i + ']'] = (item.wireless_mode == undefined) ? null : item.wireless_mode;
 			iface_hidden_a['wireless_antenna[' + i + ']'] = (item.wireless_antenna == undefined) ? null : item.wireless_antenna;
+			iface_hidden_a['wireless_antenna_gain[' + i + ']'] = (item.wireless_antenna_gain == undefined) ? null : item.wireless_antenna_gain;
+			iface_hidden_a['wireless_antenna_azimuth[' + i + ']'] = (item.wireless_antenna_azimuth == undefined) ? null : item.wireless_antenna_azimuth;
 			var iface_hid = create_hidden_inputs(iface_hidden_a);
 
 			if (data['has_ip'])

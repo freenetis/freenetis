@@ -237,11 +237,31 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 						}).html(wiface_mode_options).css('margin', '4px 15px')
 					)
 				).append(
-					$('<td>').html($('<label>').text('<?php echo __('Antenna') ?>:')).append(
+					$('<td>').html(
+						$('<label>').text('<?php echo __('Antenna') ?>:').css('font-weight', 'bold')
+					)
+				).append(
+					$('<td>').html($('<label>').text('<?php echo __('Type') ?>:')).append(
 						$('<select>').attr({
 							'name'	: 'values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][' + i + '][wireless_antenna]',
 							'class'	: 'dropdown',
 							'type'	: 'dropdown'
+						}).html(wiface_antenna_options).css('margin', '4px 15px')
+					)
+				).append(
+					$('<td>').html($('<label>').text('<?php echo __('Gain') ?>:')).append(
+						$('<input>').attr({
+							'name'	: 'values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][' + i + '][wireless_antenna_gain]',
+							'class'	: 'number',
+							'type'	: 'number'
+						}).html(wiface_antenna_options).css('margin', '4px 15px')
+					)
+				).append(
+					$('<td>').html($('<label>').text('<?php echo __('Azimuth') ?>:')).append(
+						$('<input>').attr({
+							'name'	: 'values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][' + i + '][wireless_antenna_azimuth]',
+							'class'	: 'number',
+							'type'	: 'number'
 						}).html(wiface_antenna_options).css('margin', '4px 15px')
 					)
 				));
@@ -443,7 +463,9 @@ if (FALSE): ?><script type='text/javascript'><?php endif
 	<?php $i = 0; foreach ($device_template_value[Iface_Model::TYPE_WIRELESS]['items'] as $item): ?>
 	$('input[name="values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][<?php echo $i ?>][name]"]').val('<?php echo $item['name'] ?>');
 	$('select[name="values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][<?php echo $i ?>][wireless_mode]"]').val('<?php echo $item['wireless_mode'] ?>');
-	$('select[name="values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][<?php echo $i++ ?>][wireless_antenna]"]').val('<?php echo $item['wireless_antenna'] ?>');
+	$('select[name="values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][<?php echo $i ?>][wireless_antenna]"]').val('<?php echo $item['wireless_antenna'] ?>');
+	$('input[name="values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][<?php echo $i ?>][wireless_antenna_gain]"]').val('<?php echo @$item['wireless_antenna_gain'] ?>');
+	$('input[name="values[<?php echo Iface_Model::TYPE_WIRELESS ?>][items][<?php echo $i++ ?>][wireless_antenna_azimuth]"]').val('<?php echo @$item['wireless_antenna_azimuth'] ?>');
 	<?php endforeach; ?>
 	// set values of port items
 	<?php $i = 0; foreach ($device_template_value[Iface_Model::TYPE_PORT]['items'] as $item): ?>

@@ -1405,6 +1405,8 @@ class Devices_Controller extends Controller
 							if ($im->type == Iface_Model::TYPE_WIRELESS)
 							{
 								$im->wireless_antenna = intval($_POST['wireless_antenna'][$i]);
+								$im->wireless_antenna_gain = intval($_POST['wireless_antenna_gain'][$i]);
+								$im->wireless_antenna_azimuth = intval($_POST['wireless_antenna_azimuth'][$i]);
 								$im->wireless_mode = intval($_POST['wireless_mode'][$i]);
 							}
 

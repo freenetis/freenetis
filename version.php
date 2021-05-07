@@ -15,4 +15,4 @@
  * The current version of FreenetIS.
  * This value must be changed by developers in a new release of FreenetIS.
  */
-define('FREENETIS_VERSION', '1.2.0~alpha11');
+define('FREENETIS_VERSION', '1.2.0~alpha12');

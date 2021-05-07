@@ -73,8 +73,20 @@ echo implode(' | ', $links);
 	<?php endif; ?>
 	<?php if (isset($iface->wireless_antenna)): ?>
 	<tr>
-		<th><?php echo  __('Wireless antenna') ?></th>
+		<th><?php echo  __('Wireless antenna type') ?></th>
 		<td><?php echo  Iface_Model::get_wireless_antenna($iface->wireless_antenna)  ?></td>
+	</tr>
+	<?php endif; ?>
+	<?php if (isset($iface->wireless_antenna_gain)): ?>
+	<tr>
+		<th><?php echo  __('Wireless antenna gain') ?></th>
+		<td><?php echo  $iface->wireless_antenna_gain  ?> dBi</td>
+	</tr>
+	<?php endif; ?>
+	<?php if (isset($iface->wireless_antenna_azimuth)): ?>
+	<tr>
+		<th><?php echo  __('Wireless antenna azimuth') ?></th>
+		<td><?php echo  $iface->wireless_antenna_azimuth  ?>˚</td>
 	</tr>
 	<?php endif; ?>
 	<?php if (intval($iface->link->id) > 0 && Iface_Model::type_has_link($iface->type)): ?>

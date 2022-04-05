@@ -273,7 +273,7 @@ $(document).ready(function(){
 	<?php echo form::checkbox ('on['.$i.']', 1, $states[$i], " class='n'") ?>
 	<?php echo form::dropdown ('types['.$i.']', $type_options, $type, " class='t'") ?>
 	<?php echo form::dropdown ('opers['.$i.']', $operation_options, $operations[$i], " class='o'") ?>
-	<?php echo form::input(array('name' => 'values['.$i.'][]', 'value' => $values[$i][0], 'class' => implode(' ', array_merge(array('v'), $classes)))) ?>
+	<?php echo form::input(array('name' => 'values['.$i.'][]', 'value' => $values[$i][0] ?? "", 'class' => implode(' ', array_merge(array('v'), $classes)))) ?>
 </div>
 <?php endforeach ?>
 			

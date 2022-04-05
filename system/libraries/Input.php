@@ -192,11 +192,6 @@ class Input {
 			return $new_array;
 		}
 
-		if (get_magic_quotes_gpc())
-		{
-			$str = stripslashes($str);
-		}
-
 		if ($this->use_xss_clean === TRUE)
 		{
 			$str = $this->xss_clean($str);

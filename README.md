@@ -8,3 +8,6 @@ It provides features like payment management, user and device management, servic
 * [Installation instruction (CZE)](http://wiki.freenetis.org/index.php/Instalace)
 * [Developer page](https://dev.freenetis.org/projects/freenetis)
 * [DEB repository](http://repository.freenetis.org)
+
+
+úpravy pro Pvfree.net

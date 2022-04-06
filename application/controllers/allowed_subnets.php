@@ -267,7 +267,7 @@ class Allowed_subnets_Controller extends Controller
 			Controller::error(RECORD);
 
 		// access control
-		if (!$this->acl_check_edit('Allowed_subnets_Controller', 'allowed_subnet', $allowed_subnet->member->id))
+		if (!$this->acl_check_new('Allowed_subnets_Controller', 'allowed_subnet', $allowed_subnet->member->id))
 			Controller::error(ACCESS);
 
 		$allowed_subnet->enabled = !$allowed_subnet->enabled;

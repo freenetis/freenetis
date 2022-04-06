@@ -96,7 +96,7 @@ add name="<?php echo text::cs_utf2ascii($dhcp_server->name) ?>" ranges=<?php ech
 <?php endforeach ?>
 /ip dhcp-server
 <?php foreach ($result->dhcp_servers as $dhcp_server): ?>
-add name="<?php echo text::cs_utf2ascii($dhcp_server->name) ?>" address-pool="<?php echo text::cs_utf2ascii($dhcp_server->name) ?>" authoritative=after-2sec-delay bootp-support=static disabled=no interface="<?php echo $dhcp_server->interface ?>" lease-time=3d
+add name="<?php echo text::cs_utf2ascii($dhcp_server->name) ?>" address-pool="<?php echo text::cs_utf2ascii($dhcp_server->name) ?>" authoritative=after-2sec-delay bootp-support=static disabled=no interface="<?php echo $dhcp_server->interface ?>" lease-time=3h
 <?php endforeach ?>
 /ip dhcp-server config
 set store-leases-disk=5m

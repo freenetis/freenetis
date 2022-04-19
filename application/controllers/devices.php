@@ -1,5 +1,4 @@
-<?php defined('SYSPATH') or die('No direct script access.');
-/*
+<?php defined('SYSPATH') or die('No direct script access.'); /*
  * This file is part of open source system FreenetIS
  * and it is released under GPLv3 licence.
  * 
@@ -777,6 +776,7 @@ class Devices_Controller extends Controller
 		$view->content->table_device_engineers = $grid_device_engineers;
 		$view->content->table_device_admins	= $grid_device_admins;
 		$view->content->table_ip_addresses = isset($grids['ip_addresses']) ? $grids['ip_addresses'] : '';
+		$view->content->table_ip6_addresses = isset($grids['ip6_addresses']) ? $grids['ip6_addresses'] : '';
 		$view->content->ifaces = $grids['ifaces'];
 		$view->content->vlan_ifaces = $grids['vlan_ifaces'];
 		$view->content->port_ifaces = $grids['ports'];
@@ -1572,7 +1572,13 @@ class Devices_Controller extends Controller
 								$ipm->gateway = $gateway;
 								$ipm->service = ($_POST['service'][$i] == 1);
 								$ipm->save_throwable();
+								
+								$ip6_a6 = new Ip6_addresses_Controller();
+								$ip6_a6a = $ip6_a6->calc_ip6_address($ipm->ip_address);
+								$ip6_address_add = new Ip6_address_Model();
+								$ip6_address_add->add_ip6_address_db($ipm->iface_id, $ip6_a6a);
 
+								
 								// expired subnet
 								$expired_subnets[] = $ipm->subnet_id;
 								// allowed subnet to added IP
@@ -2850,6 +2856,17 @@ class Devices_Controller extends Controller
 				}
 				ORM::factory('subnet')->set_expired_subnets($expired);
 				
+				$ip_addre = new Ip_address_Model();
+				$ip_addr = $ip_addre->get_ip_addresses_of_device($device_id);
+				foreach ($ip_addr as $ip)
+				{
+					$ip6_a6 = new Ip6_addresses_Controller();
+					$ip6_a6a = $ip6_a6->calc_ip6_address($ip->ip_address);
+					$ip6_address_del = new Ip6_address_Model();
+					$ip6_address_del->del_ip6_address_db($ip6_a6a);
+				}
+				
+				
 				$device->delete_throwable();
 				
 				try
@@ -3329,6 +3346,41 @@ class Devices_Controller extends Controller
 			}
 
 			$grids['ip_addresses']->datasource($ips);
+		}
+		
+		/** IPV6 ADDRESSES ******************************************************/
+		
+		$grids['ip6_addresses'] = '';
+		
+		if ($this->acl_check_view('Ip_addresses_Controller', 'ip_address', $member_id))
+		{
+			$ip6_address_model = new Ip6_address_Model();
+			$ip6s = $ip6_address_model->get_ip6_addresses_of_device($device->id);
+
+			$grids['ip6_addresses'] = new Grid('devices', null, array
+			(
+				'use_paginator'	   			=> false,
+				'use_selector'	   			=> false,
+				'total_items'				=> count($ip6s)
+			));
+			
+			
+			$grids['ip6_addresses']->callback_field('ip6_address')
+				->label('IPV6 address')
+				->callback('callback::ip_address_field', TRUE, FALSE, FALSE);
+
+
+
+			if ($this->acl_check_new('Ifaces_Controller', 'iface', $member_id))
+			{
+				$grids['ip6_addresses']->link_field('iface_id')
+					->link('ifaces/show', 'iface_name')
+					->label('Interface');
+			}
+
+
+
+			$grids['ip6_addresses']->datasource($ip6s);
 		}
 		
 		/** INTERFACES ********************************************************/

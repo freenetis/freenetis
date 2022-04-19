@@ -176,6 +176,14 @@ class Search_Model extends Model
 			'limit_weight' => 1,
 			'access' => array('Devices_Controller', 'devices')
 		),
+		array
+		(
+			'method' => 'device_ip6_address',
+			'model' => 'device',
+			'weight' => 0.5,
+			'limit_weight' => 1,
+			'access' => array('Devices_Controller', 'devices')
+		),
 		array(
 			'method' => 'device_ssid',
 			'model' => 'device',
@@ -804,6 +812,39 @@ class Search_Model extends Model
 				FROM devices d
 				JOIN ifaces ic ON ic.device_id = d.id
 				LEFT JOIN ip_addresses ip ON ip.iface_id = ic.id
+				WHERE ip.ip_address LIKE ? COLLATE utf8_general_ci
+				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
+		".$sql_limit, array
+		(
+			__('IP address') . ": ",
+			__('Device') . " ",
+			"%$keyword%", "%$keyword%"
+		));
+	}
+	
+	/**
+	* Searchs in devices by IP6 address
+	*
+	* @author 
+	* @param string $keyword
+	* @return MySQL_Result object
+	*/
+	public function device_ip6_address($keyword, $limit = null)
+	{
+		$sql_limit = '';
+		if ($limit)
+		{
+			$sql_limit = ' LIMIT '.$limit;
+		}
+		
+		return $this->db->query("
+				SELECT d.id, ip.ip_address AS value,
+				CONCAT(?, ip.ip_address) AS `desc`,
+				CONCAT(?, d.name) AS return_value,
+				'devices/show/' AS link
+				FROM devices d
+				JOIN ifaces ic ON ic.device_id = d.id
+				LEFT JOIN ip6_addresses ip ON ip.iface_id = ic.id
 				WHERE ip.ip_address LIKE ? COLLATE utf8_general_ci
 				ORDER BY ABS(LENGTH(value) - " . mb_strlen($keyword) . ")
 		".$sql_limit, array

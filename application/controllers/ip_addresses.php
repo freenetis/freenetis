@@ -478,6 +478,8 @@ class Ip_addresses_Controller extends Controller
 				->selected('0');
 		
 		$this->form->submit('Save');
+	    
+
 		
 		// validate form and save data 
 		if ($this->form->validate())
@@ -513,6 +515,11 @@ class Ip_addresses_Controller extends Controller
 					// expired subnets (#465)
 					ORM::factory('subnet')->set_expired_subnets($ip_address->subnet_id);
 					
+					$ip6_a6 = new Ip6_addresses_Controller();
+					$ip6_a6a = $ip6_a6->calc_ip6_address($ip_address->ip_address);
+					$ip6_address_add = new Ip6_address_Model();
+					$ip6_address_add->add_ip6_address_db($ip_address->iface_id, $ip6_a6a);
+					
 					$ip_address->transaction_commit();
 
 					try
@@ -521,6 +528,8 @@ class Ip_addresses_Controller extends Controller
 								$ip_address->iface->device->user->member->id,
 								array($ip_address->subnet_id)
 						);
+
+						
 					}
 					catch (Exception $e)
 					{
@@ -544,6 +553,8 @@ class Ip_addresses_Controller extends Controller
 
 					usleep($timeout);
 				}
+	    	
+
 			}
 		}
 		
@@ -645,9 +656,14 @@ class Ip_addresses_Controller extends Controller
 				try // try to make DB transction
 				{
 					$ip_address->transaction_start();
-
-					$ip_address->delete_ip_address_with_member($form_data['ip_address']);
-
+		
+		    			$ip_address->delete_ip_address_with_member($form_data['ip_address']);
+					
+					$ip6_a6 = new Ip6_addresses_Controller();
+					$ip6_a6a = $ip6_a6->calc_ip6_address($ip_address->ip_address);
+					$ip6_address_del = new Ip6_address_Model();
+					$ip6_address_del->del_ip6_address_db($ip6_a6a);
+					
 					$old_subnet_id = $ip_address->subnet_id;
 
 					$ip_address->iface_id = $form_data['iface_id'];
@@ -661,6 +677,11 @@ class Ip_addresses_Controller extends Controller
 
 					// expired subnets (#465)
 					ORM::factory('subnet')->set_expired_subnets($ip_address->subnet_id);
+					
+					$ip6_a6 = new Ip6_addresses_Controller();
+					$ip6_a6a = $ip6_a6->calc_ip6_address($ip_address->ip_address);
+					$ip6_address_add = new Ip6_address_Model();
+					$ip6_address_add->add_ip6_address_db($ip_address->iface_id, $ip6_a6a);
 					
 					$ip_address->transaction_commit();
 
@@ -760,7 +781,8 @@ class Ip_addresses_Controller extends Controller
 		
 		$member_id = $ip_address->iface->device->user->member_id;
 		$subnet_id = $ip_address->subnet_id;
-
+		$ip_add	= $ip_address->ip_address;
+		
 		if (!$this->acl_check_delete('Ip_addresses_Controller', 'ip_address', $member_id))
 		{
 			Controller::error(ACCESS);
@@ -802,6 +824,11 @@ class Ip_addresses_Controller extends Controller
 				{
 					$ip_address->delete_throwable();
 				}
+				
+				$ip6_a6 = new Ip6_addresses_Controller();
+				$ip6_a6a = $ip6_a6->calc_ip6_address($ip_add);
+				$ip6_address_del = new Ip6_address_Model();
+				$ip6_address_del->del_ip6_address_db($ip6_a6a);
 				
 				$ip_address->transaction_commit();
 				

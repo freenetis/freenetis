@@ -745,4 +745,87 @@ class Web_interface_Controller extends Controller
 		}
 	}
 	
+	public function ipv6_radius()
+	{
+		$ip6_address = new Ip6_address_Model();
+		$ip6_addresses = $ip6_address->get_ipv6_mac_all();
+
+		foreach ($ip6_addresses as $ip6)
+		{
+			echo $ip6->ip_address.",".$ip6->ifaces."\n";
+		}
+
+	}
+	
+	public function ipv6_qos()
+	{
+	$speed_class_model = new Speed_class_Model();
+	$ip6_class_model = new Ip6_address_Model();
+	$speed_classes = $speed_class_model->orderby('d_ceil', 'DESC')->find_all();
+		
+		
+		foreach ($speed_classes as $speed_class)
+		{
+			echo "\n $speed_class->name";
+			
+			$ips = $ip6_class_model->get_ip6_addresses_to_class($speed_class->id);
+			
+			$last_member_id = NULL;
+			$last_id = NULL;
+
+			foreach ($ips as $ip)
+			{
+				// group same member by comments
+				if ($last_member_id != $ip->member_id)
+				{
+					$min = intval($speed_class->d_rate / 1024); // convert B => kB
+					$max = intval($speed_class->d_ceil / 1024); // convert B => kB
+					echo "\n$ip->user_login;$min-$max;";
+					// change member values
+					$last_member_id = $ip->member_id;
+					$last_id = "$ip->user_login";
+					echo "$ip->ip_address";
+				}
+				else
+				{
+					echo ",$ip->ip_address";
+				}
+			}
+		}
+	}
+
+	public function allowed_ip6_addresses()
+	{
+		// if gateway set uped - anly allow to access this page from it
+		// also if redirection is not enabled
+		if (!module::e('redirection') || !network::ip_address_in_ranges(server::remote_addr()))
+		{
+			@header('HTTP/1.0 403 Forbidden');
+			die();
+		}
+	
+		$ip_adresses = ORM::factory('ip_address')->get_allowed_ip_addresses();
+		$ip6_address = new Ip6_addresses_Controller();
+		$items = array();
+	
+		foreach ($ip_adresses as $ip_adress)
+		{
+			$ip6_add = $ip6_address->calc_ip6_address($ip_adress->ip_address);
+			$items[] = $ip6_add;
+		}
+	
+		echo implode("\n", $items)."\n";
+	
+		// set state of module (last activation time)
+		//Settings::set('redirection_state', date('Y-m-d H:i:s'));
+    }
+
+
+
+
+
+
+
+
+
 }

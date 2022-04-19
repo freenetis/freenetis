@@ -1519,6 +1519,7 @@ $lang = array
 	'insert data from webpage' => 'Vložte data z internetové stránky',
 	'in your e-mail was sent a confirmation message' => 'Na váš e-mail byla odeslána potvrzovací zpráva',
 	'ip address' => 'IP adresa',
+	'ipv6 address' => 'IPV6 adresa',
 	'ip address already exists' => 'IP adresa už existuje.',
 	'ip address count on the list' => 'Počet IP adres na listině',
 	'ip address detail' => 'Detail IP adresy',

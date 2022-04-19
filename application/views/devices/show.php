@@ -239,6 +239,10 @@ echo implode(' | ', $links)
 <div id="device_ip_addresses" class="<?php echo (!$table_ip_addresses) ? 'dispNone' : '' ?>">
 <?php echo $table_ip_addresses ?><br />
 </div><br />
+<div id="device_ip6_addresses" class="<?php echo (!$table_ip6_addresses) ? 'dispNone' : '' ?>">
+<?php echo ($table_ip6_addresses) ?  : "" ?><br />
+</div><br />
+
 <?php } ?>
 
 <br class="clear" />

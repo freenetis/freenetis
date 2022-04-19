@@ -1128,10 +1128,14 @@ class callback
 	{
 		$class = 'popup_link';
 		$title = '';
-		
-		$ip_address = (isset($args[0]) && $args[0]) ?
-							$item->ip_address.'/'.$item->subnet_range :
-							$item->ip_address;
+		if (isset($args[0]) && $args[0])
+		{
+			(isset($item->subnet_range)) ? $ip_address = $item->ip_address.'/'.$item->subnet_range : $ip_address = $item->ip_address;
+		}
+		else
+		{
+			$ip_address = $item->ip_address;
+		}
 		
 		if (isset($item->ip_addresses))
 		{

@@ -1188,7 +1188,7 @@ function upgrade_1_1_0_after()
 				$bd_ceil = network::str2bytes($d_ceil);
 				$bu_rate = network::str2bytes($u_rate);
 				$bd_rate = network::str2bytes($d_rate);
-				$index = $bu_ceil . '_' . $bd_ceil . '_' . $bu_rate . '_' . $bd_rate;
+				$index = $bu_ceil . '_' - $bd_ceil . '_' . $bu_rate . '_' . $bd_rate;
 
 				if (!isset($speed_classes[$index]))
 				{

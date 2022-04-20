@@ -14,7 +14,7 @@
 /**
  * Adds a new notification message for big debtors.
  *
- * @author Ondřej Fibich <ondrej.fibich@gmail.com>
+ * @author Martin Zatloukal <slezi2@pvfree.net>
  */
 $upgrade_sql['1.1.26-pvfree'] = array
 (

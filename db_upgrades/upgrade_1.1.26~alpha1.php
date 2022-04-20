@@ -16,7 +16,7 @@
  *
  * @author Martin Zatloukal <slezi2@pvfree.net>
  */
-$upgrade_sql['1.1.26-pvfree'] = array
+$upgrade_sql['1.1.26~alpha1'] = array
 (
 "CREATE TABLE `ip6_addresses` (
   `iface_id` int(11) DEFAULT NULL,

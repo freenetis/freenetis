@@ -135,7 +135,7 @@ class Version
 				return -1;
 			}
 			
-			$order = array('dev', 'alpha', 'beta', 'rc');
+			$order = array('dev', 'alpha', 'beta', 'rc', 'pvfree');
 			$order1 = NULL;
 			$order2 = NULL;
 			$i = 0;

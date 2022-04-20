@@ -16,7 +16,7 @@
  *
  * @author Ondřej Fibich <ondrej.fibich@gmail.com>
  */
-$upgrade_sql['1.1.23-pv'] = array
+$upgrade_sql['1.1.26-pvfree'] = array
 (
 "CREATE TABLE `ip6_addresses` (
   `iface_id` int(11) DEFAULT NULL,

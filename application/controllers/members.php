@@ -591,12 +591,6 @@ class Members_Controller extends Controller
 		$speed_classes = array(NULL => '') + $speed_class->select_list();
 		$def_speed_class = $speed_class->get_members_default_class();
 
-		$form->dropdown('speed_class')
-				->options($speed_classes)
-				->selected($def_speed_class ? $def_speed_class->id : NULL)
-				->add_button('speed_classes')
-				->style('width:200px');
-		
 		$form->submit('Approve');
 		
 		//description
@@ -653,8 +647,7 @@ class Members_Controller extends Controller
 			Controller::error(ACCESS);
 		}
 		
-		if (!isset($_POST) || !isset($_POST['toapprove']) || !isset($_POST['entrance_date']) ||
-				!isset($_POST['speed_class']))
+		if (!isset($_POST) || !isset($_POST['toapprove']) || !isset($_POST['entrance_date']))
 		{
 			Controller::error(PARAMETER);
 		}
@@ -662,7 +655,6 @@ class Members_Controller extends Controller
 		$approved_count = 0;
 		$selected = @$_POST['toapprove'];
 		$date = @$_POST['entrance_date'];
-		$speed_class = @$_POST['speed_class'];
 		
 		// approve selected applicants
 		foreach ($selected AS $applicant_id)
@@ -704,8 +696,6 @@ class Members_Controller extends Controller
 					$vs->save_throwable();
 				}
 				
-				// set speed class
-				$member->speed_class_id = $speed_class;
 				
 				// unlock and set to Regular member
 				$member->type = Member_Model::TYPE_REGULAR;

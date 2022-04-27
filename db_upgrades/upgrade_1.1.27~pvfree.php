@@ -41,6 +41,10 @@ $upgrade_sql['1.1.27~pvfree'] = array
 "ALTER TABLE `ip6_addresses`
  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;",
 
+"INSERT INTO `messages` (`id`, `name`, `text`, `email_text`, `sms_text`, `type`, `self_cancel`, `ignore_whitelist`) VALUES (NULL, 'Former member message no payment', 'Former member message no payment', NULL, NULL, '21', NULL, '1');",
+
+"INSERT INTO `messages` (`id`, `name`, `text`, `email_text`, `sms_text`, `type`, `self_cancel`, `ignore_whitelist`) VALUES (NULL, 'no email', NULL, NULL, NULL, '22', NULL, '0');",
+
 
 
 );

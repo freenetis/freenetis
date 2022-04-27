@@ -140,8 +140,22 @@ class Message_Model extends ORM
 	/**
 	 * content of page for big debtors, this redirection can be set in system
 	 */
-	const BIG_DEBTOR_MESSAGE											= 20;
+	const BIG_DEBTOR_MESSAGE
+
+	 /**
+         * ukončení při neplacení
+         */
+											= 20;
+
+	const FORMER_MEMBER_MESSAGE_NOPAYMENT										= 21;
+
+	 /**
+         * ukončení bez emailu
+         */
+
 	
+	const FORMER_MEMBER_NOMESSAGE											= 22;
+
 	// self-cancel constants
 	
 	/**
@@ -189,6 +203,8 @@ class Message_Model extends ORM
 		self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE	=> 'Membership interrupt begins notification',
 		self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE		=> 'Membership interrupt ends notification',
 		self::FORMER_MEMBER_MESSAGE							=> 'Former member message',
+		self::FORMER_MEMBER_MESSAGE_NOPAYMENT                                          => 'Former member message no payment',
+		self::FORMER_MEMBER_NOMESSAGE                                                     => 'Former member no message',
 	);
 	
 	/**
@@ -267,7 +283,9 @@ class Message_Model extends ORM
 			$type == self::UNALLOWED_CONNECTING_PLACE_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE ||
-			$type == self::FORMER_MEMBER_MESSAGE
+			$type == self::FORMER_MEMBER_MESSAGE ||
+			$type == self::FORMER_MEMBER_MESSAGE_NOPAYMENT ||
+			$type == self::FORMER_MEMBER_NOMESSAGE
 		);
 	}
 	
@@ -360,7 +378,9 @@ class Message_Model extends ORM
 			$type == self::MONITORING_HOST_UP ||
 			$type == self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE ||
-			$type == self::FORMER_MEMBER_MESSAGE
+			$type == self::FORMER_MEMBER_MESSAGE ||
+			$type == self::FORMER_MEMBER_MESSAGE_NOPAYMENT ||
+			$type == self::FORMER_MEMBER_NOMESSAGE
 		);
 	}
 	
@@ -383,7 +403,8 @@ class Message_Model extends ORM
 			$type == self::CONNECTION_REQUEST_REFUSE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE ||
-			$type == self::FORMER_MEMBER_MESSAGE
+			$type == self::FORMER_MEMBER_MESSAGE ||
+			$type == self::FORMER_MEMBER_MESSAGE_NOPAYMENT
 		);
 	}
 	
@@ -414,7 +435,9 @@ class Message_Model extends ORM
 			$type != self::INTERRUPTED_MEMBERSHIP_MESSAGE &&
 			$type != self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE &&
 			$type != self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE &&
-			$type != self::FORMER_MEMBER_MESSAGE
+			$type != self::FORMER_MEMBER_MESSAGE &&
+			$type != self::FORMER_MEMBER_MESSAGE_NOPAYMENT &&
+			$type != self::FORMER_MEMBER_NOMESSAGE
 		);
 	}
 	

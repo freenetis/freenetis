@@ -591,6 +591,7 @@ class Members_Controller extends Controller
 		$speed_classes = array(NULL => '') + $speed_class->select_list();
 		$def_speed_class = $speed_class->get_members_default_class();
 
+		
 		$form->submit('Approve');
 		
 		//description
@@ -696,6 +697,7 @@ class Members_Controller extends Controller
 					$vs->save_throwable();
 				}
 				
+				// set speed class
 				
 				// unlock and set to Regular member
 				$member->type = Member_Model::TYPE_REGULAR;
@@ -4067,9 +4069,17 @@ class Members_Controller extends Controller
 		
 		$form->date('leaving_date')
 				->label('Leaving date');
+
+		$array_mess = array("0" => 'Neposílat',"19" => 'Žádost',"21" => 'Neplacení');
+
+		$form->dropdown('mess')
+		->label('Typ emailu')
+		->options($array_mess)
+		->style('width:200px');
 		
 		$form->submit('End membership');
 		
+
 		// validation
 		if ($form->validate())
 		{	
@@ -4080,6 +4090,7 @@ class Members_Controller extends Controller
 				$member->transaction_start();
 				
 				$member->leaving_date = date('Y-m-d', $form_data['leaving_date']);
+				$mess = $form_data['mess'];
 
 				// leaving date is in past or today
 				if ($member->leaving_date <= date('Y-m-d'))
@@ -4109,11 +4120,27 @@ class Members_Controller extends Controller
 				if (module::e('notification') &&
 					$member->leaving_date <= date('Y-m-d'))
 				{
-					// get message
-					$message = ORM::factory('message')->get_message_by_type(
-							Message_Model::FORMER_MEMBER_MESSAGE
-					);
-					// create notification object
+                                        if ($mess == "19")
+					{
+						$message = ORM::factory('message')->get_message_by_type(
+								    Message_Model::FORMER_MEMBER_MESSAGE);
+					}
+    
+					if ($mess == "21")
+                                        {
+                                                $message = ORM::factory('message')->get_message_by_type(
+                                                                    Message_Model::FORMER_MEMBER_MESSAGE_NOPAYMENT);
+                                        }
+
+					if ($mess == "0")
+                                        {
+                                                $message = ORM::factory('message')->get_message_by_type(
+                                                                    Message_Model::FORMER_MEMBER_NOMESSAGE);
+                                        }
+
+
+
+	    				// create notification object
 					$member_notif = array
 					(
 						'member_id'		=> $member->id,

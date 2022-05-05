@@ -21,10 +21,10 @@
 define('SYSPATH', str_replace('\\', '/', realpath('system')).'/');
 require '../config.php';
 // connect to database
-$link = mysql_connect($config['db_host'], $config['db_user'], $config['db_password']) or die(mysql_error());
-mysql_query("SET CHARACTER SET utf8", $link) or die(mysql_error());
-mysql_query("SET NAMES utf8", $link) or die(mysql_error());
-mysql_select_db($config['db_name']) or die(mysql_error());
+$link = mysqli_connect($config['db_host'], $config['db_user'], $config['db_password'], $config['db_name']) or die(mysqli_error($link));
+mysqli_query( $link ,"SET CHARACTER SET utf8") or die(mysqli_error($link));
+mysqli_query($link, "SET NAMES utf8") or die(mysqli_error($link));
+mysqli_select_db($link, $config['db_name']) or die(mysqli_error($link));
 
 $redirect_to = "";
 if (isset($_GET['redirect_to']))
@@ -129,8 +129,8 @@ else
 	WHERE ms.id = $id
 	LIMIT 1";
 }
-$message_result = mysql_query($message_query, $link) or die(mysql_error());
-$message = mysql_fetch_array($message_result);
+$message_result = mysqli_query($link, $message_query) or die(mysqli_error($link));
+$message = mysqli_fetch_array($message_result);
 // ip adress is found in the database
 if ($message && count($message) > 0)
 {
@@ -172,14 +172,14 @@ else
 		'???' AS login
 		FROM messages ms
 		WHERE ms.type = 3";
-	$message_result = mysql_query($message_query, $link) or die(mysql_error());
-	$message = mysql_fetch_array($message_result);
+	$message_result = mysqli_query($link, $message_query) or die(mysqli_error($link));
+	$message = mysqli_fetch_array($message_result);
 	$content = $message['text'];
 	
 	// connection requests enabled?
 	$cr_query = "SELECT name, value FROM config WHERE name = 'connection_request_enable'";
-	$cr_result = mysql_query($cr_query, $link) or die(mysql_error());
-	$cr_array = mysql_fetch_array($cr_result);
+	$cr_result = mysqli_query($link, $cr_query) or die(mysqli_error($link));
+	$cr_array = mysqli_fetch_array($cr_result);
 	$cr_enabled = ($cr_array && isset($cr_array['value']) && $cr_array['value']);
 
 	if ($cr_enabled)
@@ -189,8 +189,8 @@ else
 			SELECT id
 			FROM subnets s
 			WHERE inet_aton(netmask) & inet_aton('$ip_address') = inet_aton(network_address)";
-		$subnet_id_result = mysql_query($subnet_id_query, $link) or die(mysql_error());
-		$subnet_id_array = mysql_fetch_array($subnet_id_result);
+		$subnet_id_result = mysqli_query($link, $subnet_id_query) or die(mysqli_error($link));
+		$subnet_id_array = mysqli_fetch_array($subnet_id_result);
 		
 		// display link
 		if ($subnet_id_array && isset($subnet_id_array['id']) && $subnet_id_array['id'])
@@ -231,8 +231,8 @@ else
 // text in left contact panel,
 // it asssumed that after installation, there is always contact message with ID 1
 $contact_query = "SELECT * FROM messages WHERE type = 1";
-$contact_result = mysql_query($contact_query, $link) or die(mysql_error());
-$contact_array = mysql_fetch_array($contact_result) or die(mysql_error());
+$contact_result = mysqli_query($link, $contact_query) or die(mysqli_error($link));
+$contact_array = mysqli_fetch_array($contact_result) or die(mysqli_error($link));
 $contact = $contact_array['text'];
 // replace tags in curly brackets to contain particular values associated to visitor
 foreach ($message as $key => $value)
@@ -248,8 +248,8 @@ $content = str_replace('{request_url}', $redirect_to, $content);
 
 // redirection logo url
 $suffix_query = "SELECT name, value FROM config WHERE name = 'suffix'";
-$suffix_result = mysql_query($suffix_query, $link) or die(mysql_error());
-$suffix_array = mysql_fetch_array($suffix_result);
+$suffix_result = mysqli_query($link, $suffix_query) or die(mysqli_error($link));
+$suffix_array = mysqli_fetch_array($suffix_result);
 $logo = '';
 if ($suffix_array &&
 	isset($suffix_array['value']))
@@ -261,8 +261,8 @@ if ($suffix_array &&
 if (isset($message['self_cancel']) && $message['self_cancel'] > 0)
 {
 	$sct_query = "SELECT name, value FROM config WHERE name = 'self_cancel_text'";
-	$sct_result = mysql_query($sct_query, $link) or die(mysql_error());
-	$sct_array = mysql_fetch_array($sct_result);
+	$sct_result = mysqli_query($link, $sct_query) or die(mysqli_error($link));
+	$sct_array = mysqli_fetch_array($sct_result);
 	$sct = 'OK, I am aware';
 	if ($sct_array)
 	{
@@ -271,7 +271,7 @@ if (isset($message['self_cancel']) && $message['self_cancel'] > 0)
 	$footer = '<a class="cancel_link" href="cancel.php?redirect_to='.$redirect_to.'">'.$sct.'</a>';
 }
 // close database connection
-mysql_close($link);
+mysqli_close($link);
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">

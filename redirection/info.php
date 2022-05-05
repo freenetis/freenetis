@@ -21,10 +21,10 @@
 define('SYSPATH', str_replace('\\', '/', realpath('system')).'/');
 require '../config.php';
 // connect to database
-$link = mysql_connect($config['db_host'], $config['db_user'], $config['db_password']) or die(mysql_error());
-mysql_query("SET CHARACTER SET utf8", $link) or die(mysql_error());
-mysql_query("SET NAMES utf8", $link) or die(mysql_error());
-mysql_select_db($config['db_name']) or die(mysql_error());
+$link = mysqli_connect($config['db_host'], $config['db_user'], $config['db_password'], $config['db_name']) or die(mysqli_error($link));
+mysqli_query( $link ,"SET CHARACTER SET utf8") or die(mysqli_error($link));
+mysqli_query($link, "SET NAMES utf8") or die(mysqli_error($link));
+mysqli_select_db($link, $config['db_name']) or die(mysqli_error($link));
 
 // obtain ip address
 // preview of redirection can be viewed by passing GET argument
@@ -84,14 +84,14 @@ $info_query = "
 	ON inet_aton(us.netmask) & inet_aton('$ip_address') = inet_aton(us.network_address)
 	LIMIT 1
 	";
-$info_result = mysql_query($info_query, $link) or die(mysql_error());
-$info = mysql_fetch_array($info_result);
+$info_result = mysqli_query($link, $info_query) or die(mysqli_error($link));
+$info = mysqli_fetch_array($info_result);
 
 // text in left contact panel,
 // it asssumed that after installation, there is always contact message with ID 1
 $contact_query = "SELECT * FROM messages WHERE type = 1";
-$contact_result = mysql_query($contact_query, $link) or die(mysql_error());
-$contact_array = mysql_fetch_array($contact_result) or die(mysql_error());
+$contact_result = mysqli_query($link, $contact_query) or die(mysqli_error($link));
+$contact_array = mysqli_fetch_array($contact_result) or die(mysqli_error($link));
 $contact = $contact_array['text'];
 // replace tags in curly brackets to contain particular values associated to visitor
 foreach ($info as $key => $value)
@@ -104,8 +104,8 @@ foreach ($info as $key => $value)
 
 // redirection logo url
 $suffix_query = "SELECT name, value FROM config WHERE name = 'suffix'";
-$suffix_result = mysql_query($suffix_query, $link) or die(mysql_error());
-$suffix_array = mysql_fetch_array($suffix_result);
+$suffix_result = mysqli_query($link, $suffix_query) or die(mysqli_error($link));
+$suffix_array = mysqli_fetch_array($suffix_result);
 $logo = '';
 
 if ($suffix_array && isset($suffix_array['value']))
@@ -114,7 +114,7 @@ if ($suffix_array && isset($suffix_array['value']))
 }
 
 // close database connection
-mysql_close($link);
+mysqli_close($link);
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">

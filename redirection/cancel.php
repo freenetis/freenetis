@@ -21,10 +21,10 @@
 define('SYSPATH', str_replace('\\', '/', realpath('system')).'/');
 require '../config.php';
 // connect to database
-$link = mysql_connect($config['db_host'], $config['db_user'], $config['db_password']) or die(mysql_error());
-mysql_query("SET CHARACTER SET utf8", $link) or die(mysql_error());
-mysql_query("SET NAMES utf8", $link) or die(mysql_error());
-mysql_select_db($config['db_name']) or die(mysql_error());
+$link = mysqli_connect($config['db_host'], $config['db_user'], $config['db_password'], $config['db_name']) or die(mysqli_error($link));
+mysqli_query( $link ,"SET CHARACTER SET utf8") or die(mysqli_error($link));
+mysqli_query($link, "SET NAMES utf8") or die(mysqli_error($link));
+mysqli_select_db($link, $config['db_name']) or die(mysqli_error($link));
 // obtain remote ip address
 $ip_address = $_SERVER['REMOTE_ADDR'];
 
@@ -87,8 +87,8 @@ $message_query = "
 	WHERE m.ip_address = '$ip_address'
 	ORDER BY m.self_cancel DESC, m.datetime ASC
 	LIMIT 1";
-$message_result = mysql_query($message_query, $link) or die(mysql_error());
-$message = mysql_fetch_array($message_result);
+$message_result = mysqli_query($link, $message_query) or die(mysqli_error($link));
+$message = mysqli_fetch_array($message_result);
 
 
 // no redirection found - perhaps visiting this page by mistake?
@@ -114,27 +114,27 @@ if ($message && count($message) > 0)
 				LEFT JOIN messages_ip_addresses mip ON mip.ip_address_id = ip.id
 				LEFT JOIN messages m ON m.id = mip.message_id
 				WHERE u.member_id = ".$message['member_id']." OR ip.member_id = ".$message['member_id'];
-		$ip_result = mysql_query($ip_query, $link);
+		$ip_result = mysqli_query($link, $ip_query);
 		$ip_id_array = array();
-		while($item = mysql_fetch_array($ip_result))
+		while($item = mysqli_fetch_array($ip_result))
 		{
 			$ip_id_array[] = $item['ip_address_id'];
 		}
 		$d_query = "DELETE FROM messages_ip_addresses WHERE ip_address_id IN (".implode(",",$ip_id_array).")
 			AND message_id = ".$message['message_id'];
-		mysql_query($d_query, $link);
+		mysqli_query($link, $d_query);
 	}
 	else
 	{
 		$d_query = "DELETE FROM messages_ip_addresses WHERE ip_address_id = ".$message['ip_address_id'].
 			" AND message_id = ".$message['message_id'];
-		mysql_query($d_query, $link);
+		mysqli_query($link, $d_query);
 	}
 }
 // message after redirection
 $message_query = "SELECT * FROM messages WHERE type = 2";
-$message_result = mysql_query($message_query, $link) or die(mysql_error());
-$message = mysql_fetch_array($message_result);
+$message_result = mysqli_query($link, $message_query) or die(mysqli_error($link));
+$message = mysqli_fetch_array($message_result);
 $content = $message['text'];
 
 if ($redirect_to != '')
@@ -142,8 +142,8 @@ if ($redirect_to != '')
 
 // redirection logo url
 $suffix_query = "SELECT name, value FROM config WHERE name = 'suffix'";
-$suffix_result = mysql_query($suffix_query, $link) or die(mysql_error());
-$suffix_array = mysql_fetch_array($suffix_result);
+$suffix_result = mysqli_query($link, $suffix_query) or die(mysqli_error($link));
+$suffix_array = mysqli_fetch_array($suffix_result);
 $logo = '';
 if ($suffix_array &&
 	isset($suffix_array['value']))
@@ -199,11 +199,11 @@ li {
 <span style="display:none;"><?php echo number_format(memory_get_usage() / 1024 / 1024, 2).' MB'; ?></span>
 
 <?php
-$gateway_result = mysql_query("SELECT name, value FROM config WHERE name = 'gateway'", $link);
-$gateway = mysql_fetch_array($gateway_result);
+$gateway_result = mysqli_query($link, "SELECT name, value FROM config WHERE name = 'gateway'");
+$gateway = mysqli_fetch_array($gateway_result);
 
-$port_self_cancel_result = mysql_query("SELECT name, value FROM config WHERE name = 'redirection_port_self_cancel'", $link);
-$port_self_cancel = mysql_fetch_array($port_self_cancel_result);
+$port_self_cancel_result = mysqli_query($link, "SELECT name, value FROM config WHERE name = 'redirection_port_self_cancel'");
+$port_self_cancel = mysqli_fetch_array($port_self_cancel_result);
 
 $port_self_cancel = ($port_self_cancel['value']!='') ? $port_self_cancel['value'] : 80;
 

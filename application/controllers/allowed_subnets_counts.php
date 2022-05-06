@@ -41,7 +41,7 @@ class Allowed_subnets_counts_Controller extends Controller
 			Controller::error(RECORD);
 		
 		// access control
-		if (!$this->acl_check_edit('Allowed_subnets_Controller', 'allowed_subnet', $member_id))
+		if (!$this->acl_check_new('Allowed_subnets_Controller', 'allowed_subnet', $member_id))
 			Controller::error(ACCESS);
 
 		$form = new Forge(url::base(TRUE) . url::current(TRUE));

@@ -757,39 +757,26 @@ class Web_interface_Controller extends Controller
 
 	}
 	
+
+
 	public function ipv6_qos()
 	{
-	$speed_class_model = new Speed_class_Model();
-	$ip6_class_model = new Ip6_address_Model();
-	$speed_classes = $speed_class_model->orderby('d_ceil', 'DESC')->find_all();
-		
-		
+		$speed_class_model = new Speed_class_Model();
+		$ip6_class_model = new Ip6_address_Model();
+		$speed_classes = $speed_class_model->orderby('d_ceil', 'DESC')->find_all();
+
+
 		foreach ($speed_classes as $speed_class)
 		{
-			echo "\n $speed_class->name";
-			
+
 			$ips = $ip6_class_model->get_ip6_addresses_to_class($speed_class->id);
-			
-			$last_member_id = NULL;
-			$last_id = NULL;
 
 			foreach ($ips as $ip)
 			{
-				// group same member by comments
-				if ($last_member_id != $ip->member_id)
-				{
-					$min = intval($speed_class->d_rate / 1024); // convert B => kB
-					$max = intval($speed_class->d_ceil / 1024); // convert B => kB
-					echo "\n$ip->user_login;$min-$max;";
-					// change member values
-					$last_member_id = $ip->member_id;
-					$last_id = "$ip->user_login";
-					echo "$ip->ip_address";
-				}
-				else
-				{
-					echo ",$ip->ip_address";
-				}
+				$min = intval($speed_class->d_rate / 1024); // convert B => kB
+				$max = intval($speed_class->d_ceil / 1024); // convert B => kB
+				echo "$ip->ip_address\t";
+				echo "$ip->user_login\t$max\t$min\n";
 			}
 		}
 	}

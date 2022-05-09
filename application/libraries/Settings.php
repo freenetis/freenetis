@@ -85,6 +85,9 @@ class Settings
 		// deduct day (1-31) (#332)
 		// default value is 15 because this constant was used before FreenetIS 1.1
 		'deduct_day'						=> 15,
+
+		// Payment VAT rate, 0-100
+		'payment_vat'						=> 0,
 		
 		/**
 		 * DATABASE SETTINGS

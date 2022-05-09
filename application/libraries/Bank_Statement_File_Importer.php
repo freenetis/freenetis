@@ -469,18 +469,21 @@ abstract class Bank_Statement_File_Importer
 	
 	/**
 	 * Adds member as affected by this parsed statement. Later if statement is
-	 * succefully parsed and saved these members are inform by notification.
+	 * successfully parsed and saved these members are inform by notification.
 	 * 
 	 * @param integer $member_id
+	 * @param array $details bank transfer ID, amount, date of issue
 	 */
-	protected function add_affected_member($member_id)
+	protected function add_affected_member($member_id, $details)
 	{
 		$member_id = intval($member_id);
 		
-		if (!in_array($member_id, $this->affected_members))
+		if (!array_key_exists($member_id, $this->affected_members))
 		{
-			$this->affected_members[] = $member_id;
+			$this->affected_members[$member_id] = array();
 		}
+
+		$this->affected_members[$member_id][] = $details;
 	}
 	
 	/**
@@ -679,12 +682,40 @@ abstract class Bank_Statement_File_Importer
 			{
 				$send_sms = Notifications_Controller::KEEP;
 			}
-			
-			foreach ($this->affected_members as $member_id)
+
+			$payment_vat = floatval(Settings::get('payment_vat'));
+			if ($payment_vat <= 0 || $payment_vat > 100)
 			{
+				$payment_vat = 0;
+			}
+			
+			foreach ($this->affected_members as $member_id => $details)
+			{
+				$total_amount = 0;
+				$ids = array();
+				foreach ($details as $detail)
+				{
+					if (array_key_exists('bank_transfer_id', $detail))
+					{
+						$ids[] = $detail['bank_transfer_id'];
+					}
+					if (array_key_exists('amount', $detail))
+					{
+						$total_amount += floatval($detail['amount']);
+					}
+				}
+				$total_novat = $total_amount / (1 + $payment_vat / 100);
+
 				Message_Model::activate_special_notice(
 						Message_Model::RECEIVED_PAYMENT_NOTICE_MESSAGE,
-						$member_id, $this->get_user_id(), $send_email, $send_sms
+						$member_id, $this->get_user_id(), $send_email, $send_sms, array
+						(
+							'payment_id' => implode(', ', $ids),
+							'payment_amount' => round($total_amount, 2),
+							'payment_amount_novat' => round($total_novat, 2),
+							'payment_vat' => round($total_amount - $total_novat, 2),
+							'payment_date' => date('Y-m-d')
+						)
 				);
 			}
 			

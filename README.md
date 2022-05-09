@@ -12,7 +12,7 @@ It provides features like payment management, user and device management, servic
 
 úpravy pro Pvfree.net
 
-pokud používáte výstup přihlášky do pdf,je nutno nainstalovat mpdf
+pokud používáte výstup přihlášky do pdf, je nutno nainstalovat mpdf
 
 
 apt install composer

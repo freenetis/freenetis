@@ -250,7 +250,12 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
                             if ($ca->id)
                             {
                                 // add affected member for notification
-                                $this->add_affected_member($member_id);
+                                $this->add_affected_member($member_id, array
+								(
+									'bank_transfer_id' => $bt->id,
+									'amount' => $item['castka'],
+									'date' => $now
+								));
 
                                 // assigning transfer
                                 $a_transfer_id = Transfer_Model::insert_transfer(
@@ -326,7 +331,12 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 							if ($ca->id)
 							{
 								// add affected member for notification
-								$this->add_affected_member($member_id);
+								$this->add_affected_member($member_id, array
+								(
+									'bank_transfer_id' => $bt->id,
+									'amount' => $item['castka'],
+									'date' => $now
+								));
 
 								// assigning transfer
 								$a_transfer_id = Transfer_Model::insert_transfer(

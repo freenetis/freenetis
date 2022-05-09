@@ -113,25 +113,25 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 			$this->parsed_transactions[] = array
 			(
 				'datum'				=> date('Y-m-d', strtotime($t['column0']['value'])),
-				'id_pohybu'			=> $t['column22']['value'],
-				'id_pokynu'			=> $t['column17']['value'],
-				'kod_banky'			=> $t['column3']['value'],
-				'ks'				=> $t['column4']['value'],
-				'mena'				=> $t['column14']['value'],
-				'nazev_banky'		=> $t['column12']['value'],
+				'id_pohybu'			=> $t['column22']['value'] ?? '',
+				'id_pokynu'			=> $t['column17']['value'] ?? '',
+				'kod_banky'			=> $t['column3']['value'] ?? '',
+				'ks'				=> $t['column4']['value'] ?? '',
+				'mena'				=> $t['column14']['value'] ?? '',
+				'nazev_banky'		=> $t['column12']['value'] ?? '',
 				'nazev_protiuctu'	=> empty($t['column10']['value']) ?
 											$t['column7']['value'] :
 											$t['column10']['value'],
-				'castka'			=> $t['column1']['value'],
-				'protiucet'			=> $t['column2']['value'],
-				'provedl'			=> $t['column9']['value'],
+				'castka'			=> $t['column1']['value'] ?? '',
+				'protiucet'			=> $t['column2']['value'] ?? '',
+				'provedl'			=> $t['column9']['value'] ?? '',
 				'prevod'			=> NULL, // not available
-				'ss'				=> $t['column6']['value'],
-				'typ'				=> $t['column8']['value'],
-				'upresneni'			=> $t['column22']['value'],
-				'identifikace'		=> $t['column7']['value'],
-				'vs'				=> ltrim($t['column5']['value'], '0'),
-				'zprava'			=> $t['column16']['value'],
+				'ss'				=> $t['column6']['value'] ?? '',
+				'typ'				=> $t['column8']['value'] ?? '',
+				'upresneni'			=> $t['column22']['value'] ?? '',
+				'identifikace'		=> $t['column7']['value'] ?? '',
+				'vs'				=> ltrim($t['column5']['value'] ?? '', '0'),
+				'zprava'			=> $t['column16']['value'] ?? '',
 			);
 		}
 		

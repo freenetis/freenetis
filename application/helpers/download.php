@@ -35,7 +35,8 @@ class download {
 			$extension = pathinfo($filepath, PATHINFO_EXTENSION);
 
 			// Remove directory path from the filename
-			$filename = end(explode('/', $filepath));
+			$tmp = explode('/', $filepath);
+			$filename = end($tmp);
 
 			// Set filesize
 			$filesize = filesize($filepath);
@@ -43,7 +44,8 @@ class download {
 		else
 		{
 			// Grab the file extension
-			$extension = end(explode('.', $filename));
+			$tmp = explode('.', $filename);
+			$extension = end($tmp);
 
 			// Try to determine if the filename includes a file extension.
 			// We need it in order to set the MIME type

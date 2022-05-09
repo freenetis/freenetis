@@ -275,6 +275,8 @@ class Registration_Controller extends Controller
 					$user->pre_title = $form_data['title1'];
 					$user->post_title = $form_data['title2'];
 					$user->type = User_Model::MAIN_USER;
+					$user->application_password = '';
+					$user->settings = '';
 
 					if (empty($form_data['birthday']))
 					{
@@ -362,6 +364,8 @@ class Registration_Controller extends Controller
 					$member->entrance_fee = $entrance_fee;
 					$member->applicant_registration_datetime = date('Y-m-d H:i:s');
 					$member->comment = $form_data['comment'];
+					$member->registration = 0;
+					$member->leaving_date =  '0000-00-00';
 					$member->save_throwable();
 
 					$user->member_id = $member->id;

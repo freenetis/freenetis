@@ -16,5 +16,7 @@ pokud používáte výstup přihlášky do pdf,je nutno nainstalovat mpdf
 
 
 apt install composer
+
 cd /usr/share/freenetis/application/vendors/
+
 composer require mpdf/mpdf

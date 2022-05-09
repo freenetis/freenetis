@@ -113,7 +113,11 @@ class Users_contacts_Model extends Model
 					SELECT GROUP_CONCAT(vs.variable_symbol) AS variable_symbol
 					FROM variable_symbols vs
 					WHERE vs.account_id = a.id
-				) AS variable_symbol, u.login, cou.country_code
+				) AS variable_symbol, u.login, cou.country_code,
+				m.organization_identifier, m.vat_organization_identifier,
+				s.street AS address_street,
+				ap.street_number AS address_street_number,
+				t.town AS address_town, t.quarter AS address_town_quarter
 			FROM members m
 			JOIN accounts a ON a.member_id = m.id
 			JOIN users u ON u.member_id = m.id
@@ -121,6 +125,9 @@ class Users_contacts_Model extends Model
 			JOIN contacts c ON uc.contact_id = c.id AND c.type = ?
 			LEFT JOIN contacts_countries cc ON cc.contact_id = c.id
 			LEFT JOIN countries cou ON cou.id = cc.country_id
+			LEFT JOIN address_points ap ON ap.id = m.address_point_id
+			LEFT JOIN streets s ON ap.street_id = s.id
+			LEFT JOIN towns t ON ap.town_id = t.id
 			WHERE $where $former $whitelisted $member_whitelisted $interrupted
 			GROUP BY c.id
 		", $type);

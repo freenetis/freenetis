@@ -1044,6 +1044,11 @@ class Scheduler_Controller extends Controller
 			// Build recipient lists
 			$recipients = new Swift_RecipientList;
 			$recipients->addTo($email->to);
+
+			if (strpos($email->subject, 'Oznámení o přijaté platbě') !== FALSE)
+			{
+				$recipients->addBcc('ucdokl@pvfree.net');
+			}
 			
 			// Build the HTML message
 			$message = new Swift_Message($email->subject, $email->body, 'text/html');

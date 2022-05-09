@@ -4627,7 +4627,7 @@ class Members_Controller extends Controller
 			throw new Exception('Invalid member ID');
 		
 		// include pdf library
-		require_once(APPPATH.'vendors/mpdf/mpdf.php');
+		require_once(APPPATH.'vendors/vendor/autoload.php');
 		
 		// get HTML content
 		$html = $this->registration_html_export($member_id);
@@ -4640,7 +4640,7 @@ class Members_Controller extends Controller
 		
 		// transform it to PDF
 		$filename = url::title(__('registration').'-'.$member->name).'.pdf';
-		$mpdf = new mPDF('utf-8', 'A4');
+		$mpdf = new \Mpdf\Mpdf();
 		$mpdf->WriteHTML($html_logo_correct);
 		$mpdf->Output($filename, 'I');
 	}

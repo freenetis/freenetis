@@ -1032,8 +1032,7 @@ class Message_Model extends ORM
 						$text = str_replace('{'.$key.'}', $value, $text);
 					}
 				}
-				// replace comment
-				$text = str_replace('{comment}', $comment, $text);
+				
 				// replace comment or additional arguments
 				if (!is_array($comment))
 				{
@@ -1236,7 +1235,6 @@ class Message_Model extends ORM
 					}
 				}
 				// replace comment
-				$text = str_replace('{comment}', $comment, $text);
 				if (!is_array($comment))
 				{
 					$comment = array('comment' => $comment);

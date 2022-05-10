@@ -1032,6 +1032,15 @@ class Message_Model extends ORM
 				}
 				// replace comment
 				$text = str_replace('{comment}', $comment, $text);
+				// replace comment or additional arguments
+				if (!is_array($comment))
+				{
+					$comment = array('comment' => $comment);
+				}
+				foreach ($comment as $key => $value)
+				{
+					$text = str_replace('{'.$key.'}', $value, $text);
+				}
 
 				// if empty message do not send
 				if (empty($text))
@@ -1226,6 +1235,15 @@ class Message_Model extends ORM
 				}
 				// replace comment
 				$text = str_replace('{comment}', $comment, $text);
+				if (!is_array($comment))
+				{
+					$comment = array('comment' => $comment);
+				}
+				foreach ($comment as $key => $value)
+				{
+					$text = str_replace('{'.$key.'}', $value, $text)		
+				}
+
 
 				// if empty message or invalid number for sending SMS do not send
 				if (empty($text) || !Phone_operator_Model::is_sms_enabled_for($number))

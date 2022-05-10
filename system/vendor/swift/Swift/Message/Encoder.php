@@ -110,7 +110,7 @@ class Swift_Message_Encoder
     foreach ($data as $key => $string)
     {
       $key = (string) $key;
-      if ($key{0} == 'a') //This is an address
+      if ($key[0] == 'a') //This is an address
       {
         if ($init_chunk && $init_chunk < (strlen($string)+2)) $ret .= $le;
         $ret .= $le . $string;
@@ -187,7 +187,7 @@ class Swift_Message_Encoder
     foreach ($data as $key => $string)
     {
       $key = (string) $key;
-      if ($key{0} == 'a') //An address
+      if ($key[0] == 'a') //An address
       {
         if ($init_chunk && $init_chunk < (strlen($string)+3)) $ret .= "=";
         $ret .= $le . $string;
@@ -247,7 +247,7 @@ class Swift_Message_Encoder
         || ($val >= 33 && $val <= 60) || ($val >= 62 && $val <= 126)
         && $val != 63)
       {
-        $ret .= $string{$i};
+        $ret .= $string[$i];
       }
       else
       {

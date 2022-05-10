@@ -789,6 +789,7 @@ class Message_Model extends ORM
 	 * @param integer $email			E-mail state
 	 * @param integer $sms				SMS state
 	 * @param string $comment			Comment for member
+	 * @param string|array $comment		Comment for member or additional arguments
 	 * @return boolean					Notification made?
 	 */
 	public static function activate_special_notice(
@@ -987,6 +988,7 @@ class Message_Model extends ORM
 	 * @param Message_Model $message	Message to send
 	 * @param Mysql_Result $contacts	Contacts to send
 	 * @param string $comment			Comment
+	 * @param string|array $comment		Comment for member or additional arguments
 	 * @return integer					Number of sended emails
 	 * @throws Exception				On error
 	 */

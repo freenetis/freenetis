@@ -120,7 +120,7 @@ class Json_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impo
 				'mena'				=> $t['column14']['value'] ?? '',
 				'nazev_banky'		=> $t['column12']['value'] ?? '',
 				'nazev_protiuctu'	=> empty($t['column10']['value']) ?
-											$t['column7']['value'] :
+											($t['column7']['value'] ?? '-') :
 											$t['column10']['value'],
 				'castka'			=> $t['column1']['value'] ?? '',
 				'protiucet'			=> $t['column2']['value'] ?? '',

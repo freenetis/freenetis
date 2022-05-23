@@ -156,6 +156,8 @@ class Message_Model extends ORM
 	
 	const FORMER_MEMBER_NOMESSAGE											= 22;
 
+	const FORMER_MEMBER_MESSAGE_RETURN_PAYMENT										= 23;
+
 	// self-cancel constants
 	
 	/**
@@ -205,6 +207,7 @@ class Message_Model extends ORM
 		self::FORMER_MEMBER_MESSAGE							=> 'Former member message',
 		self::FORMER_MEMBER_MESSAGE_NOPAYMENT                                          => 'Former member message no payment',
 		self::FORMER_MEMBER_NOMESSAGE                                                     => 'Former member no message',
+		self::FORMER_MEMBER_MESSAGE_RETURN_PAYMENT                                          => 'Former member message return payment',
 	);
 	
 	/**
@@ -285,7 +288,8 @@ class Message_Model extends ORM
 			$type == self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE ||
 			$type == self::FORMER_MEMBER_MESSAGE ||
 			$type == self::FORMER_MEMBER_MESSAGE_NOPAYMENT ||
-			$type == self::FORMER_MEMBER_NOMESSAGE
+			$type == self::FORMER_MEMBER_NOMESSAGE ||
+			$type == self::FORMER_MEMBER_MESSAGE_RETURN_PAYMENT
 		);
 	}
 	
@@ -380,7 +384,8 @@ class Message_Model extends ORM
 			$type == self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE ||
 			$type == self::FORMER_MEMBER_MESSAGE ||
 			$type == self::FORMER_MEMBER_MESSAGE_NOPAYMENT ||
-			$type == self::FORMER_MEMBER_NOMESSAGE
+			$type == self::FORMER_MEMBER_NOMESSAGE ||
+			$type == self::FORMER_MEMBER_MESSAGE_RETURN_PAYMENT
 		);
 	}
 	
@@ -404,7 +409,8 @@ class Message_Model extends ORM
 			$type == self::INTERRUPTED_MEMBERSHIP_BEGIN_NOTIFY_MESSAGE ||
 			$type == self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE ||
 			$type == self::FORMER_MEMBER_MESSAGE ||
-			$type == self::FORMER_MEMBER_MESSAGE_NOPAYMENT
+			$type == self::FORMER_MEMBER_MESSAGE_NOPAYMENT ||
+			$type == self::FORMER_MEMBER_MESSAGE_RETURN_PAYMENT
 		);
 	}
 	
@@ -437,7 +443,8 @@ class Message_Model extends ORM
 			$type != self::INTERRUPTED_MEMBERSHIP_END_NOTIFY_MESSAGE &&
 			$type != self::FORMER_MEMBER_MESSAGE &&
 			$type != self::FORMER_MEMBER_MESSAGE_NOPAYMENT &&
-			$type != self::FORMER_MEMBER_NOMESSAGE
+			$type != self::FORMER_MEMBER_NOMESSAGE &&
+			$type != self::FORMER_MEMBER_MESSAGE_RETURN_PAYMENT
 		);
 	}
 	
@@ -1241,7 +1248,7 @@ class Message_Model extends ORM
 				}
 				foreach ($comment as $key => $value)
 				{
-					$text = str_replace('{'.$key.'}', $value, $text)		
+					$text = str_replace('{'.$key.'}', $value, $text);
 				}
 
 

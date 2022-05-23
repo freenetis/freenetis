@@ -4070,12 +4070,17 @@ class Members_Controller extends Controller
 		$form->date('leaving_date')
 				->label('Leaving date');
 
-		$array_mess = array("0" => 'Neposílat',"19" => 'Žádost',"21" => 'Neplacení');
+		$array_mess = array("0" => 'Neposílat',"19" => 'Žádost',"21" => 'Neplacení',"23" => 'Přeplatek');
 
 		$form->dropdown('mess')
 		->label('Typ emailu')
 		->options($array_mess)
 		->style('width:200px');
+
+		$form->input('comment')
+		->label('č.ú.')
+		->style('width:200px');
+
 		
 		$form->submit('End membership');
 		
@@ -4091,6 +4096,7 @@ class Members_Controller extends Controller
 				
 				$member->leaving_date = date('Y-m-d', $form_data['leaving_date']);
 				$mess = $form_data['mess'];
+				$comment = array('leaving_date' => $member->leaving_date);
 
 				// leaving date is in past or today
 				if ($member->leaving_date <= date('Y-m-d'))
@@ -4117,8 +4123,7 @@ class Members_Controller extends Controller
 				);
 
 				// leaving date is in past or today
-				if (module::e('notification') &&
-					$member->leaving_date <= date('Y-m-d'))
+				if (module::e('notification'))
 				{
                                         if ($mess == "19")
 					{
@@ -4130,6 +4135,14 @@ class Members_Controller extends Controller
                                         {
                                                 $message = ORM::factory('message')->get_message_by_type(
                                                                     Message_Model::FORMER_MEMBER_MESSAGE_NOPAYMENT);
+                                        }
+					
+					if ($mess == "23")
+                                        {
+                                                $message = ORM::factory('message')->get_message_by_type(
+                                                                    Message_Model::FORMER_MEMBER_MESSAGE_RETURN_PAYMENT);
+						$comment = array('leaving_date' => $member->leaving_date,
+								 'ucet' => $form_data['comment']);
                                         }
 
 					if ($mess == "0")
@@ -4149,7 +4162,7 @@ class Members_Controller extends Controller
 					// notify by email
 					Notifications_Controller::notify(
 							$message, array($member_notif), $this->user_id,
-							NULL, FALSE, TRUE, TRUE, FALSE, FALSE, TRUE
+							$comment, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE
 					);
 				}
 				

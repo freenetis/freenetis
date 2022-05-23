@@ -1049,6 +1049,21 @@ class Scheduler_Controller extends Controller
 			{
 				$recipients->addBcc('ucdokl@pvfree.net');
 			}
+			if (strpos($email->subject, 'Ukončení členství s přeplatkem') !== FALSE)
+			{
+				$recipients->addBcc('rada@pvfree.net');
+				$recipients->addBcc('pokladnik@pvfree.net');
+			}
+			
+			if (strpos($email->subject, 'Ukončení členství podle Stanov') !== FALSE)
+			{
+				$recipients->addBcc('rada@pvfree.net');
+			}
+			
+			if (strpos($email->subject, 'Ukončení členství na vlastní žádost') !== FALSE)
+			{
+				$recipients->addBcc('rada@pvfree.net');
+			}
 			
 			// Build the HTML message
 			$message = new Swift_Message($email->subject, $email->body, 'text/html');

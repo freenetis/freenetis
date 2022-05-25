@@ -240,7 +240,7 @@ class Swift_Message_Encoder
     $len = strlen($string);
     for ($i = 0; $i < $len; $i++)
     {
-      $val = ord($string{$i});
+      $val = ord($string[$i]);
       //9, 32 = HT, SP; 10, 13 = CR, LF; 33-60 & 62-126 are ok
       // 63 = '?'; 95 = '_' and need encoding to go in the headers
       if ((!$bin && ($val == 32 || $val == 9 || $val == 10 || $val == 13))

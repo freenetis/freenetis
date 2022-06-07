@@ -241,6 +241,7 @@ class Membership_interrupts_Controller extends Controller
 				$members_fee->activation_date = $from;
 				$members_fee->deactivation_date = $to;
 				$members_fee->priority = 0;
+				$members_fee->comment = '';
 
 				$members_fee->save_throwable();
 

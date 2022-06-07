@@ -1484,18 +1484,20 @@ class Notifications_Controller extends Controller
 		
 		foreach ($members as $member)
 		{
-			// convert object to array
-			if (is_object($member))
-			{
-				$member = get_object_vars($member);
+			if(!empty($member)){
+				// convert object to array
+				if (is_object($member))
+				{
+					$member = get_object_vars($member);
+				}
+				// check whitelist
+				if ($member['whitelisted'] && !$message->ignore_whitelist)
+				{
+					continue;
+				}
+				// add ID
+				$member_ids[] = $member['member_id'];
 			}
-			// check whitelist
-			if ($member['whitelisted'] && !$message->ignore_whitelist)
-			{
-				continue;
-			}
-			// add ID
-			$member_ids[] = $member['member_id'];
 		}
 		
 		// get all IPs of members or users

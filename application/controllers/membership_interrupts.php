@@ -277,8 +277,7 @@ class Membership_interrupts_Controller extends Controller
 				ORM::factory('member')->reactivate_messages($member->id);
 
 				// begin of redirection today? => notify member
-				if (module::e('notification') &&
-					date('Y-m-d') == $members_fee->activation_date)
+				if (module::e('notification'))
 				{
 					// get message
 					$message = ORM::factory('message')->get_message_by_type(
@@ -290,10 +289,14 @@ class Membership_interrupts_Controller extends Controller
 						'member_id'		=> $members_fee->member->id,
 						'whitelisted'	=> $members_fee->member->has_whitelist()
 					);
+					$comment = array( 
+						'activation_date' => $members_fee->activation_date,
+						'deactivation_date' => $members_fee->deactivation_date
+					 );
 					// notify by email
 					Notifications_Controller::notify(
 							$message, array($member_notif), $this->user_id,
-							NULL, FALSE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE
+							$comment, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, TRUE
 					);
 				}
 

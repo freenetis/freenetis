@@ -934,10 +934,10 @@ class Scheduler_Controller extends Controller
 							TRUE, FALSE, FALSE, TRUE
 					);
 					// inform new former members (email and sms)
-					Notifications_Controller::notify(
-							$message, $today_former_members, NULL, NULL,
-							FALSE, TRUE, TRUE, FALSE, FALSE, TRUE
-					);
+			//		Notifications_Controller::notify(
+			//				$message, $today_former_members, NULL, NULL,
+			//				FALSE, TRUE, TRUE, FALSE, FALSE, TRUE
+			//		);
 				}
 			}
 			catch (Exception $e)
@@ -985,10 +985,10 @@ class Scheduler_Controller extends Controller
 				// redirect all interrupt members
 				Notifications_Controller::notify(
 						$i_message, $interr_members, NULL, NULL,
-						TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, TRUE
+						TRUE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE
 				);
 				// inform interrupted members which is interupted from today
-				Notifications_Controller::notify(
+			/*	Notifications_Controller::notify(
 						$bi_message, $begin_interr_members, NULL, NULL,
 						FALSE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE
 				);
@@ -997,6 +997,7 @@ class Scheduler_Controller extends Controller
 						$ei_message, $end_interr_members, NULL, NULL,
 						FALSE, TRUE, TRUE, FALSE, FALSE, FALSE, TRUE
 				);
+			*/
 			}
 			catch (Exception $e)
 			{
@@ -1061,6 +1062,11 @@ class Scheduler_Controller extends Controller
 			}
 			
 			if (strpos($email->subject, 'Ukončení členství na vlastní žádost') !== FALSE)
+			{
+				$recipients->addBcc('rada@pvfree.net');
+			}
+			
+			if (strpos($email->subject, 'Oznámení o započetí přerušení členství') !== FALSE)
 			{
 				$recipients->addBcc('rada@pvfree.net');
 			}

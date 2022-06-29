@@ -1576,8 +1576,9 @@ class Devices_Controller extends Controller
 								$ip6_a6 = new Ip6_addresses_Controller();
 								$ip6_a6a = $ip6_a6->calc_ip6_address($ipm->ip_address);
 								$ip6_address_add = new Ip6_address_Model();
-								$ip6_address_add->add_ip6_address_db($ipm->iface_id, $ip6_a6a);
-
+								if (isset($ip6_a6a)){
+									$ip6_address_add->add_ip6_address_db($ipm->iface_id, $ip6_a6a);
+								}
 								
 								// expired subnet
 								$expired_subnets[] = $ipm->subnet_id;
@@ -2862,10 +2863,11 @@ class Devices_Controller extends Controller
 				{
 					$ip6_a6 = new Ip6_addresses_Controller();
 					$ip6_a6a = $ip6_a6->calc_ip6_address($ip->ip_address);
-					$ip6_address_del = new Ip6_address_Model();
-					$ip6_address_del->del_ip6_address_db($ip6_a6a);
+					if (isset($ip6_a6a)){
+						$ip6_address_del = new Ip6_address_Model();
+						$ip6_address_del->del_ip6_address_db($ip6_a6a);
+					}
 				}
-				
 				
 				$device->delete_throwable();
 				

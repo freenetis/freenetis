@@ -31,7 +31,7 @@ class Ip6_addresses_Controller extends Controller
 		    $z = dechex($z);
 		    if ($w != "10")
 		    {
-			    $ip6_address = "2a07:9c3:".$y.":".$z."00::/56";
+			    $ip6_address = NULL;
 		    }
 		    else
 		    {

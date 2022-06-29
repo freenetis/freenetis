@@ -1850,7 +1850,7 @@ class Members_Controller extends Controller
 				if (!$is_former)
 				{
 					// end membership link
-					if ($this->acl_check_edit(get_class($this), 'members') &&
+					if ($this->acl_check_delete(get_class($this), 'members') &&
 						!$end_membership)
 					{
 						$member_links[] = html::anchor(
@@ -3476,7 +3476,6 @@ class Members_Controller extends Controller
 			
 			$match = array();
 			$match2 = array();
-			
 			// validate address
 			if ($address_point_server_active &&
 				(

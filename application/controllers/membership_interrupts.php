@@ -443,7 +443,7 @@ class Membership_interrupts_Controller extends Controller
 					
 					if ($member->leaving_date > date('Y-m-d'))
 					{
-						$member->leaving_date = NULL;
+						$member->leaving_date = '0000-00-00';
 					
 						$member->save_throwable();
 					}

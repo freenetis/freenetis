@@ -238,6 +238,7 @@ class Fees_Controller extends Controller
 				$fee->fee = $form_data['fee'];
 				$fee->from = date("Y-m-d", $form_data['from']);
 				$fee->to = date("Y-m-d", $form_data['to']);
+				$fee->readonly = '0';
 				
 				$fee->save_throwable();
 				

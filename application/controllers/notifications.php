@@ -167,7 +167,6 @@ class Notifications_Controller extends Controller
 			{
 				$smss = array($member->id => intval($form_data['sms']));
 			}
-
 			// notify
 			$stats = Notifications_Controller::notify_from_form(
 					$message, $user_id, $comment,
@@ -1482,9 +1481,11 @@ class Notifications_Controller extends Controller
 		// get member IDs or user IDS array
 		$member_ids = array();
 		
+		
 		foreach ($members as $member)
 		{
-			if(!empty($member)){
+
+			if (!empty($member)){
 				// convert object to array
 				if (is_object($member))
 				{
@@ -1690,7 +1691,7 @@ class Notifications_Controller extends Controller
 				FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE,
 				$notification_type, TRUE
 		);
-		
+
 		/* make new redirection */
 		
 		// remove members that are highlighted as KEEP and DEACTIVATE
@@ -1755,7 +1756,7 @@ class Notifications_Controller extends Controller
 	 * 
 	 * @see Notifications_Controller#notify_from_form
 	 * @param array $member_ids
-	 * @param integer $whitelisted
+	 * @param string $whitelisted
 	 * @return array
 	 */
 	private static function _make_array_for_notify($member_ids, $whitelisted = 0)

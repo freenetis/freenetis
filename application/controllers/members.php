@@ -4038,6 +4038,7 @@ class Members_Controller extends Controller
 			Controller::warning(PARAMETER);
 		
 		$member = new Member_Model($member_id);
+		$variable_symbol_model = new Variable_Symbol_Model();
 		
 		$end_membership = ORM::factory('membership_interrupt')
 				->has_member_end_after_interrupt_end_in_date($member->id, date('Y-m-d'));
@@ -4088,7 +4089,6 @@ class Members_Controller extends Controller
 		if ($form->validate())
 		{	
 			$form_data = $form->as_array();
-			
 			try
 			{
 				$member->transaction_start();
@@ -4102,6 +4102,11 @@ class Members_Controller extends Controller
 				{
 					$member->type = Member_Model::TYPE_FORMER;
 					$member->locked = 1; // lock account
+				//get variable symbol id
+
+				$var_sym_id = $variable_symbol_model->get_variable_symbol_id_member($member->id);
+				$variable_symbol_model->delete_variable_symbol($var_sym_id);
+
 				}
 				
 				$member->save_throwable();

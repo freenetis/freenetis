@@ -131,4 +131,32 @@ class Variable_Symbol_Model extends ORM
 		
 		return NULL;
 	}
+	
+	/**Get variable symbol from member id
+	*/
+	public function get_variable_symbol_id_member($member_id)
+	{
+		$query = $this->db->query("
+				SELECT v.*
+				FROM variable_symbols v
+				JOIN accounts a ON v.account_id = a.id
+				WHERE a.member_id = ?
+			",$member_id);
+		if ($query->count() > 0)
+		{
+			return $query = $query->current()->id;
+		}
+		
+		return NULL;
+
+	}
+	
+	/** remove variable symbol from id
+	*/
+	public function delete_variable_symbol($id)
+	{
+		$this->db->query("
+				DELETE FROM variable_symbols WHERE id = ?
+				",$id);
+	}
 }

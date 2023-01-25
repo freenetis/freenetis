@@ -893,6 +893,7 @@ class Scheduler_Controller extends Controller
 		if (date('H:i', $this->t) == '00:' . self::AM_FORMER_MEMBER)
 		{
 			$member_model = new Member_Model();
+			$variable_symbol_model = new Variable_Symbol_Model();
 			
 			try
 			{
@@ -916,6 +917,9 @@ class Scheduler_Controller extends Controller
 						foreach ($today_former_members as $m)
 						{
 							$mids[] = $m->member_id;
+							//delete var symbol
+							$var_sym_id = $variable_symbol_model->get_variable_symbol_id_member($m ->member_id);
+							$variable_symbol_model->delete_variable_symbol($var_sym_id);
 						}
 						// delete
 						$member_model->delete_members_devices($mids);

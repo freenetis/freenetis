@@ -4102,12 +4102,15 @@ class Members_Controller extends Controller
 				{
 					$member->type = Member_Model::TYPE_FORMER;
 					$member->locked = 1; // lock account
+				}
+
 				//get variable symbol id
 
-				$var_sym_id = $variable_symbol_model->get_variable_symbol_id_member($member->id);
-				$variable_symbol_model->delete_variable_symbol($var_sym_id);
-
-				}
+				$var_sym_id = $variable_symbol_model->get_id_variable_symbol_id_member($member->id);
+				$var_sym = $variable_symbol_model->get_variable_symbol_id_member($member->id);
+				$var_sym = "$var_sym+U";
+				$variable_symbol_model->update_variable_symbol($var_sym, $var_sym_id);
+				
 				
 				$member->save_throwable();
 				
@@ -4303,8 +4306,11 @@ class Members_Controller extends Controller
 				->rules('required')
 				->options(array
 				(
-					'pdf'	=>	'PDF '.__('document'),
-					'html'	=>	'HTML'
+					'p-pdf'	=>	'Prihlaska PDF '.__('document'),
+					'p-html'=>	'Prihlaska HTML',
+					'o-pdf' =>      'Ukonční PDF '.__('document'),
+                                        'o-html'=>      'Ukončení HTML'
+
 				));
 		
 		$form->submit('Export');
@@ -4316,16 +4322,28 @@ class Members_Controller extends Controller
 
 			switch ($form_data["format"])
 			{
-				case 'html':
+				case 'p-html':
 					// do html export
 					die($this->registration_html_export($member_id));
 					break;
 
-				case 'pdf':
+				case 'p-pdf':
 					// do pdf export
 					$this->registration_pdf_export($member_id);
 					die();
 					break;
+
+				case 'o-html':
+                                        // do html export
+                                        die($this->end_html_export($member_id));
+                                        break;
+
+				case 'o-pdf':
+                                        // do pdf export
+                                        $this->end_pdf_export($member_id);
+                                        die();
+                                        break;
+
 			}
 		}
 
@@ -4443,7 +4461,7 @@ class Members_Controller extends Controller
 			$page .= '<tr><td>' . __('Account number').':</td>';
 			$page .= '<td><b>' . $a_bank_account_number. '</b></td></tr>';
 		}
-		
+
 		$page .= '<tr><td colspan="2"><b>' . $a_member->address_point->street->street.' '.
 				$a_member->address_point->street_number. '</b></td></tr>';
 		$page .= '<tr><td colspan="2"><b>' . $a_member->address_point->town->zip_code .' '.
@@ -4629,6 +4647,291 @@ class Members_Controller extends Controller
 		return $page;
 	}
 
+private function end_html_export($member_id, $page_width = '18cm')
+    {
+	$member = new Member_Model($member_id);
+
+	// record doesn't exist
+	if ($member->id == 0)
+	    throw new Exception('Invalid member ID');
+	
+	// html head
+	$page = "<html>";
+	$page .= "<head>";
+	$page .= "<title>".__('Export of end').' - '.$member->name."</title>";
+	$page .= "</head>";
+	$page .= '<body style="font-size:14px">';
+	
+	// -------------------- LOGO -------------------------------
+	
+	$logo = Settings::get('registration_logo');
+	$page .= '<div style="width:' . $page_width . '">';
+	
+	if (file_exists($logo))
+	{
+	    $page .= '<div style="float:left; width: 50%">'.
+		    '<img src="'.url_lang::base().'export/logo" width=274 height=101>'.
+		    '</div>';
+	}
+	else	//if logo doesn't exist, insert only blank div
+	{
+	    $page .= '<div style="float:left; width: 50%" width=274 height=101></div>';
+	}
+	
+	// --------------- INFO ABOUT ASSOCIATION -----------------
+	
+	$page .= '<div style="float:right; position: relative; width: 47%">';
+	$page .= '<table style="float:right;">';
+	$a_member = new Member_Model(Member_Model::ASSOCIATION);
+	
+	if (Settings::get('finance_enabled'))
+	{
+	    $ba_model = new Bank_account_Model();
+	    $a_bank_account_number = NULL;
+
+	    if (Settings::get('export_header_bank_account'))
+	    {
+		$ba_model->find(Settings::get('export_header_bank_account'));
+	    }
+
+	    // not set in settings
+	    if (!$ba_model->id)
+	    {
+		$bank_accounts = $ba_model->get_assoc_bank_accounts();
+
+		if ($bank_accounts->count())
+		{
+		    $a_bank_account_number = $bank_accounts->current()->account_number;
+		}
+	    }
+	    else
+	    {
+		$a_bank_account_number = $ba_model->account_nr . '/' . $ba_model->bank_nr;
+	    }
+	}
+	
+	$page .= '<tr><td colspan="2"><b>' . $a_member->name . '</b></td></tr>';
+	
+	if (!empty($a_member->organization_identifier))
+	{
+	    $page .= '<tr><td>' . __('Organization identifier') . ':</td>
+		    <td><b>'.$a_member->organization_identifier. '</b></td></tr>';
+	}
+	
+	if (!empty($a_member->vat_organization_identifier))
+	{
+	    $page .= '<tr><td>' . __('VAT organization identifier') . ':</td>
+		    <td><b>'.$a_member->vat_organization_identifier. '</b></td></tr>';
+	}
+	
+	if (Settings::get('finance_enabled'))
+	{	
+	    $page .= '<tr><td>' . __('Account number').':</td>';
+	    $page .= '<td><b>' . $a_bank_account_number. '</b></td></tr>';
+	}
+	
+	$page .= '<tr><td colspan="2"><b>' . $a_member->address_point->street->street.' '.
+		$a_member->address_point->street_number. '</b></td></tr>';
+	$page .= '<tr><td colspan="2"><b>' . $a_member->address_point->town->zip_code .' '.
+		$a_member->address_point->town->town. '</b></td></tr>';
+	
+	$page .= '</table></div>'.
+		'<div style="clear:both;text-align:center;font-weight:bold;margin:0px;">';
+	
+	// --------------------- MAIN TITLE -------------------------
+	
+	$page .= '<p style="font-size:1.5em">'.__('Žádost o ukončení členství v PVfree.net, z. s.')
+	."</p>";
+	
+	// --------------------- INFO -------------------------
+	
+	//$page .= '<div style="text-align: left">'
+	//      . $this->settings->get('registration_info').'</div>';
+	
+	// ----------- TABLE WITH INFORMATION ABOUT MEMBER --------
+	
+	$member_name = $member->name;
+	
+	$street = $member->address_point->street->street.' '
+		.$member->address_point->street_number;
+	
+	$town = $member->address_point->town->town;
+	
+	if ($member->address_point->town->quarter != '') 
+	    $town .= '-'.$member->address_point->town->quarter;
+	
+	$zip_code = $member->address_point->town->zip_code;
+	
+	if (Settings::get('finance_enabled'))
+	{
+	    $account_model = new Account_Model();
+	    $account_id = $account_model->where('member_id',$member_id)->find()->id;
+	    
+	    $variable_symbol_model = new Variable_Symbol_Model();
+	
+	    $variable_symbols = array();
+	    $var_syms = $variable_symbol_model->find_account_variable_symbols($account_id);
+	
+	    foreach ($var_syms as $var_sym)
+	    {
+		$variable_symbols[] = $var_sym->variable_symbol;
+	    }	
+	}
+	
+	$entrance_date = date::pretty($member->entrance_date);
+
+	$user_model = new User_Model();
+	
+	$user = $user_model->where('member_id', $member_id)
+		->where('type', User_Model::MAIN_USER)
+		->find();
+	
+	$emails = $user->get_user_emails($user->id);
+	$email = '';
+	if ($emails && $emails->current())
+	{
+	    $email = $emails->current()->email;
+	}
+	$birthday = date::pretty($user->birthday);
+
+	$enum_type_model = new Enum_type_Model();
+	$types = $enum_type_model->get_values(Enum_type_Model::CONTACT_TYPE_ID);
+	$contact_model = new Contact_Model();
+	$contacts = $contact_model->find_all_users_contacts($user->id);
+	
+	$phones = array();
+	$arr_contacts = array();
+	
+	foreach ($contacts as $contact)
+	{
+	    if ($contact->type == Contact_Model::TYPE_PHONE)
+	    {
+	        $phones[] = $contact->value;
+	    }
+	    else if($contact->type == Contact_Model::TYPE_ICQ ||
+		    $contact->type == Contact_Model::TYPE_MSN ||
+		    $contact->type == Contact_Model::TYPE_JABBER ||
+		    $contact->type == Contact_Model::TYPE_SKYPE)
+	    {
+	        $arr_contacts[] = $types[$contact->type].': '.$contact->value;
+	    }
+	}
+	
+	$contact_info = implode('<br />', $arr_contacts);
+	
+	if (Settings::get('networks_enabled')) 
+	{
+	    $device_engineer_model = new Device_engineer_Model();
+	    $device_engineers = $device_engineer_model->get_engineers_of_user($user->id);
+	    $arr_engineers = array();
+
+	    foreach ($device_engineers as $device_engineer)
+	    {
+		$arr_engineers[] = $device_engineer->surname;
+	    }
+
+	    $engineers = (count($arr_engineers)) ? implode(', ',$arr_engineers) : $member->user->surname;
+
+	    $subnet = new Subnet_Model();
+	    $subnet = $subnet->get_subnet_of_user($user->id);
+	    $subnet_name = isset($subnet->name) ? $subnet->name : '';
+	}
+	
+	$tbl = '<table border="1" cellpadding="5" cellspacing="0" width="100%" style="font-size:14px;">';
+	$tbl .= "<tr>";
+	$tbl .= "	<td><b>". __('Name') .", ";
+	$tbl .= __('Surname') .",".__('Title') ."</b></td>";
+	$tbl .= "	<td align=\"center\">$member_name</td>";
+	$tbl .= "	<td><b>". __('ID of member') ."</b><br /> (";
+	$tbl .= __('according to freenetis') .")</td>";
+	$tbl .= "	<td align=\"center\"><b>$member_id</b></td>";
+	$tbl .= "</tr>";
+	$tbl .= "<tr>";
+	$tbl .= "	<td><b>". __('Address of connecting place');
+	$tbl .= "</b> (". __('Street') .", ";
+	$tbl .= __('Street number') .", ";
+	$tbl .=  __('Town') . ", " . __('ZIP code') .")</td>";
+	$tbl .= "	<td align=\"center\">$street<br />$town<br />$zip_code</td>";
+	$tbl .= "	<td><b>". __('Email') ."</b></td>";
+	$tbl .= "	<td align=\"center\">$email</td>";
+	$tbl .= "</tr>";
+	$tbl .= "<tr>";
+	$tbl .= "	<td><b>". __('Birthday') ."</b></td>";
+	$tbl .= "	<td align=\"center\">$birthday</td>";
+	$tbl .= "	<td><b>". __('Phone') ."<b/></td>";
+	$tbl .= "	<td align=\"center\">".implode("<br />", $phones)."</td>";
+	$tbl .= "</tr>";
+	$tbl .= "<tr>";
+	if (Settings::get('finance_enabled'))
+	{
+	    $tbl .= "	<td><b>".__('Variable symbol') ."</b></td>";
+	    $tbl .= "	<td align=\"center\">".implode("<br />", $variable_symbols)."</td>";
+	}
+	else
+	    $tbl .= "	<td></td><td></td>";
+	$tbl .= "	<td><b>".__('Kredit') ."</b></td>";
+	$tbl .= "	<td align=\"center\">$contact_info</td>";
+	$tbl .= "</tr>";
+/*	if (Settings::get('networks_enabled'))
+	{
+	    $tbl .= "<tr>";
+	    $tbl .= "	<td><b>".__('Subnet')."</b></td>";
+	    $tbl .= "	<td align=\"center\">$subnet_name</td>";
+	    $tbl .= "	<td><b>". __('Engineer') ."</b></td>";
+	    $tbl .= "	<td align=\"center\">$engineers</td>";
+	    $tbl .= "</tr>";
+	}
+*/
+	$tbl .= "<tr>";
+	$tbl .= "	<td><b>". __('Entrance date') ."</b></td>";
+	$tbl .= "	<td align=\"center\">$entrance_date</td>";
+	$tbl .= "	<td><b>". __('Datum ukončení') ."</b></td>";
+	$tbl .= "	<td align=\"center\">&nbsp;</td>";
+	$tbl .= "</tr>";
+	$tbl .= "</table>";
+	
+	$page .= $tbl;
+	$page .= '<br>';
+	$page .= '<br>';
+
+	$page .= '<br><p style="text-align:left">'
+              .__('Žádám o vrácení přeplatku na č.ú.:')
+              .' : ......................................../.............</p>';
+
+	
+
+
+/*	$page .= '<div style="text-align:left">';
+	$page .= $this->settings->get('registration_license');
+	$page .= "</div>";
+*/	
+	$page .= '<br><br><p style="text-align:left">'
+              .__('Datum')
+              .' :      '. date("d.m.Y") . '</p>';
+
+	$page .= '<br><br><p style="text-align:left">'
+	      .__(' Podpis')
+	      .' : ........................................</p>';
+	
+//	$page .= '<p style="margin-top: 50px; font-size:1.2em">'.
+//		__('Decision Counsil about adoption of member').'</p>';
+	
+//	$page .= '<p style="text-align:left">'.__('Member adopted on').
+//		':    .........................................</p>';
+	
+//	$page .= '<p style="text-align:left">'.__('Signature and stamp').
+//		':    .........................................</p>';
+	
+	$page .= "</div></div>";
+	$page .= "</body>";
+	$page .= "</html>";
+	
+	return $page;
+    }
+
+
+
+
 	/**
 	 * Function to export registration of member to pdf-format
 	 * 
@@ -4661,6 +4964,41 @@ class Members_Controller extends Controller
 		$mpdf->WriteHTML($html_logo_correct);
 		$mpdf->Output($filename, 'I');
 	}
+
+    /**
+     * Function to export registration of member to pdf-format
+     * 
+     * @author OndĹ™ej Fibich
+     * @param integer $member_id	id of member to export
+     */
+    private function end_pdf_export($member_id)
+    {
+	$member = new Member_Model($member_id);
+
+	// record doesn't exist
+	if ($member->id == 0)
+	    throw new Exception('Invalid member ID');
+	
+	// include pdf library
+	require_once(APPPATH.'vendors/vendor/autoload.php');
+	
+	// get HTML content
+	$html = $this->end_html_export($member_id);
+	// logo image change (cannot load image from export/logo)
+	$html_logo_correct = str_replace(
+		url_lang::base() . 'export/logo',
+		Settings::get('registration_logo'),
+		$html
+	);
+	
+	// transform it to PDF
+	$filename = url::title(__('Ukončení').'-'.$member->name).'.pdf';
+	$mpdf = new \Mpdf\Mpdf();
+	$mpdf->WriteHTML($html_logo_correct);
+	$mpdf->Output($filename, 'I');
+    }
+
+
 
 	/**
 	 * Checks if username already exists.

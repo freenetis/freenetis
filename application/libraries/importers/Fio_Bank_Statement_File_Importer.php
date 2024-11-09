@@ -45,20 +45,23 @@ abstract class Fio_Bank_Statement_File_Importer extends Bank_Statement_File_Impo
 				. $settings->api_token . '/' . $ltc . '/';
 
 		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
 		curl_setopt($ch, CURLOPT_URL, $url);
 		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 		$response = curl_exec($ch);
+		$response_error = curl_error($ch);
+		$response_http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 		curl_close($ch);
 
 		// done?
-		if ($response !== FALSE)
+		if ($response !== FALSE && $response_http_code < 300)
 		{
 			return TRUE;
 		}
 
 		// error in downloading
 		$m = __('Setting of the last downloaded transaction has failed');
-		throw new Exception($m . ' (' . $response . ')');
+		throw new Exception($m . ' (E' . $response_http_code . ' ' . $response_error . ')');
 	}
 
 	/**

@@ -51,7 +51,7 @@ class Fio_Bank_Account_Settings extends Bank_Account_Settings
 	 */
 	public function get_download_base_url()
 	{
-		return 'https://www.fio.cz/ib_api/rest/';
+		return 'https://fioapi.fio.cz/v1/rest/';
 	}
 	
 	/*

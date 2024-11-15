@@ -138,7 +138,7 @@ class Address_point_Model extends ORM
 		}
 		else
 		{
-			$where .= " AND (gps IS NULL OR gps = '')";
+			$where .= " AND (gps IS NULL OR gps LIKE '')";
 		}
 		
 		// query

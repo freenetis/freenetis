@@ -32,7 +32,7 @@ class Import_Controller extends Controller
 	private static $file_types = array
 	(
 		Bank_account_Model::TYPE_RAIFFEISENBANK         => 'XML Raiffeisenbank',
-		Bank_account_Model::TYPE_FIO			=> 'Fio CSV',
+		Bank_account_Model::TYPE_FIO			=> 'Fio API CSV',
 		Bank_account_Model::TYPE_UNICREDIT		=> 'Unicredit CSV'
 	);
 

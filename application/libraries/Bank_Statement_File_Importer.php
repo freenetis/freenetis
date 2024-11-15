@@ -579,18 +579,24 @@ abstract class Bank_Statement_File_Importer
 	protected function do_download(Bank_account_Model $bank_account,
 			Bank_Account_Settings $settings, $url)
 	{
-		$fd = @file_get_contents($url);
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+		$response = curl_exec($ch);
+		$response_error = curl_error($ch);
+		$response_http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		curl_close($ch);
 
-		if ($fd == FALSE)
+		if ($response == FALSE || $response_http_code >= 300)
 		{
-			$e = error_get_last();
 			$m = __('Cannot download statement from ') . ' "' . $url . '": '
-					. (isset($e['message']) ? $e['message'] : '');
+					. 'E' . $response_http_code . ' ' . $response_error;
 			$this->add_error($m);
 			return FALSE;
 		}
 
-		return $fd;
+		return $response;
 	}
 	
 	/**

@@ -102,19 +102,20 @@ class Log_Model extends ORM
 	{
 		// get all old partitions
 		$partitions = $this->db->query("
-			SELECT partition_name FROM
-			(
-				SELECT DISTINCT CONCAT('p_', DATE_FORMAT(time, '%Y_%m_%d')) AS partition_name
-				FROM logs l
-				WHERE DATE_SUB(NOW(), INTERVAL 31 DAY) > time
-			) p GROUP BY partition_name
-		");
+			SELECT PARTITION_NAME
+			FROM INFORMATION_SCHEMA.PARTITIONS
+			WHERE TABLE_NAME = ? and 
+			  TABLE_SCHEMA = ? and
+				PARTITION_NAME <> 'p_first' AND
+				PARTITION_NAME < CONCAT('p_', 
+					DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 31 DAY), '%Y_%m_%d'));
+		", 'logs', Config::get('db_name'));
 		
 		foreach ($partitions as $partition)
 		{
 			$this->db->query("
 				ALTER TABLE logs
-				DROP PARTITION " . $partition->partition_name
+				DROP PARTITION " . $partition->PARTITION_NAME
 			);
 		}
 	}

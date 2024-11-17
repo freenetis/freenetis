@@ -12,8 +12,7 @@
  */
 
 require dirname(__FILE__) . '/Fio_Bank_Statement_File_Importer.php';
-require dirname(__FILE__) . '/Fio/FioParser.php';
-require dirname(__FILE__) . '/Fio/NewFioCsvParser.php';
+require dirname(__FILE__) . '/Fio/FioApiCsvParser.php';
 
 /**
  * FIO importer for statements in CSV format that are obtained from the FIO
@@ -34,13 +33,6 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
 	 */
 	private $data = NULL;
 
-    /**
-     * Indicates whether header is available or not.
-     *
-     * @var boolean
-     */
-    private $header_available = TRUE;
-
 	/*
 	 * @Override
 	 */
@@ -48,31 +40,22 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
 	{
 		// reset
 		$this->data = NULL;
-        $this->header_available = TRUE;
 		// parse (we have no function for checking)
 		try
 		{
-            $parser_new = new NewFioCsvParser;
-            if ($parser_new->accept_file($this->get_file_data()))
-            {
-                $this->header_available = FALSE;
-                $this->data = $parser_new->parse($this->get_file_data());
+						$parser_api = new FioApiCsvParser;
+            if ($parser_api->accept_file($this->get_file_data()))
+						{
+                $this->data = $parser_api->parse($this->get_file_data());
                 // correct data
-                foreach ($this->data as &$row)
+                foreach ($this->data['items'] as &$row)
                 {
                     $this->correct_new_listing_row($row);
                 }
-            }
-            // old parser
+						}
             else
             {
-                $this->set_file_data(iconv('cp1250', 'UTF-8', $this->get_file_data()));
-                $this->data = FioParser::parseCSV($this->get_file_data());
-                // correct data
-                foreach ($this->data as &$row)
-                {
-                    $this->correct_old_listing_row($row);
-                }
+                return FALSE;
             }
 
 			// ok
@@ -145,21 +128,16 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
 	{
 		if (empty($this->data))
 			throw new InvalidArgumentException('Check CSV first');
+		
+		$fio_ph = $this->data['header'];
+		
+		$hd = new Header_Data($fio_ph['accountId'], $fio_ph['bankId']);
 
-        if (!$this->header_available)
-        {
-            return NULL;
-        }
-
-		$fio_ph = FioParser::getListingHeader();
-
-		$hd = new Header_Data($fio_ph['account_nr'], $fio_ph['bank_nr']);
-
-		$hd->currency = 'CZK';
-		$hd->openingBalance = $fio_ph['opening_balance'];
-		$hd->closingBalance = $fio_ph['closing_balance'];
-		$hd->dateStart = $fio_ph['from'];
-		$hd->dateEnd = $fio_ph['to'];
+		$hd->currency = $fio_ph['currency'];
+		$hd->openingBalance = $fio_ph['openingBalance'];
+		$hd->closingBalance = $fio_ph['closingBalance'];
+		$hd->dateStart = $fio_ph['dateStart'];
+		$hd->dateEnd = $fio_ph['dateEnd'];
 
 		return $hd;
 	}
@@ -178,7 +156,7 @@ class Csv_Fio_Bank_Statement_File_Importer extends Fio_Bank_Statement_File_Impor
 	 */
 	protected function get_parsed_transactions()
 	{
-		return $this->data;
+		return $this->data['items'];
 	}
 
 }

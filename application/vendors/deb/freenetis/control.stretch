@@ -2,7 +2,7 @@ Priority: optional
 Section: web
 Pre-Depends: debconf (>= 0.5) | debconf-2.0
 Depends: coreutils (>= 6.10-6), wget (>= 1.11-4.1), grep (>= 2.5.3), apache2, php, php-curl, libapache2-mod-php, php-mysql, mysql-client, php-mcrypt, php-mbstring, php-gd, php-snmp, php-imap, cron | anacron | cron-daemon, locales
-Suggests: mysql-server (>= 5.0.0), mysql-client
+Suggests: mysql-server (>= 5.0.0)
 Architecture: all
 Maintainer: Ondrej Fibich <ondrej.fibich@gmail.com>
 Homepage: http://www.freenetis.org

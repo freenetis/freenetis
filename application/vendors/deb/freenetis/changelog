@@ -1,3 +1,11 @@
+freenetis (1.1.27) stable; urgency=low
+  * New CSV API FIO parser.
+  * FIO API - new URL support.
+  * Improve error message and status check for bank statement imports downloaded
+    from a HTTP service.
+  * Fix removal of active logs if no record is present for a day.
+-- Ondrej Fibich <ondrej.fibich@gmail.com>  Mon, 18 Nov 2024 08:04:21 +0100
+
 freenetis (1.1.26) stable; urgency=low
   * Support for import of Raiffeisenbank XML statement
   * Support Debian Buster
